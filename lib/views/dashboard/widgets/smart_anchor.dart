@@ -148,10 +148,7 @@ class _PathPainter extends CustomPainter {
     bool bold = false,
   }) {
     final painter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: bold ? labelStyleBold : labelStyle,
-      ),
+      text: TextSpan(text: text, style: bold ? labelStyleBold : labelStyle),
       textDirection: TextDirection.ltr,
     )..layout();
     canvas.drawRect(
@@ -576,14 +573,12 @@ class _SmartAnchorPathCardState extends ConsumerState<SmartAnchorPathCard> {
                     bracketColor: context.colorScheme.primary,
                     backgroundColor: context.colorScheme.surfaceContainerLow,
                     anchorTitle: appLocalizations.smartAnchorPathAnchor,
-                    labelStyle: AppTextStyle.footnote.of(context).copyWith(
-                      color: context.colorScheme.onSurfaceVariant,
-                    ),
+                    labelStyle: AppTextStyle.footnote
+                        .of(context)
+                        .copyWith(color: context.colorScheme.onSurfaceVariant),
                     labelStyleBold: AppTextStyle.footnote
                         .of(context, emphasized: true)
-                        .copyWith(
-                          color: context.colorScheme.onSurfaceVariant,
-                        ),
+                        .copyWith(color: context.colorScheme.onSurfaceVariant),
                   ),
                 ),
               ),
