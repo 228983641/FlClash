@@ -36,6 +36,13 @@ void main() {
     );
   });
 
+  test('snapshot round-trips the aggregation switch', () {
+    const snapshot = SmartAnchorSnapshot(aggregationEnabled: true);
+    final restored = SmartAnchorSnapshot.fromJson(snapshot.toJson());
+    expect(restored.aggregationEnabled, isTrue);
+    expect(SmartAnchorSnapshot.fromJson({}).aggregationEnabled, isFalse);
+  });
+
   test('missing or unknown aggregation fields fall back to defaults', () {
     final missing = SmartAnchorSnapshot.fromJson({});
     expect(missing.aggregationMode, AggregationGroupMode.primaryOnly);

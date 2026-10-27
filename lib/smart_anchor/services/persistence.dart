@@ -78,6 +78,7 @@ class SmartAnchorSnapshot {
     this.sharedLockGroupIds = const [],
     this.autoFailoverEnabled = true,
     this.paths = const {},
+    this.aggregationEnabled = false,
     this.aggregationMode = AggregationGroupMode.primaryOnly,
     this.aggregationSources = const [],
     this.switchEvents = const {},
@@ -90,6 +91,7 @@ class SmartAnchorSnapshot {
   final List<String> sharedLockGroupIds;
   final bool autoFailoverEnabled;
   final Map<String, List<AnchorPathPoint>> paths;
+  final bool aggregationEnabled;
   final AggregationGroupMode aggregationMode;
   final List<AggregationSourceInput> aggregationSources;
   final Map<String, List<SwitchEvent>> switchEvents;
@@ -117,6 +119,7 @@ class SmartAnchorSnapshot {
         for (final entry in paths.entries)
           entry.key: [for (final point in entry.value) point.toJson()],
       },
+      'aggregationEnabled': aggregationEnabled,
       'aggregationMode': aggregationMode.name,
       'aggregationSources': [
         for (final source in aggregationSources)
@@ -239,6 +242,7 @@ class SmartAnchorSnapshot {
           : const [],
       autoFailoverEnabled: json['autoFailoverEnabled'] as bool? ?? true,
       paths: paths,
+      aggregationEnabled: json['aggregationEnabled'] as bool? ?? false,
       aggregationMode: mode,
       aggregationSources: sources,
       switchEvents: switchEvents,
@@ -282,6 +286,8 @@ class SmartAnchorStore {
   static const sharedGroupsKey = 'config:sharedGroups';
 
   static const autoFailoverKey = 'config:autoFailover';
+
+  static const aggregationEnabledKey = 'config:aggregationEnabled';
 
   static const aggregationModeKey = 'config:aggregationMode';
 
@@ -355,6 +361,16 @@ class SmartAnchorStore {
           }
         }
       }
+    }
+    var aggregationEnabled = false;
+    final enabledRaw = all[aggregationEnabledKey];
+    if (enabledRaw != null) {
+      final decoded = json.decode(enabledRaw);
+      if (decoded is bool) {
+        aggregationEnabled = decoded;
+      }
+    } else if (aggregationSources.isNotEmpty) {
+      aggregationEnabled = true;
     }
     final sharedRaw = all[sharedGroupsKey];
     final sharedIds = <String>[];
@@ -435,6 +451,7 @@ class SmartAnchorStore {
       sharedLockGroupIds: sharedIds,
       autoFailoverEnabled: autoFailoverEnabled,
       paths: paths,
+      aggregationEnabled: aggregationEnabled,
       aggregationMode: aggregationMode,
       aggregationSources: aggregationSources,
       switchEvents: switchEvents,
@@ -448,6 +465,7 @@ class SmartAnchorStore {
     ]);
     fresh[sharedGroupsKey] = json.encode(input.sharedLockGroupIds);
     fresh[autoFailoverKey] = json.encode(input.autoFailoverEnabled);
+    fresh[aggregationEnabledKey] = json.encode(input.aggregationEnabled);
     fresh[aggregationModeKey] = json.encode(input.aggregationMode.name);
     if (input.aggregationSources.isNotEmpty) {
       fresh[aggregationSourcesKey] = json.encode([

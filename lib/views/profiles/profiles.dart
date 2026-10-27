@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'add.dart';
 import 'edit.dart';
 import 'preview.dart';
+import '../smart_anchor_aggregation.dart';
 
 const _infoGap = 4.0;
 
@@ -136,6 +137,7 @@ class _ProfilesViewState extends ConsumerState<ProfilesView> {
               currentProfileId: state.currentProfileId,
               spacing: spacing,
               revealsSelected: !picker,
+              showAggregation: !picker,
             ),
           ),
         );
@@ -150,12 +152,14 @@ class _ProfilesGrid extends ConsumerStatefulWidget {
     required this.currentProfileId,
     required this.spacing,
     required this.revealsSelected,
+    this.showAggregation = false,
   });
 
   final List<Profile> profiles;
   final int? currentProfileId;
   final double spacing;
   final bool revealsSelected;
+  final bool showAggregation;
 
   @override
   ConsumerState<_ProfilesGrid> createState() => _ProfilesGridState();
@@ -235,7 +239,7 @@ class _ProfilesGridState extends ConsumerState<_ProfilesGrid> {
   @override
   Widget build(BuildContext context) {
     final profiles = widget.profiles;
-    return WidthBuilder(
+    final grid = WidthBuilder(
       builder: (_, width) {
         return GridView.builder(
           key: profilesStoreKey,
@@ -261,6 +265,18 @@ class _ProfilesGridState extends ConsumerState<_ProfilesGrid> {
           },
         );
       },
+    );
+    if (!widget.showAggregation) {
+      return grid;
+    }
+    return Column(
+      children: [
+        Padding(
+          padding: EdgeInsets.only(top: context.contentTopPadding),
+          child: const SmartAnchorAggregationCard(),
+        ),
+        Expanded(child: grid),
+      ],
     );
   }
 }

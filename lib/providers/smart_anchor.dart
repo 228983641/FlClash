@@ -60,6 +60,7 @@ class SmartAnchor extends _$SmartAnchor {
       sharedLockGroupIds: snapshot.sharedLockGroupIds,
       autoFailoverEnabled: snapshot.autoFailoverEnabled,
       paths: snapshot.paths,
+      aggregationEnabled: snapshot.aggregationEnabled,
       aggregationMode: snapshot.aggregationMode,
       aggregationSources: snapshot.aggregationSources,
       switchEvents: snapshot.switchEvents,
@@ -67,6 +68,9 @@ class SmartAnchor extends _$SmartAnchor {
   }
 
   Future<SmartAnchorInput> refreshAggregationSources() async {
+    if (!state.aggregationEnabled) {
+      return state;
+    }
     final stubs = [
       for (final source in state.aggregationSources)
         if (source.config.isEmpty) source,
@@ -252,6 +256,10 @@ class SmartAnchor extends _$SmartAnchor {
 
   void setAggregationMode(AggregationGroupMode mode) {
     update(state.copyWith(aggregationMode: mode));
+  }
+
+  void setAggregationEnabled(bool enabled) {
+    update(state.copyWith(aggregationEnabled: enabled));
   }
 
   void setAggregationSource({

@@ -1,5 +1,4 @@
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
@@ -12,7 +11,6 @@ import 'package:fl_clash/smart_anchor/services/cloudflare_trace.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:fl_clash/smart_anchor/services/scoring_engine.dart';
 import 'package:fl_clash/smart_anchor/services/service_status.dart';
-import 'package:fl_clash/smart_anchor/services/subscription_merger.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,11 +19,6 @@ const _lockCountries = ['US', 'SG', 'JP', 'HK', 'KR', 'TW', 'DE', 'GB', 'NL'];
 
 String _lockSummary(List<String> lockedCountries, String noneLabel) {
   return lockedCountries.isEmpty ? noneLabel : lockedCountries.join(', ');
-}
-
-String _profileHost(String url) {
-  final host = Uri.tryParse(url)?.host ?? '';
-  return host.isEmpty ? url : host;
 }
 
 String _countryName(AppLocalizations appLocalizations, String code) {
@@ -88,8 +81,6 @@ class SmartAnchorSettingsView extends ConsumerWidget {
         }
       }
     }
-    final profiles = ref.watch(profilesProvider);
-    final currentProfileId = ref.watch(currentProfileProvider)?.id;
     return CommonScaffold(
       title: appLocalizations.smartAnchor,
       body: ListView(
@@ -118,22 +109,60 @@ class SmartAnchorSettingsView extends ConsumerWidget {
                   title: Text(service.displayName),
                   subtitle: Text(
                     service.isEnabled
-                        ? '${appLocalizations.countryLock}: '
-                              '${_lockSummary(service.lockedCountries, appLocalizations.countryLockNone)}'
-                              '${input.anchors[service.serviceId] == null ? '' : ' · ${input.anchors[service.serviceId]!.city.isEmpty ? input.anchors[service.serviceId]!.countryCode : input.anchors[service.serviceId]!.city}'}'
-                              '${serviceHasNoUsableNodes(input, service, proxyNames) ? ' · ${appLocalizations.smartAnchorNoUsableNodes}' : ''}'
+                        ? [
+                            if (input.anchors[service.serviceId] != null)
+                              input.anchors[service.serviceId]!.city.isEmpty
+                                  ? input
+                                        .anchors[service.serviceId]!
+                                        .countryCode
+                                  : input.anchors[service.serviceId]!.city,
+                            if (serviceHasNoUsableNodes(
+                              input,
+                              service,
+                              proxyNames,
+                            ))
+                              appLocalizations.smartAnchorNoUsableNodes,
+                          ].join(' · ')
                         : appLocalizations.turnOff,
                   ),
-                  trailing: CommonSwitch(
-                    value: service.isEnabled,
-                    onChanged: (value) {
-                      ref
-                          .read(smartAnchorProvider.notifier)
-                          .updateService(service.serviceId, isEnabled: value);
-                      ref
-                          .read(setupActionProvider.notifier)
-                          .applyProfileDebounce(silence: true);
-                    },
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TonalButton(
+                        size: TonalButtonSize.compact,
+                        label: _lockSummary(
+                          service.lockedCountries,
+                          appLocalizations.countryLockNone,
+                        ),
+                        onPressed: service.isEnabled
+                            ? () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        SmartAnchorCountryPickerView(
+                                          serviceId: service.serviceId,
+                                        ),
+                                  ),
+                                );
+                              }
+                            : null,
+                      ),
+                      const SizedBox(width: 8),
+                      CommonSwitch(
+                        value: service.isEnabled,
+                        onChanged: (value) {
+                          ref
+                              .read(smartAnchorProvider.notifier)
+                              .updateService(
+                                service.serviceId,
+                                isEnabled: value,
+                              );
+                          ref
+                              .read(setupActionProvider.notifier)
+                              .applyProfileDebounce(silence: true);
+                        },
+                      ),
+                    ],
                   ),
                   onPressed: () {
                     Navigator.of(context).push(
@@ -200,146 +229,9 @@ class SmartAnchorSettingsView extends ConsumerWidget {
                       },
                     ),
                   ),
-                if (group.serviceIds.length == 1 ||
-                    input.sharedLockGroupIds.contains(group.id))
-                  ListItem.open(
-                    title: Text(
-                      '${group.displayName} ${appLocalizations.countryLock}',
-                    ),
-                    subtitle: Text(
-                      _lockSummary(
-                        services
-                            .firstWhere(
-                              (service) =>
-                                  service.serviceId == group.serviceIds.first,
-                            )
-                            .lockedCountries,
-                        appLocalizations.countryLockNone,
-                      ),
-                    ),
-                    widget: SmartAnchorCountryPickerView(
-                      serviceId: group.serviceIds.first,
-                    ),
-                  ),
-                if (group.serviceIds.length > 1 &&
-                    !input.sharedLockGroupIds.contains(group.id))
-                  for (final memberId in group.serviceIds)
-                    ListItem.open(
-                      title: Text(
-                        '${services.firstWhere((service) => service.serviceId == memberId).displayName} ${appLocalizations.countryLock}',
-                      ),
-                      subtitle: Text(
-                        _lockSummary(
-                          services
-                              .firstWhere(
-                                (service) => service.serviceId == memberId,
-                              )
-                              .lockedCountries,
-                          appLocalizations.countryLockNone,
-                        ),
-                      ),
-                      widget: SmartAnchorCountryPickerView(serviceId: memberId),
-                    ),
               ],
-              for (final service in services)
-                if (groupForService(service.serviceId) == null)
-                  ListItem.open(
-                    title: Text(
-                      '${service.displayName} ${appLocalizations.countryLock}',
-                    ),
-                    subtitle: Text(
-                      _lockSummary(
-                        service.lockedCountries,
-                        appLocalizations.countryLockNone,
-                      ),
-                    ),
-                    widget: SmartAnchorCountryPickerView(
-                      serviceId: service.serviceId,
-                    ),
-                  ),
             ],
             footer: appLocalizations.smartAnchorLockDesc,
-          ),
-          generateSection(
-            title: appLocalizations.subscriptionAggregation,
-            items: [
-              if (ref.watch(currentProfileProvider) case final current?)
-                DecorationListItem(
-                  title: Text(
-                    '${appLocalizations.smartAnchorPrimarySubscription}: '
-                    '${current.label.isEmpty ? _profileHost(current.url) : current.label}',
-                  ),
-                ),
-              for (final profile in profiles)
-                if (profile.id != currentProfileId &&
-                    profile.type != ProfileType.custom)
-                  DecorationListItem(
-                    title: Text(
-                      profile.label.isEmpty
-                          ? _profileHost(profile.url)
-                          : profile.label,
-                    ),
-                    trailing: CommonSwitch(
-                      value: input.aggregationSources.any(
-                        (source) => source.sourceId == 'profile:${profile.id}',
-                      ),
-                      onChanged: (value) async {
-                        if (!value) {
-                          ref
-                              .read(smartAnchorProvider.notifier)
-                              .setAggregationSource(
-                                sourceId: 'profile:${profile.id}',
-                                sourceLabel: profile.label.isEmpty
-                                    ? _profileHost(profile.url)
-                                    : profile.label,
-                                config: const {},
-                                enabled: false,
-                              );
-                        } else {
-                          try {
-                            final config = await ref
-                                .read(coreHandlerProvider)
-                                .getConfig(profile.id);
-                            ref
-                                .read(smartAnchorProvider.notifier)
-                                .setAggregationSource(
-                                  sourceId: 'profile:${profile.id}',
-                                  sourceLabel: profile.label.isEmpty
-                                      ? _profileHost(profile.url)
-                                      : profile.label,
-                                  config: config,
-                                  enabled: true,
-                                );
-                          } catch (_) {
-                            dialogs.showNotifier(
-                              appLocalizations.smartAnchorAggregationLoadFailed,
-                              level: MessageLevel.error,
-                            );
-                            return;
-                          }
-                        }
-                        ref
-                            .read(setupActionProvider.notifier)
-                            .applyProfileDebounce(silence: true);
-                      },
-                    ),
-                  ),
-              ListItem<AggregationGroupMode>.options(
-                title: Text(appLocalizations.aggregationMode),
-                options: AggregationGroupMode.values,
-                textBuilder: (mode) => mode == AggregationGroupMode.primaryOnly
-                    ? appLocalizations.aggregationPrimaryOnly
-                    : appLocalizations.aggregationMergeAll,
-                value: input.aggregationMode,
-                onChanged: (mode) {
-                  ref
-                      .read(smartAnchorProvider.notifier)
-                      .setAggregationMode(mode);
-                },
-              ),
-            ],
-            footer:
-                '${appLocalizations.smartAnchorAggregationDesc}\n${input.aggregationMode == AggregationGroupMode.primaryOnly ? appLocalizations.aggregationPrimaryOnlyDesc : appLocalizations.aggregationMergeAllDesc}',
           ),
           generateSection(
             title: appLocalizations.smartAnchorDiagnostics,

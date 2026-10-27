@@ -27,6 +27,7 @@ class SmartAnchorInput {
     this.anchors = const {},
     this.metadataByProxy = const {},
     this.accessByService = const {},
+    this.aggregationEnabled = false,
     this.aggregationSources = const [],
     this.aggregationMode = AggregationGroupMode.primaryOnly,
     this.sharedLockGroupIds = const [],
@@ -39,6 +40,7 @@ class SmartAnchorInput {
   final Map<String, ServiceAnchor> anchors;
   final Map<String, NodeMetadataCache> metadataByProxy;
   final Map<String, Map<String, ServiceAccessResult>> accessByService;
+  final bool aggregationEnabled;
   final List<AggregationSourceInput> aggregationSources;
   final AggregationGroupMode aggregationMode;
   final List<String> sharedLockGroupIds;
@@ -48,7 +50,7 @@ class SmartAnchorInput {
 
   bool get hasWork {
     return services.any((service) => service.isEnabled) ||
-        aggregationSources.isNotEmpty;
+        (aggregationEnabled && aggregationSources.isNotEmpty);
   }
 
   SmartAnchorInput copyWith({
@@ -56,6 +58,7 @@ class SmartAnchorInput {
     Map<String, ServiceAnchor>? anchors,
     Map<String, NodeMetadataCache>? metadataByProxy,
     Map<String, Map<String, ServiceAccessResult>>? accessByService,
+    bool? aggregationEnabled,
     List<AggregationSourceInput>? aggregationSources,
     AggregationGroupMode? aggregationMode,
     List<String>? sharedLockGroupIds,
@@ -68,6 +71,7 @@ class SmartAnchorInput {
       anchors: anchors ?? this.anchors,
       metadataByProxy: metadataByProxy ?? this.metadataByProxy,
       accessByService: accessByService ?? this.accessByService,
+      aggregationEnabled: aggregationEnabled ?? this.aggregationEnabled,
       aggregationSources: aggregationSources ?? this.aggregationSources,
       aggregationMode: aggregationMode ?? this.aggregationMode,
       sharedLockGroupIds: sharedLockGroupIds ?? this.sharedLockGroupIds,
@@ -98,7 +102,7 @@ Map<String, dynamic> buildSmartConfig(
   }
   var config = Map<String, dynamic>.from(rawConfig);
   var effectiveInput = input;
-  if (input.aggregationSources.isNotEmpty) {
+  if (input.aggregationEnabled && input.aggregationSources.isNotEmpty) {
     config = _applyAggregation(config, input);
     effectiveInput = _remapInputForMergedConfig(input, _proxyNames(config));
     _orderUnifiedGroup(config, effectiveInput);

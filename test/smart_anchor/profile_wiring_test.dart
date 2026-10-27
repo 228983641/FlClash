@@ -112,6 +112,7 @@ void main() {
       baseConfig(),
       SmartAnchorInput(
         services: [claude.copyWith(isEnabled: false)],
+        aggregationEnabled: true,
         aggregationSources: [
           const AggregationSourceInput(
             sourceId: 'extra',
@@ -138,6 +139,7 @@ void main() {
       baseConfig(),
       SmartAnchorInput(
         services: [claude.copyWith(isEnabled: false)],
+        aggregationEnabled: true,
         metadataByProxy: {
           'US-far': meta('US-far', 40.7128, -74.0060, 70),
           'US-near': meta('US-near', 34.0522, -118.2437, 90),
@@ -169,12 +171,40 @@ void main() {
     ]);
   });
 
+  test('disabled aggregation leaves the config unmerged', () {
+    final result = buildSmartConfig(
+      baseConfig(),
+      SmartAnchorInput(
+        services: [claude.copyWith(isEnabled: false)],
+        aggregationEnabled: false,
+        aggregationSources: [
+          const AggregationSourceInput(
+            sourceId: 'extra',
+            sourceLabel: 'B',
+            config: {
+              'proxies': [
+                {'name': 'B-01', 'type': 'vless', 'server': 'e.example'},
+              ],
+              'proxy-groups': [],
+              'rules': [],
+            },
+          ),
+        ],
+      ),
+    );
+    final proxies = result['proxies'] as List;
+    expect(proxies.length, 4);
+    final groups = result['proxy-groups'] as List;
+    expect(groups.any((group) => group['name'] == '🔗 聚合全部节点'), isFalse);
+  });
+
   test('smart ranking survives aggregation renames', () {
     final now = DateTime.now().millisecondsSinceEpoch;
     final result = buildSmartConfig(
       baseConfig(),
       SmartAnchorInput(
         services: [claude],
+        aggregationEnabled: true,
         anchors: {'claude': anchor},
         metadataByProxy: {
           'US-near': meta('US-near', 34.0522, -118.2437, 90),
