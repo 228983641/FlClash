@@ -1029,5 +1029,7 @@
   "smartAnchorTrustSafe": "放心",
   "smartAnchorTrustWatch": "留意",
   "smartAnchorTrustRisky": "高危",
-  "smartAnchorUnknown": "未知"
+  "smartAnchorUnknown": "未知",
+  "smartAnchorPathGlobe": "地球",
+  "smartAnchorGlobeHint": "拖动可旋转地球"
 }

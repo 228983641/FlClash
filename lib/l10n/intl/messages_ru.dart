@@ -1880,6 +1880,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorDiagnostics": MessageLookupByLibrary.simpleMessage(
       "Diagnostics",
     ),
+    "smartAnchorGlobeHint": MessageLookupByLibrary.simpleMessage(
+      "Drag to rotate the globe",
+    ),
     "smartAnchorInvalidCountryCode": MessageLookupByLibrary.simpleMessage(
       "Country codes must be 2 letters, e.g. US, JP.",
     ),
@@ -1914,6 +1917,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorPathFromAnchor": MessageLookupByLibrary.simpleMessage(
       "From anchor",
     ),
+    "smartAnchorPathGlobe": MessageLookupByLibrary.simpleMessage("Globe"),
     "smartAnchorPathManual": MessageLookupByLibrary.simpleMessage("Manual"),
     "smartAnchorPathStart": MessageLookupByLibrary.simpleMessage("Start"),
     "smartAnchorPathTapHint": MessageLookupByLibrary.simpleMessage(

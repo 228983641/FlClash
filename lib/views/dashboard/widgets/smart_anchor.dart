@@ -16,6 +16,7 @@ import 'package:fl_clash/smart_anchor/services/scoring_engine.dart';
 import 'package:fl_clash/smart_anchor/services/subscription_merger.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/views/smart_anchor.dart';
+import 'package:fl_clash/views/smart_anchor_globe.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -767,6 +768,34 @@ class _SmartAnchorPathCardState extends ConsumerState<SmartAnchorPathCard> {
                     ),
                     child: Text(appLocalizations.smartAnchorSetAnchor),
                   ),
+                FilledButton.tonal(
+                  onPressed: hasPoints
+                      ? () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => SmartAnchorGlobeView(
+                                title: selected.label,
+                                tracks: [
+                                  for (var i = 0; i < members.length; i++)
+                                    GlobeTrack(
+                                      label:
+                                          serviceById[selected.members[i]]
+                                              ?.displayName ??
+                                          selected.members[i],
+                                      color: members[i].color,
+                                      points: members[i].points,
+                                      anchorLat: members[i].anchor?.lat,
+                                      anchorLon: members[i].anchor?.lon,
+                                      anchorPlace: members[i].anchorPlace,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+                      : null,
+                  child: Text(appLocalizations.smartAnchorPathGlobe),
+                ),
                 FilledButton.tonal(
                   onPressed: hasPoints ? _exportDiagram : null,
                   child: Text(appLocalizations.smartAnchorPathExport),

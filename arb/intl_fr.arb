@@ -1029,5 +1029,7 @@
   "smartAnchorTrustSafe": "Safe",
   "smartAnchorTrustWatch": "Watch",
   "smartAnchorTrustRisky": "Risky",
-  "smartAnchorUnknown": "Unknown"
+  "smartAnchorUnknown": "Unknown",
+  "smartAnchorPathGlobe": "Globe",
+  "smartAnchorGlobeHint": "Drag to rotate the globe"
 }

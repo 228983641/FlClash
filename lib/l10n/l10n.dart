@@ -8707,6 +8707,26 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Globe`
+  String get smartAnchorPathGlobe {
+    return Intl.message(
+      'Globe',
+      name: 'smartAnchorPathGlobe',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Drag to rotate the globe`
+  String get smartAnchorGlobeHint {
+    return Intl.message(
+      'Drag to rotate the globe',
+      name: 'smartAnchorGlobeHint',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -1400,6 +1400,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "smartAnchorDesc": MessageLookupByLibrary.simpleMessage("业务锁国、锚点记忆与纯净度排序。"),
     "smartAnchorDiagnostics": MessageLookupByLibrary.simpleMessage("诊断"),
+    "smartAnchorGlobeHint": MessageLookupByLibrary.simpleMessage("拖动可旋转地球"),
     "smartAnchorInvalidCountryCode": MessageLookupByLibrary.simpleMessage(
       "国家代码须为 2 位字母，如 US、JP。",
     ),
@@ -1426,6 +1427,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "smartAnchorPathExport": MessageLookupByLibrary.simpleMessage("导出图片"),
     "smartAnchorPathFromAnchor": MessageLookupByLibrary.simpleMessage("距锚点"),
+    "smartAnchorPathGlobe": MessageLookupByLibrary.simpleMessage("地球"),
     "smartAnchorPathManual": MessageLookupByLibrary.simpleMessage("手动"),
     "smartAnchorPathStart": MessageLookupByLibrary.simpleMessage("开始"),
     "smartAnchorPathTapHint": MessageLookupByLibrary.simpleMessage(
