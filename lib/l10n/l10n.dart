@@ -8216,6 +8216,26 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Auto failover`
+  String get smartAnchorAutoFailover {
+    return Intl.message(
+      'Auto failover',
+      name: 'smartAnchorAutoFailover',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `When the node in use fails 2 consecutive probes, automatically switch to the next ranked node and never switch back. When off, a failing node is never switched away automatically.`
+  String get smartAnchorAutoFailoverDesc {
+    return Intl.message(
+      'When the node in use fails 2 consecutive probes, automatically switch to the next ranked node and never switch back. When off, a failing node is never switched away automatically.',
+      name: 'smartAnchorAutoFailoverDesc',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

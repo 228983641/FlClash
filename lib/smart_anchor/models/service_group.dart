@@ -37,6 +37,57 @@ const List<ServiceGroup> defaultServiceGroups = [
     serviceIds: ['netflix'],
   ),
   ServiceGroup(id: 'x-group', displayName: 'X', serviceIds: ['x']),
+  ServiceGroup(
+    id: 'copilot-group',
+    displayName: 'Microsoft Copilot',
+    serviceIds: ['copilot'],
+  ),
+  ServiceGroup(
+    id: 'meta-ai-group',
+    displayName: 'Meta AI',
+    serviceIds: ['meta-ai'],
+  ),
+  ServiceGroup(id: 'grok-group', displayName: 'Grok', serviceIds: ['grok']),
+  ServiceGroup(
+    id: 'perplexity-group',
+    displayName: 'Perplexity',
+    serviceIds: ['perplexity'],
+  ),
+  ServiceGroup(
+    id: 'mistral-group',
+    displayName: 'Mistral',
+    serviceIds: ['mistral'],
+  ),
+  ServiceGroup(id: 'poe-group', displayName: 'Poe', serviceIds: ['poe']),
+  ServiceGroup(
+    id: 'deepseek-group',
+    displayName: 'DeepSeek',
+    serviceIds: ['deepseek'],
+  ),
+  ServiceGroup(id: 'kimi-group', displayName: 'Kimi', serviceIds: ['kimi']),
+  ServiceGroup(
+    id: 'doubao-group',
+    displayName: 'Doubao',
+    serviceIds: ['doubao'],
+  ),
+  ServiceGroup(id: 'qwen-group', displayName: 'Qwen', serviceIds: ['qwen']),
+  ServiceGroup(id: 'glm-group', displayName: 'ChatGLM', serviceIds: ['glm']),
+  ServiceGroup(id: 'ernie-group', displayName: 'ERNIE', serviceIds: ['ernie']),
+  ServiceGroup(
+    id: 'yuanbao-group',
+    displayName: 'Yuanbao',
+    serviceIds: ['yuanbao'],
+  ),
+  ServiceGroup(
+    id: 'disney-group',
+    displayName: 'Disney+',
+    serviceIds: ['disney'],
+  ),
+  ServiceGroup(
+    id: 'appletv-group',
+    displayName: 'Apple TV+',
+    serviceIds: ['appletv'],
+  ),
 ];
 
 ServiceGroup? groupForService(String serviceId) {

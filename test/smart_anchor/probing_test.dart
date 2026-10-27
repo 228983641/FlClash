@@ -95,7 +95,9 @@ void main() {
     final prober = SmartAnchorProber(
       egressLookup: (_) async => null,
       serviceCheckLookup: (_, _) async {
-        return {ServiceTarget.claude: const ServiceCheck(ServiceProbeStatus.timeout)};
+        return {
+          ServiceTarget.claude: const ServiceCheck(ServiceProbeStatus.timeout),
+        };
       },
       geoLookup:
           ({required ip, required proxyName, required entryServer}) async =>

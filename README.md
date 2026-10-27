@@ -132,6 +132,8 @@
   toggles only; details live in settings).
 - [x] Service groups and multi-country lock: same-company services (Google, YouTube, Gemini) can share one set of locked countries and one anchor, toggled per group; locked countries are now a list per service group, synced across members while sharing is on.
 - [x] ip.net.coffee merge: Cloudflare edge info (colo/WARP/protocol) and official service status (Claude/OpenAI/Cloudflare) in diagnostics; DNS/WebRTC leaks stay device-level diagnostics, global Ping stays latency display only.
+- [x] Auto-failover switch and anti-bounce guard: auto-switching can be turned off; when on, a switch needs two consecutive failures of the node in use, never targets a region-blocked node, never follows a ranking change alone, a manual switch resets the failure count, and at most three switches happen per service in ten minutes before failover freezes in place. Lock or no lock, the rule is the same: a locked service only switches within its locked countries, an unlocked service switches by purity and anchor distance.
+- [x] More presets and user-editable services: Copilot, Meta AI, Grok, Perplexity, Mistral, Poe, DeepSeek, Kimi, Doubao, Qwen, ChatGLM, ERNIE, Yuanbao, Disney+ and Apple TV+ presets, all off by default; any preset or custom service can be edited from the services list (name, match rules, DNS domains, lock countries), and custom services can be added or deleted like scripts and subscriptions are edited.
 - [ ] After all features, a user-perspective review pass; Windows version later
   (Android first).
 

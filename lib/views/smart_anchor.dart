@@ -1,9 +1,11 @@
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/providers/smart_anchor.dart';
 import 'package:fl_clash/smart_anchor/models/service_group.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
+import 'package:fl_clash/views/smart_anchor_edit.dart';
 import 'package:fl_clash/smart_anchor/services/cloudflare_trace.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:fl_clash/smart_anchor/services/scoring_engine.dart';
@@ -24,8 +26,14 @@ List<ServiceToggleConfig> effectiveSmartServices(SmartAnchorInput input) {
     for (final service in defaultServiceToggles) service.serviceId: service,
     for (final service in input.services) service.serviceId: service,
   };
+  final defaultIds = {
+    for (final service in defaultServiceToggles) service.serviceId,
+  };
   return [
     for (final service in defaultServiceToggles) byId[service.serviceId]!,
+    for (final service in input.services)
+      if (!defaultIds.contains(service.serviceId))
+        byId[service.serviceId] ?? service,
   ];
 }
 
@@ -51,6 +59,18 @@ class SmartAnchorSettingsView extends ConsumerWidget {
           generateSection(
             title: appLocalizations.smartAnchorServices,
             items: [
+              DecorationListItem(
+                title: Text(appLocalizations.smartAnchorAutoFailover),
+                subtitle: Text(appLocalizations.smartAnchorAutoFailoverDesc),
+                trailing: CommonSwitch(
+                  value: input.autoFailoverEnabled,
+                  onChanged: (value) {
+                    ref
+                        .read(smartAnchorProvider.notifier)
+                        .setAutoFailover(value);
+                  },
+                ),
+              ),
               for (final service in services)
                 DecorationListItem(
                   title: Text(service.displayName),
@@ -71,7 +91,22 @@ class SmartAnchorSettingsView extends ConsumerWidget {
                           .applyProfileDebounce(silence: true);
                     },
                   ),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            SmartAnchorServiceEditView(service: service),
+                      ),
+                    );
+                  },
                 ),
+              ListItem.open(
+                leading: const GlyphIcon(AppGlyphs.add),
+                title: Text(
+                  '${appLocalizations.add} ${appLocalizations.smartAnchorServices}',
+                ),
+                widget: const SmartAnchorServiceEditView(),
+              ),
             ],
           ),
           generateSection(
@@ -145,6 +180,22 @@ class SmartAnchorSettingsView extends ConsumerWidget {
                         ),
                       ),
                       widget: SmartAnchorCountryPickerView(serviceId: memberId),
+                    ),
+                for (final service in services)
+                  if (groupForService(service.serviceId) == null)
+                    ListItem.open(
+                      title: Text(
+                        '${service.displayName} ${appLocalizations.countryLock}',
+                      ),
+                      subtitle: Text(
+                        _lockSummary(
+                          service.lockedCountries,
+                          appLocalizations.countryLockNone,
+                        ),
+                      ),
+                      widget: SmartAnchorCountryPickerView(
+                        serviceId: service.serviceId,
+                      ),
                     ),
               ],
             ],

@@ -1364,6 +1364,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorAggregationDesc": MessageLookupByLibrary.simpleMessage(
       "两种模式都会额外生成一个聚合全部节点统一组，DNS 两种模式都只用主订阅的。",
     ),
+    "smartAnchorAutoFailover": MessageLookupByLibrary.simpleMessage("自动切换"),
+    "smartAnchorAutoFailoverDesc": MessageLookupByLibrary.simpleMessage(
+      "在用节点连续 2 次探测失败时自动切到下一顺位，且不回切；关闭后故障节点不会自动切换。",
+    ),
     "smartAnchorDesc": MessageLookupByLibrary.simpleMessage("业务锁国、锚点记忆与纯净度排序。"),
     "smartAnchorDiagnostics": MessageLookupByLibrary.simpleMessage("诊断"),
     "smartAnchorLockDesc": MessageLookupByLibrary.simpleMessage(

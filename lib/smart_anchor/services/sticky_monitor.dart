@@ -1,3 +1,56 @@
+import 'service_access.dart';
+
+class FailoverGuard {
+  final Map<String, int> _failures = {};
+  final Map<String, String?> _lastCurrent = {};
+  final Map<String, List<int>> _switchTimes = {};
+
+  String? noteResult({
+    required String serviceId,
+    required String currentName,
+    required ServiceAccessReason? reason,
+    required List<String> ranked,
+    required Map<String, ServiceAccessResult> accessByProxy,
+    required int nowMs,
+  }) {
+    if (_lastCurrent[serviceId] != currentName) {
+      _failures[serviceId] = 0;
+      _lastCurrent[serviceId] = currentName;
+    }
+    if (reason == null ||
+        reason == ServiceAccessReason.accessible ||
+        reason == ServiceAccessReason.unknown ||
+        reason == ServiceAccessReason.serviceDown) {
+      _failures[serviceId] = 0;
+      return null;
+    }
+    final count = (_failures[serviceId] ?? 0) + 1;
+    _failures[serviceId] = count;
+    if (count < 2) {
+      return null;
+    }
+    _failures[serviceId] = 0;
+    final recent = (_switchTimes[serviceId] ?? [])
+        .where((time) => nowMs - time <= 10 * 60 * 1000)
+        .toList();
+    if (recent.length >= 3) {
+      _switchTimes[serviceId] = recent;
+      return null;
+    }
+    for (final name in ranked) {
+      if (name == currentName) {
+        continue;
+      }
+      if (accessByProxy[name]?.reason == ServiceAccessReason.regionBlocked) {
+        continue;
+      }
+      _switchTimes[serviceId] = [...recent, nowMs];
+      return name;
+    }
+    return null;
+  }
+}
+
 class StickyMonitor {
   StickyMonitor({required List<String> ranked, int initialIndex = 0})
     : _ranked = List<String>.of(ranked),

@@ -171,8 +171,51 @@ class ProxiesAction extends _$ProxiesAction {
       unawaited(
         ref
             .read(smartAnchorProvider.notifier)
-            .probeNodes(proxyNames: names.toList(), currentProxyName: current),
+            .probeNodes(proxyNames: names.toList(), currentProxyName: current)
+            .then((_) => smartAnchorFailoverCheck()),
       );
+    }
+  }
+
+  final FailoverGuard _failoverGuard = FailoverGuard();
+
+  void smartAnchorFailoverCheck() {
+    final smart = ref.read(smartAnchorProvider);
+    if (!smart.autoFailoverEnabled) {
+      return;
+    }
+    final groups = ref.read(groupsProvider);
+    final groupNames = {for (final group in groups) group.name};
+    final names = <String>[];
+    for (final group in groups) {
+      for (final proxy in group.all) {
+        if (!groupNames.contains(proxy.name) && !names.contains(proxy.name)) {
+          names.add(proxy.name);
+        }
+      }
+    }
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    for (final service in smart.services.where(
+      (service) => service.isEnabled,
+    )) {
+      final groupName = '🎯 Smart-${service.serviceId.toUpperCase()}';
+      final group = groups.getGroup(groupName);
+      final currentName = group?.now;
+      if (currentName == null) {
+        continue;
+      }
+      final ranked = rankedProxiesForService(smart, service, names);
+      final next = _failoverGuard.noteResult(
+        serviceId: service.serviceId,
+        currentName: currentName,
+        reason: smart.accessByService[service.serviceId]?[currentName]?.reason,
+        ranked: ranked,
+        accessByProxy: smart.accessByService[service.serviceId] ?? const {},
+        nowMs: nowMs,
+      );
+      if (next != null) {
+        changeProxyDebounce(groupName, next);
+      }
     }
   }
 

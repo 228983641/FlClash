@@ -1833,6 +1833,12 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorAggregationDesc": MessageLookupByLibrary.simpleMessage(
       "Both modes add a unified group with all merged nodes. DNS always comes from the primary subscription only.",
     ),
+    "smartAnchorAutoFailover": MessageLookupByLibrary.simpleMessage(
+      "Auto failover",
+    ),
+    "smartAnchorAutoFailoverDesc": MessageLookupByLibrary.simpleMessage(
+      "When the node in use fails 2 consecutive probes, automatically switch to the next ranked node and never switch back. When off, a failing node is never switched away automatically.",
+    ),
     "smartAnchorDesc": MessageLookupByLibrary.simpleMessage(
       "Per-service country lock, anchor memory and purity ranking.",
     ),

@@ -48,7 +48,52 @@ class SmartAnchor extends _$SmartAnchor {
       metadataByProxy: snapshot.metadataByProxy,
       accessByService: snapshot.accessByService,
       sharedLockGroupIds: snapshot.sharedLockGroupIds,
+      autoFailoverEnabled: snapshot.autoFailoverEnabled,
     );
+  }
+
+  void setAutoFailover(bool enabled) {
+    update(state.copyWith(autoFailoverEnabled: enabled));
+  }
+
+  List<ServiceToggleConfig> _mergedServices(
+    Map<String, ServiceToggleConfig> byId,
+  ) {
+    final defaultIds = {
+      for (final service in defaultServiceToggles) service.serviceId,
+    };
+    return [
+      for (final service in defaultServiceToggles) byId[service.serviceId]!,
+      for (final service in state.services)
+        if (!defaultIds.contains(service.serviceId))
+          byId[service.serviceId] ?? service,
+    ];
+  }
+
+  void upsertService(ServiceToggleConfig config) {
+    final byId = {
+      for (final service in defaultServiceToggles) service.serviceId: service,
+      for (final service in state.services) service.serviceId: service,
+    };
+    byId[config.serviceId] = config;
+    update(state.copyWith(services: _mergedServices(byId)));
+  }
+
+  void deleteService(String serviceId) {
+    if (defaultServiceToggles.any(
+      (service) => service.serviceId == serviceId,
+    )) {
+      return;
+    }
+    update(
+      state.copyWith(
+        services: [
+          for (final service in state.services)
+            if (service.serviceId != serviceId) service,
+        ],
+      ),
+    );
+    clearAnchor(serviceId);
   }
 
   void updateService(
@@ -66,14 +111,7 @@ class SmartAnchor extends _$SmartAnchor {
         return;
       }
       byId[serviceId] = current.copyWith(isEnabled: isEnabled);
-      update(
-        state.copyWith(
-          services: [
-            for (final service in defaultServiceToggles)
-              byId[service.serviceId]!,
-          ],
-        ),
-      );
+      update(state.copyWith(services: _mergedServices(byId)));
     }
     if (targetCountry != null) {
       setLockCountries(
@@ -113,13 +151,7 @@ class SmartAnchor extends _$SmartAnchor {
         targetCountry: normalized.isEmpty ? '' : normalized.first,
       );
     }
-    update(
-      state.copyWith(
-        services: [
-          for (final service in defaultServiceToggles) byId[service.serviceId]!,
-        ],
-      ),
-    );
+    update(state.copyWith(services: _mergedServices(byId)));
     if (changed) {
       for (final id in targets) {
         clearAnchor(id);

@@ -73,6 +73,7 @@ class SmartAnchorSnapshot {
     this.metadataByProxy = const {},
     this.accessByService = const {},
     this.sharedLockGroupIds = const [],
+    this.autoFailoverEnabled = true,
   });
 
   final List<ServiceToggleConfig> services;
@@ -80,11 +81,13 @@ class SmartAnchorSnapshot {
   final Map<String, NodeMetadataCache> metadataByProxy;
   final Map<String, Map<String, ServiceAccessResult>> accessByService;
   final List<String> sharedLockGroupIds;
+  final bool autoFailoverEnabled;
 
   Map<String, dynamic> toJson() {
     return {
       'services': [for (final service in services) service.toJson()],
       'sharedLockGroupIds': sharedLockGroupIds,
+      'autoFailoverEnabled': autoFailoverEnabled,
       'anchors': {
         for (final entry in anchors.entries) entry.key: entry.value.toJson(),
       },
@@ -159,6 +162,7 @@ class SmartAnchorSnapshot {
       sharedLockGroupIds: shared is List
           ? [for (final id in shared) id.toString()]
           : const [],
+      autoFailoverEnabled: json['autoFailoverEnabled'] as bool? ?? true,
     );
   }
 
@@ -169,6 +173,7 @@ class SmartAnchorSnapshot {
       metadataByProxy: metadataByProxy,
       accessByService: accessByService,
       sharedLockGroupIds: sharedLockGroupIds,
+      autoFailoverEnabled: autoFailoverEnabled,
     );
   }
 }
@@ -193,6 +198,8 @@ class SmartAnchorStore {
 
   static const sharedGroupsKey = 'config:sharedGroups';
 
+  static const autoFailoverKey = 'config:autoFailover';
+
   Future<SmartAnchorSnapshot?> load() async {
     final all = await records.readAll();
     if (all.isEmpty) {
@@ -215,6 +222,14 @@ class SmartAnchorStore {
     final anchors = <String, ServiceAnchor>{};
     final metadata = <String, NodeMetadataCache>{};
     final access = <String, Map<String, ServiceAccessResult>>{};
+    final autoFailoverRaw = all[autoFailoverKey];
+    var autoFailoverEnabled = true;
+    if (autoFailoverRaw != null) {
+      final decoded = json.decode(autoFailoverRaw);
+      if (decoded is bool) {
+        autoFailoverEnabled = decoded;
+      }
+    }
     final sharedRaw = all[sharedGroupsKey];
     final sharedIds = <String>[];
     if (sharedRaw == null) {
@@ -262,6 +277,7 @@ class SmartAnchorStore {
       metadataByProxy: metadata,
       accessByService: access,
       sharedLockGroupIds: sharedIds,
+      autoFailoverEnabled: autoFailoverEnabled,
     );
   }
 
@@ -271,6 +287,7 @@ class SmartAnchorStore {
       for (final service in input.services) service.toJson(),
     ]);
     fresh[sharedGroupsKey] = json.encode(input.sharedLockGroupIds);
+    fresh[autoFailoverKey] = json.encode(input.autoFailoverEnabled);
     for (final entry in input.anchors.entries) {
       fresh[anchorKey(entry.key)] = json.encode(entry.value.toJson());
     }
