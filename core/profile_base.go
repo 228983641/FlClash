@@ -18,7 +18,10 @@ import (
 )
 
 // What makes a profile large stays in the Core; the overlay the host sends
-// back replaces every other section.
+// back replaces every other section, except the sections the host itself
+// adds to: those merge with the profile's, overlay first and deduped by
+// name, so an injected group or node is never wiped by the profile's own
+// section. Anything else the host never sends stays a plain replace.
 var profileBaseSections = []string{"proxies", "proxy-groups", "sub-rules"}
 
 func handleGetProfileBase(path string) (*ProfileBase, error) {
@@ -142,9 +145,20 @@ func mergeProfileBase(base *SetupBase) (*yaml.Node, error) {
 		return nil, err
 	}
 	for _, key := range profileBaseSections {
-		if value := mappingValue(profile, key); value != nil {
-			setMappingValue(root, key, value)
+		profileValue := mappingValue(profile, key)
+		if profileValue == nil {
+			continue
 		}
+		overlayValue := mappingValue(root, key)
+		if key == "sub-rules" || overlayValue == nil {
+			setMappingValue(root, key, profileValue)
+			continue
+		}
+		merged, err := appendNamedSections(overlayValue, profileValue)
+		if err != nil {
+			return nil, err
+		}
+		setMappingValue(root, key, merged)
 	}
 	rules, err := appendRules(mappingValue(root, "rules"), mappingValue(profile, "rules"))
 	if err != nil {
@@ -202,6 +216,57 @@ func mappingValue(mapping *yaml.Node, key string) *yaml.Node {
 		}
 	}
 	return nil
+}
+
+// Merges two sequence sections by the "name" field of each mapping item,
+// keeping the first section's order and dropping later duplicates. Items
+// without a name pass through. A non-sequence section falls back to the
+// first one.
+func appendNamedSections(first, second *yaml.Node) (*yaml.Node, error) {
+	first, second = resolveAlias(first), resolveAlias(second)
+	if first == nil || isNull(first) {
+		return second, nil
+	}
+	if second == nil || isNull(second) {
+		return first, nil
+	}
+	if first.Kind != yaml.SequenceNode || second.Kind != yaml.SequenceNode {
+		return nil, fmt.Errorf("sections must be lists")
+	}
+	seen := make(map[string]struct{}, len(first.Content))
+	content := make([]*yaml.Node, 0, len(first.Content)+len(second.Content))
+	content = append(content, first.Content...)
+	for _, item := range first.Content {
+		if name := mappingName(item); name != "" {
+			seen[name] = struct{}{}
+		}
+	}
+	for _, item := range second.Content {
+		if name := mappingName(item); name != "" {
+			if _, dup := seen[name]; dup {
+				continue
+			}
+			seen[name] = struct{}{}
+		}
+		content = append(content, item)
+	}
+	return &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", Content: content}, nil
+}
+
+func mappingName(item *yaml.Node) string {
+	item = resolveAlias(item)
+	if item == nil || item.Kind != yaml.MappingNode {
+		return ""
+	}
+	value := mappingValue(item, "name")
+	if value == nil {
+		return ""
+	}
+	value = resolveAlias(value)
+	if value.Kind != yaml.ScalarNode {
+		return ""
+	}
+	return value.Value
 }
 
 func setMappingValue(mapping *yaml.Node, key string, value *yaml.Node) {

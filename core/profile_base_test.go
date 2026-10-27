@@ -196,6 +196,70 @@ func TestLoadConfigWithBasePutsTheAddedRulesFirstAndTheOverlayOverTheRest(t *tes
 	}
 }
 
+// The host injects groups and nodes the profile never had: a smart-routing
+// group and an aggregated node pool. The merge must keep both, overlay
+// first, with the profile's own entries appended and duplicates dropped.
+func TestLoadConfigWithBaseMergesOverlayGroupsAndProxies(t *testing.T) {
+	path := writeBaseProfile(t, baseProfile)
+	base, err := handleGetProfileBase(path)
+	if err != nil {
+		t.Fatalf("handleGetProfileBase = %v", err)
+	}
+	overlay := overlayOf(t, base, []string{"DOMAIN,added.test,DIRECT"}, map[string]any{
+		"proxies": []any{
+			map[string]any{"name": "c", "type": "socks5", "server": "127.0.0.1", "port": 1080},
+			map[string]any{"name": "a", "type": "socks5", "server": "127.0.0.1", "port": 1081},
+		},
+		"proxy-groups": []any{
+			map[string]any{"name": "smart", "type": "select", "proxies": []any{"c"}},
+			map[string]any{"name": "g", "type": "select", "proxies": []any{"a"}},
+		},
+	})
+	configPath := filepath.Join(t.TempDir(), "config.yaml")
+
+	if _, err := loadConfigWithBase(&SetupBase{Path: path, Overlay: overlay}, configPath); err != nil {
+		t.Fatalf("loadConfigWithBase = %v", err)
+	}
+	raw, err := handleGetConfig(configPath)
+	if err != nil {
+		t.Fatalf("handleGetConfig = %v", err)
+	}
+	proxyNames := make([]string, 0, len(raw.Proxy))
+	for _, proxy := range raw.Proxy {
+		name, _ := proxy["name"].(string)
+		proxyNames = append(proxyNames, name)
+	}
+	if want := []string{"c", "a", "b"}; !reflect.DeepEqual(proxyNames, want) {
+		t.Errorf("proxies = %v, want %v", proxyNames, want)
+	}
+	for _, proxy := range raw.Proxy {
+		if proxy["name"] == "a" && fmt.Sprintf("%v", proxy["port"]) != "1081" {
+			t.Errorf("proxy a port = %v, want the overlay's 1081", proxy["port"])
+		}
+	}
+	groupProxies := func(name string) []string {
+		for _, group := range raw.ProxyGroup {
+			if group["name"] != name {
+				continue
+			}
+			members, _ := group["proxies"].([]any)
+			names := make([]string, 0, len(members))
+			for _, member := range members {
+				text, _ := member.(string)
+				names = append(names, text)
+			}
+			return names
+		}
+		return nil
+	}
+	if want := []string{"c"}; !reflect.DeepEqual(groupProxies("smart"), want) {
+		t.Errorf("smart proxies = %v, want %v", groupProxies("smart"), want)
+	}
+	if want := []string{"a"}; !reflect.DeepEqual(groupProxies("g"), want) {
+		t.Errorf("g proxies = %v, want %v (the overlay's group wins)", groupProxies("g"), want)
+	}
+}
+
 // The Android service and mihomo's controller reload config.yaml without the
 // profile, and the anchor it was written with sits in a section the overlay drops.
 func TestLoadConfigWithBaseWritesAConfigThatLoadsAlone(t *testing.T) {
