@@ -22,7 +22,12 @@ class SmartAnchor extends _$SmartAnchor {
 
   @override
   SmartAnchorInput build() {
-    return const SmartAnchorInput();
+    return SmartAnchorInput(
+      services: [
+        for (final service in defaultServiceToggles)
+          service.copyWith(isEnabled: false),
+      ],
+    );
   }
 
   void update(SmartAnchorInput next) {
@@ -76,6 +81,28 @@ class SmartAnchor extends _$SmartAnchor {
 
   void setAggregationMode(AggregationGroupMode mode) {
     update(state.copyWith(aggregationMode: mode));
+  }
+
+  void setAggregationSource({
+    required String sourceId,
+    required String sourceLabel,
+    required Map<String, dynamic> config,
+    required bool enabled,
+  }) {
+    final sources = [
+      for (final source in state.aggregationSources)
+        if (source.sourceId != sourceId) source,
+    ];
+    if (enabled) {
+      sources.add(
+        AggregationSourceInput(
+          sourceId: sourceId,
+          sourceLabel: sourceLabel,
+          config: config,
+        ),
+      );
+    }
+    update(state.copyWith(aggregationSources: sources));
   }
 
   void clearAnchor(String serviceId) {

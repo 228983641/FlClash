@@ -1,4 +1,5 @@
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/providers/smart_anchor.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
@@ -43,6 +44,8 @@ class SmartAnchorSettingsView extends ConsumerWidget {
     final input = ref.watch(smartAnchorProvider);
     final services = effectiveSmartServices(input);
     final groups = ref.watch(groupsProvider);
+    final profiles = ref.watch(profilesProvider);
+    final currentProfileId = ref.watch(currentProfileProvider)?.id;
     return CommonScaffold(
       title: appLocalizations.smartAnchor,
       body: ListView(
@@ -69,6 +72,9 @@ class SmartAnchorSettingsView extends ConsumerWidget {
                       ref
                           .read(smartAnchorProvider.notifier)
                           .updateService(service.serviceId, isEnabled: value);
+                      ref
+                          .read(setupActionProvider.notifier)
+                          .applyProfileDebounce(silence: true);
                     },
                   ),
                 ),
@@ -84,6 +90,9 @@ class SmartAnchorSettingsView extends ConsumerWidget {
                     ref
                         .read(smartAnchorProvider.notifier)
                         .updateService(service.serviceId, targetCountry: code);
+                    ref
+                        .read(setupActionProvider.notifier)
+                        .applyProfileDebounce(silence: true);
                   },
                 ),
               ],
@@ -93,6 +102,54 @@ class SmartAnchorSettingsView extends ConsumerWidget {
           generateSection(
             title: appLocalizations.subscriptionAggregation,
             items: [
+              for (final profile in profiles)
+                if (profile.id != currentProfileId &&
+                    profile.type != ProfileType.custom)
+                  DecorationListItem(
+                    title: Text(
+                      profile.label.isEmpty ? profile.url : profile.label,
+                    ),
+                    trailing: CommonSwitch(
+                      value: input.aggregationSources.any(
+                        (source) => source.sourceId == 'profile:${profile.id}',
+                      ),
+                      onChanged: (value) async {
+                        if (!value) {
+                          ref
+                              .read(smartAnchorProvider.notifier)
+                              .setAggregationSource(
+                                sourceId: 'profile:${profile.id}',
+                                sourceLabel: profile.label.isEmpty
+                                    ? profile.url
+                                    : profile.label,
+                                config: const {},
+                                enabled: false,
+                              );
+                        } else {
+                          try {
+                            final config = await ref
+                                .read(coreHandlerProvider)
+                                .getConfig(profile.id);
+                            ref
+                                .read(smartAnchorProvider.notifier)
+                                .setAggregationSource(
+                                  sourceId: 'profile:${profile.id}',
+                                  sourceLabel: profile.label.isEmpty
+                                      ? profile.url
+                                      : profile.label,
+                                  config: config,
+                                  enabled: true,
+                                );
+                          } catch (_) {
+                            return;
+                          }
+                        }
+                        ref
+                            .read(setupActionProvider.notifier)
+                            .applyProfileDebounce(silence: true);
+                      },
+                    ),
+                  ),
               ListItem<AggregationGroupMode>.options(
                 title: Text(appLocalizations.aggregationMode),
                 options: AggregationGroupMode.values,
