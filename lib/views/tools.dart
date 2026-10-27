@@ -5,6 +5,7 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/views/about.dart';
+import 'package:fl_clash/views/smart_anchor.dart';
 import 'package:fl_clash/views/access.dart';
 import 'package:fl_clash/views/backup_and_restore.dart';
 import 'package:fl_clash/views/config/general.dart';
@@ -60,6 +61,7 @@ class _ToolViewState extends ConsumerState<ToolsView> {
         const _AdvancedConfigItem(),
         const _CustomResourcesItem(),
         const _GeneralItem(),
+        const _SmartAnchorItem(),
       ],
       footer: [
         if (system.isAndroid) appLocalizations.accessControlDesc,
@@ -198,6 +200,19 @@ class _GeneralItem extends StatelessWidget {
       leading: const GlyphIcon(AppGlyphs.settings),
       title: Text(context.appLocalizations.general),
       widget: const GeneralView(),
+    );
+  }
+}
+
+class _SmartAnchorItem extends StatelessWidget {
+  const _SmartAnchorItem();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListItem.open(
+      leading: const GlyphIcon(AppGlyphs.verified),
+      title: Text(context.appLocalizations.smartAnchor),
+      widget: const SmartAnchorSettingsView(),
     );
   }
 }

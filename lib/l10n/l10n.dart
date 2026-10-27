@@ -7943,8 +7943,7 @@ class AppLocalizations {
   String customImportDroppedSubRules(num count, Object label) {
     return Intl.plural(
       count,
-      one:
-          '1 SUB-RULE rule was dropped, since custom profiles do not support sub-rules',
+      one: '1 SUB-RULE rule was dropped, since custom profiles do not support sub-rules',
       other:
           '$label SUB-RULE rules were dropped, since custom profiles do not support sub-rules',
       name: 'customImportDroppedSubRules',
@@ -8050,6 +8049,151 @@ class AppLocalizations {
       name: 'alreadyInLocalProxies',
       desc: '',
       args: [name],
+    );
+  }
+
+  /// `Smart Anchor`
+  String get smartAnchor {
+    return Intl.message(
+      'Smart Anchor',
+      name: 'smartAnchor',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Per-service country lock, anchor memory and purity ranking.`
+  String get smartAnchorDesc {
+    return Intl.message(
+      'Per-service country lock, anchor memory and purity ranking.',
+      name: 'smartAnchorDesc',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Subscription Aggregation`
+  String get subscriptionAggregation {
+    return Intl.message(
+      'Subscription Aggregation',
+      name: 'subscriptionAggregation',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Services`
+  String get smartAnchorServices {
+    return Intl.message(
+      'Services',
+      name: 'smartAnchorServices',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Diagnostics`
+  String get smartAnchorDiagnostics {
+    return Intl.message(
+      'Diagnostics',
+      name: 'smartAnchorDiagnostics',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Country lock`
+  String get countryLock {
+    return Intl.message(
+      'Country lock',
+      name: 'countryLock',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No lock`
+  String get countryLockNone {
+    return Intl.message('No lock', name: 'countryLockNone', desc: '', args: []);
+  }
+
+  /// `Single country`
+  String get countryLockSingle {
+    return Intl.message(
+      'Single country',
+      name: 'countryLockSingle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Reset anchor`
+  String get smartAnchorResetAnchor {
+    return Intl.message(
+      'Reset anchor',
+      name: 'smartAnchorResetAnchor',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Probe now`
+  String get smartAnchorProbeNow {
+    return Intl.message(
+      'Probe now',
+      name: 'smartAnchorProbeNow',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Aggregation mode`
+  String get aggregationMode {
+    return Intl.message(
+      'Aggregation mode',
+      name: 'aggregationMode',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Primary only`
+  String get aggregationPrimaryOnly {
+    return Intl.message(
+      'Primary only',
+      name: 'aggregationPrimaryOnly',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Merge all`
+  String get aggregationMergeAll {
+    return Intl.message(
+      'Merge all',
+      name: 'aggregationMergeAll',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; changing the lock country clears the old anchor.`
+  String get smartAnchorLockDesc {
+    return Intl.message(
+      'No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; changing the lock country clears the old anchor.',
+      name: 'smartAnchorLockDesc',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Both modes add a unified group with all merged nodes. DNS always comes from the primary subscription only.`
+  String get smartAnchorAggregationDesc {
+    return Intl.message(
+      'Both modes add a unified group with all merged nodes. DNS always comes from the primary subscription only.',
+      name: 'smartAnchorAggregationDesc',
+      desc: '',
+      args: [],
     );
   }
 }

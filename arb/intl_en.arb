@@ -963,5 +963,20 @@
   "preferred": "Preferred",
   "addToLocalProxies": "Add to local proxies",
   "addedToLocalProxies": "Added {name} to local proxies",
-  "alreadyInLocalProxies": "{name} is already in local proxies"
+  "alreadyInLocalProxies": "{name} is already in local proxies",
+  "smartAnchor": "Smart Anchor",
+  "smartAnchorDesc": "Per-service country lock, anchor memory and purity ranking.",
+  "subscriptionAggregation": "Subscription Aggregation",
+  "smartAnchorServices": "Services",
+  "smartAnchorDiagnostics": "Diagnostics",
+  "countryLock": "Country lock",
+  "countryLockNone": "No lock",
+  "countryLockSingle": "Single country",
+  "smartAnchorResetAnchor": "Reset anchor",
+  "smartAnchorProbeNow": "Probe now",
+  "aggregationMode": "Aggregation mode",
+  "aggregationPrimaryOnly": "Primary only",
+  "aggregationMergeAll": "Merge all",
+  "smartAnchorLockDesc": "No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; changing the lock country clears the old anchor.",
+  "smartAnchorAggregationDesc": "Both modes add a unified group with all merged nodes. DNS always comes from the primary subscription only."
 }

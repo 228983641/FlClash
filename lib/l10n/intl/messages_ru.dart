@@ -310,6 +310,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "ageSecretKeyRequiredTip": MessageLookupByLibrary.simpleMessage(
       "Профиль зашифрован с помощью age, для расшифровки нужен секретный ключ age",
     ),
+    "aggregationMergeAll": MessageLookupByLibrary.simpleMessage("Merge all"),
+    "aggregationMode": MessageLookupByLibrary.simpleMessage("Aggregation mode"),
+    "aggregationPrimaryOnly": MessageLookupByLibrary.simpleMessage(
+      "Primary only",
+    ),
     "agree": MessageLookupByLibrary.simpleMessage("Согласен"),
     "allReferencedProxies": MessageLookupByLibrary.simpleMessage(
       "Все используемые прокси",
@@ -548,6 +553,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "coreStatus": MessageLookupByLibrary.simpleMessage("Статус ядра"),
     "country": MessageLookupByLibrary.simpleMessage("Регион"),
+    "countryLock": MessageLookupByLibrary.simpleMessage("Country lock"),
+    "countryLockNone": MessageLookupByLibrary.simpleMessage("No lock"),
+    "countryLockSingle": MessageLookupByLibrary.simpleMessage("Single country"),
     "crashDetected": MessageLookupByLibrary.simpleMessage("Обнаружен сбой"),
     "crashDetectedTip": m6,
     "crashTest": MessageLookupByLibrary.simpleMessage("Тест сбоя"),
@@ -995,9 +1003,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "inputRuleContent": MessageLookupByLibrary.simpleMessage(
       "Введите содержимое правила",
     ),
-    "installedAppsPermissionDeniedMessage": MessageLookupByLibrary.simpleMessage(
-      "Разрешение на список приложений отклонено, поэтому установленные приложения недоступны. Предоставьте его вручную в системных настройках.",
-    ),
+    "installedAppsPermissionDeniedMessage":
+        MessageLookupByLibrary.simpleMessage(
+          "Разрешение на список приложений отклонено, поэтому установленные приложения недоступны. Предоставьте его вручную в системных настройках.",
+        ),
     "installedAppsPermissionDesc": MessageLookupByLibrary.simpleMessage(
       "Эта система не выдаёт список установленных приложений без разрешения. Предоставьте его, чтобы настроить прокси для отдельных приложений.",
     ),
@@ -1820,6 +1829,24 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "slide": MessageLookupByLibrary.simpleMessage("Сдвиг"),
     "sliders": MessageLookupByLibrary.simpleMessage("Ползунки"),
+    "smartAnchor": MessageLookupByLibrary.simpleMessage("Smart Anchor"),
+    "smartAnchorAggregationDesc": MessageLookupByLibrary.simpleMessage(
+      "Both modes add a unified group with all merged nodes. DNS always comes from the primary subscription only.",
+    ),
+    "smartAnchorDesc": MessageLookupByLibrary.simpleMessage(
+      "Per-service country lock, anchor memory and purity ranking.",
+    ),
+    "smartAnchorDiagnostics": MessageLookupByLibrary.simpleMessage(
+      "Diagnostics",
+    ),
+    "smartAnchorLockDesc": MessageLookupByLibrary.simpleMessage(
+      "No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; changing the lock country clears the old anchor.",
+    ),
+    "smartAnchorProbeNow": MessageLookupByLibrary.simpleMessage("Probe now"),
+    "smartAnchorResetAnchor": MessageLookupByLibrary.simpleMessage(
+      "Reset anchor",
+    ),
+    "smartAnchorServices": MessageLookupByLibrary.simpleMessage("Services"),
     "sniffProtocols": MessageLookupByLibrary.simpleMessage("Протоколы"),
     "sniffer": MessageLookupByLibrary.simpleMessage("Сниффер"),
     "snifferStatusDesc": MessageLookupByLibrary.simpleMessage(
@@ -1870,6 +1897,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "style": MessageLookupByLibrary.simpleMessage("Стиль"),
     "submit": MessageLookupByLibrary.simpleMessage("Отправить"),
+    "subscriptionAggregation": MessageLookupByLibrary.simpleMessage(
+      "Subscription Aggregation",
+    ),
     "subscriptionInfo": MessageLookupByLibrary.simpleMessage(
       "Информация о подписке",
     ),

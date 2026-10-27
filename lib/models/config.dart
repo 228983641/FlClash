@@ -120,6 +120,8 @@ const List<DashboardWidget> defaultDashboardWidgets = [
   DashboardWidget.profiles,
   DashboardWidget.proxyGroups,
   DashboardWidget.connectionStats,
+  DashboardWidget.smartAnchor,
+  DashboardWidget.subscriptionAggregation,
 ];
 
 /// A phone starts without the VPN switch and the diagnostic cards, which stay
@@ -131,6 +133,8 @@ final List<DashboardWidget> platformDefaultDashboardWidgets = system.isAndroid
         DashboardWidget.outboundMode,
         DashboardWidget.profiles,
         DashboardWidget.proxyGroups,
+        DashboardWidget.smartAnchor,
+        DashboardWidget.subscriptionAggregation,
       ]
     : defaultDashboardWidgets;
 

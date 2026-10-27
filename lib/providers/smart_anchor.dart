@@ -4,8 +4,10 @@ import 'package:fl_clash/common/request.dart';
 import 'package:fl_clash/common/service_probe.dart';
 import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/smart_anchor/services/api_pool.dart';
+import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
 import 'package:fl_clash/smart_anchor/services/persistence.dart';
 import 'package:fl_clash/smart_anchor/services/probing.dart';
+import 'package:fl_clash/smart_anchor/services/subscription_merger.dart';
 import 'package:fl_clash/smart_anchor/services/service_access.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -39,6 +41,41 @@ class SmartAnchor extends _$SmartAnchor {
       metadataByProxy: snapshot.metadataByProxy,
       accessByService: snapshot.accessByService,
     );
+  }
+
+  void updateService(
+    String serviceId, {
+    bool? isEnabled,
+    String? targetCountry,
+  }) {
+    final byId = {
+      for (final service in defaultServiceToggles) service.serviceId: service,
+      for (final service in state.services) service.serviceId: service,
+    };
+    final current = byId[serviceId];
+    if (current == null) {
+      return;
+    }
+    final countryChanged =
+        targetCountry != null && targetCountry != current.targetCountry;
+    byId[serviceId] = current.copyWith(
+      isEnabled: isEnabled,
+      targetCountry: targetCountry,
+    );
+    update(
+      state.copyWith(
+        services: [
+          for (final service in defaultServiceToggles) byId[service.serviceId]!,
+        ],
+      ),
+    );
+    if (countryChanged) {
+      clearAnchor(serviceId);
+    }
+  }
+
+  void setAggregationMode(AggregationGroupMode mode) {
+    update(state.copyWith(aggregationMode: mode));
   }
 
   void clearAnchor(String serviceId) {

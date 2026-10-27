@@ -261,6 +261,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "ageSecretKeyRequiredTip": MessageLookupByLibrary.simpleMessage(
       "该配置已用 age 加密，需要 age 私钥才能解密",
     ),
+    "aggregationMergeAll": MessageLookupByLibrary.simpleMessage("全部合并模式"),
+    "aggregationMode": MessageLookupByLibrary.simpleMessage("聚合模式"),
+    "aggregationPrimaryOnly": MessageLookupByLibrary.simpleMessage("主订阅模式"),
     "agree": MessageLookupByLibrary.simpleMessage("同意"),
     "allReferencedProxies": MessageLookupByLibrary.simpleMessage("全部被引用的代理"),
     "allReferencedProxyProviders": MessageLookupByLibrary.simpleMessage(
@@ -415,6 +418,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "coreStatus": MessageLookupByLibrary.simpleMessage("核心状态"),
     "country": MessageLookupByLibrary.simpleMessage("区域"),
+    "countryLock": MessageLookupByLibrary.simpleMessage("锁国"),
+    "countryLockNone": MessageLookupByLibrary.simpleMessage("不限"),
+    "countryLockSingle": MessageLookupByLibrary.simpleMessage("单国"),
     "crashDetected": MessageLookupByLibrary.simpleMessage("检测到崩溃"),
     "crashDetectedTip": m6,
     "crashTest": MessageLookupByLibrary.simpleMessage("崩溃测试"),
@@ -1354,6 +1360,18 @@ class MessageLookup extends MessageLookupByLibrary {
     "skipSrcAddress": MessageLookupByLibrary.simpleMessage("跳过来源地址"),
     "slide": MessageLookupByLibrary.simpleMessage("滑动"),
     "sliders": MessageLookupByLibrary.simpleMessage("滑块"),
+    "smartAnchor": MessageLookupByLibrary.simpleMessage("智能锚点"),
+    "smartAnchorAggregationDesc": MessageLookupByLibrary.simpleMessage(
+      "两种模式都会额外生成一个聚合全部节点统一组，DNS 两种模式都只用主订阅的。",
+    ),
+    "smartAnchorDesc": MessageLookupByLibrary.simpleMessage("业务锁国、锚点记忆与纯净度排序。"),
+    "smartAnchorDiagnostics": MessageLookupByLibrary.simpleMessage("诊断"),
+    "smartAnchorLockDesc": MessageLookupByLibrary.simpleMessage(
+      "不限表示不按国家过滤，风控风险最高。单国锁固定登录国家，风险最低；改锁国会清空旧锚点。",
+    ),
+    "smartAnchorProbeNow": MessageLookupByLibrary.simpleMessage("立即探测"),
+    "smartAnchorResetAnchor": MessageLookupByLibrary.simpleMessage("重置锚点"),
+    "smartAnchorServices": MessageLookupByLibrary.simpleMessage("业务"),
     "sniffProtocols": MessageLookupByLibrary.simpleMessage("协议"),
     "sniffer": MessageLookupByLibrary.simpleMessage("域名嗅探"),
     "snifferStatusDesc": MessageLookupByLibrary.simpleMessage(
@@ -1392,6 +1410,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "style": MessageLookupByLibrary.simpleMessage("风格"),
     "submit": MessageLookupByLibrary.simpleMessage("提交"),
+    "subscriptionAggregation": MessageLookupByLibrary.simpleMessage("订阅聚合"),
     "subscriptionInfo": MessageLookupByLibrary.simpleMessage("订阅信息"),
     "sudoPasswordTitle": MessageLookupByLibrary.simpleMessage("输入 sudo 密码"),
     "suspended": MessageLookupByLibrary.simpleMessage("挂起中…"),

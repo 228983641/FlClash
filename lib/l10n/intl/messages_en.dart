@@ -306,6 +306,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "ageSecretKeyRequiredTip": MessageLookupByLibrary.simpleMessage(
       "This profile is encrypted with age and needs an age secret key to decrypt",
     ),
+    "aggregationMergeAll": MessageLookupByLibrary.simpleMessage("Merge all"),
+    "aggregationMode": MessageLookupByLibrary.simpleMessage("Aggregation mode"),
+    "aggregationPrimaryOnly": MessageLookupByLibrary.simpleMessage(
+      "Primary only",
+    ),
     "agree": MessageLookupByLibrary.simpleMessage("Agree"),
     "allReferencedProxies": MessageLookupByLibrary.simpleMessage(
       "All referenced proxies",
@@ -528,6 +533,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "coreStatus": MessageLookupByLibrary.simpleMessage("Core status"),
     "country": MessageLookupByLibrary.simpleMessage("Region"),
+    "countryLock": MessageLookupByLibrary.simpleMessage("Country lock"),
+    "countryLockNone": MessageLookupByLibrary.simpleMessage("No lock"),
+    "countryLockSingle": MessageLookupByLibrary.simpleMessage("Single country"),
     "crashDetected": MessageLookupByLibrary.simpleMessage("Crash detected"),
     "crashDetectedTip": m6,
     "crashTest": MessageLookupByLibrary.simpleMessage("Crash test"),
@@ -961,9 +969,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "inputRuleContent": MessageLookupByLibrary.simpleMessage(
       "Enter the rule content",
     ),
-    "installedAppsPermissionDeniedMessage": MessageLookupByLibrary.simpleMessage(
-      "The app list permission was denied, so installed apps cannot be listed. Please grant it manually in system settings.",
-    ),
+    "installedAppsPermissionDeniedMessage":
+        MessageLookupByLibrary.simpleMessage(
+          "The app list permission was denied, so installed apps cannot be listed. Please grant it manually in system settings.",
+        ),
     "installedAppsPermissionDesc": MessageLookupByLibrary.simpleMessage(
       "This system hides the installed app list until the permission is granted. Authorize it to configure the per-app proxy.",
     ),
@@ -1740,6 +1749,24 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "slide": MessageLookupByLibrary.simpleMessage("Slide"),
     "sliders": MessageLookupByLibrary.simpleMessage("Sliders"),
+    "smartAnchor": MessageLookupByLibrary.simpleMessage("Smart Anchor"),
+    "smartAnchorAggregationDesc": MessageLookupByLibrary.simpleMessage(
+      "Both modes add a unified group with all merged nodes. DNS always comes from the primary subscription only.",
+    ),
+    "smartAnchorDesc": MessageLookupByLibrary.simpleMessage(
+      "Per-service country lock, anchor memory and purity ranking.",
+    ),
+    "smartAnchorDiagnostics": MessageLookupByLibrary.simpleMessage(
+      "Diagnostics",
+    ),
+    "smartAnchorLockDesc": MessageLookupByLibrary.simpleMessage(
+      "No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; changing the lock country clears the old anchor.",
+    ),
+    "smartAnchorProbeNow": MessageLookupByLibrary.simpleMessage("Probe now"),
+    "smartAnchorResetAnchor": MessageLookupByLibrary.simpleMessage(
+      "Reset anchor",
+    ),
+    "smartAnchorServices": MessageLookupByLibrary.simpleMessage("Services"),
     "sniffProtocols": MessageLookupByLibrary.simpleMessage("Protocols"),
     "sniffer": MessageLookupByLibrary.simpleMessage("Sniffer"),
     "snifferStatusDesc": MessageLookupByLibrary.simpleMessage(
@@ -1786,6 +1813,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "style": MessageLookupByLibrary.simpleMessage("Style"),
     "submit": MessageLookupByLibrary.simpleMessage("Submit"),
+    "subscriptionAggregation": MessageLookupByLibrary.simpleMessage(
+      "Subscription Aggregation",
+    ),
     "subscriptionInfo": MessageLookupByLibrary.simpleMessage(
       "Subscription info",
     ),

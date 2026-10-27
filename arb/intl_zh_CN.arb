@@ -963,5 +963,20 @@
   "preferred": "首选",
   "addToLocalProxies": "添加到本地代理",
   "addedToLocalProxies": "已将 {name} 添加到本地代理",
-  "alreadyInLocalProxies": "本地代理中已有 {name}"
+  "alreadyInLocalProxies": "本地代理中已有 {name}",
+  "smartAnchor": "智能锚点",
+  "smartAnchorDesc": "业务锁国、锚点记忆与纯净度排序。",
+  "subscriptionAggregation": "订阅聚合",
+  "smartAnchorServices": "业务",
+  "smartAnchorDiagnostics": "诊断",
+  "countryLock": "锁国",
+  "countryLockNone": "不限",
+  "countryLockSingle": "单国",
+  "smartAnchorResetAnchor": "重置锚点",
+  "smartAnchorProbeNow": "立即探测",
+  "aggregationMode": "聚合模式",
+  "aggregationPrimaryOnly": "主订阅模式",
+  "aggregationMergeAll": "全部合并模式",
+  "smartAnchorLockDesc": "不限表示不按国家过滤，风控风险最高。单国锁固定登录国家，风险最低；改锁国会清空旧锚点。",
+  "smartAnchorAggregationDesc": "两种模式都会额外生成一个聚合全部节点统一组，DNS 两种模式都只用主订阅的。"
 }

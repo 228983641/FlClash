@@ -321,6 +321,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "ageSecretKeyRequiredTip": MessageLookupByLibrary.simpleMessage(
       "Este perfil está cifrado con age y necesita una clave secreta de age para descifrarse",
     ),
+    "aggregationMergeAll": MessageLookupByLibrary.simpleMessage("Merge all"),
+    "aggregationMode": MessageLookupByLibrary.simpleMessage("Aggregation mode"),
+    "aggregationPrimaryOnly": MessageLookupByLibrary.simpleMessage(
+      "Primary only",
+    ),
     "agree": MessageLookupByLibrary.simpleMessage("Aceptar"),
     "allReferencedProxies": MessageLookupByLibrary.simpleMessage(
       "Todos los proxies referenciados",
@@ -573,6 +578,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "coreStatus": MessageLookupByLibrary.simpleMessage("Estado del núcleo"),
     "country": MessageLookupByLibrary.simpleMessage("Región"),
+    "countryLock": MessageLookupByLibrary.simpleMessage("Country lock"),
+    "countryLockNone": MessageLookupByLibrary.simpleMessage("No lock"),
+    "countryLockSingle": MessageLookupByLibrary.simpleMessage("Single country"),
     "crashDetected": MessageLookupByLibrary.simpleMessage("Fallo detectado"),
     "crashDetectedTip": m6,
     "crashTest": MessageLookupByLibrary.simpleMessage("Prueba de fallo"),
@@ -1028,9 +1036,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "inputRuleContent": MessageLookupByLibrary.simpleMessage(
       "Introduce el contenido de la regla",
     ),
-    "installedAppsPermissionDeniedMessage": MessageLookupByLibrary.simpleMessage(
-      "Se denegó el permiso de lista de apps, por lo que no se pueden mostrar las apps instaladas. Concédelo manualmente en los ajustes del sistema.",
-    ),
+    "installedAppsPermissionDeniedMessage":
+        MessageLookupByLibrary.simpleMessage(
+          "Se denegó el permiso de lista de apps, por lo que no se pueden mostrar las apps instaladas. Concédelo manualmente en los ajustes del sistema.",
+        ),
     "installedAppsPermissionDesc": MessageLookupByLibrary.simpleMessage(
       "Este sistema oculta la lista de apps instaladas hasta que se concede el permiso. Autorízalo para configurar el proxy por app.",
     ),
@@ -1879,6 +1888,24 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "slide": MessageLookupByLibrary.simpleMessage("Deslizar"),
     "sliders": MessageLookupByLibrary.simpleMessage("Reguladores"),
+    "smartAnchor": MessageLookupByLibrary.simpleMessage("Smart Anchor"),
+    "smartAnchorAggregationDesc": MessageLookupByLibrary.simpleMessage(
+      "Both modes add a unified group with all merged nodes. DNS always comes from the primary subscription only.",
+    ),
+    "smartAnchorDesc": MessageLookupByLibrary.simpleMessage(
+      "Per-service country lock, anchor memory and purity ranking.",
+    ),
+    "smartAnchorDiagnostics": MessageLookupByLibrary.simpleMessage(
+      "Diagnostics",
+    ),
+    "smartAnchorLockDesc": MessageLookupByLibrary.simpleMessage(
+      "No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; changing the lock country clears the old anchor.",
+    ),
+    "smartAnchorProbeNow": MessageLookupByLibrary.simpleMessage("Probe now"),
+    "smartAnchorResetAnchor": MessageLookupByLibrary.simpleMessage(
+      "Reset anchor",
+    ),
+    "smartAnchorServices": MessageLookupByLibrary.simpleMessage("Services"),
     "sniffProtocols": MessageLookupByLibrary.simpleMessage("Protocolos"),
     "sniffer": MessageLookupByLibrary.simpleMessage("Sniffer"),
     "snifferStatusDesc": MessageLookupByLibrary.simpleMessage(
@@ -1929,6 +1956,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "style": MessageLookupByLibrary.simpleMessage("Estilo"),
     "submit": MessageLookupByLibrary.simpleMessage("Enviar"),
+    "subscriptionAggregation": MessageLookupByLibrary.simpleMessage(
+      "Subscription Aggregation",
+    ),
     "subscriptionInfo": MessageLookupByLibrary.simpleMessage(
       "Información de la suscripción",
     ),

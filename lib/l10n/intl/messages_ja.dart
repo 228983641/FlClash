@@ -266,6 +266,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "ageSecretKeyRequiredTip": MessageLookupByLibrary.simpleMessage(
       "このプロファイルは age で暗号化されており、復号には age 秘密鍵が必要です",
     ),
+    "aggregationMergeAll": MessageLookupByLibrary.simpleMessage("Merge all"),
+    "aggregationMode": MessageLookupByLibrary.simpleMessage("Aggregation mode"),
+    "aggregationPrimaryOnly": MessageLookupByLibrary.simpleMessage(
+      "Primary only",
+    ),
     "agree": MessageLookupByLibrary.simpleMessage("同意する"),
     "allReferencedProxies": MessageLookupByLibrary.simpleMessage(
       "参照されているすべてのプロキシ",
@@ -450,6 +455,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "coreStatus": MessageLookupByLibrary.simpleMessage("コアの状態"),
     "country": MessageLookupByLibrary.simpleMessage("地域"),
+    "countryLock": MessageLookupByLibrary.simpleMessage("Country lock"),
+    "countryLockNone": MessageLookupByLibrary.simpleMessage("No lock"),
+    "countryLockSingle": MessageLookupByLibrary.simpleMessage("Single country"),
     "crashDetected": MessageLookupByLibrary.simpleMessage("クラッシュを検出しました"),
     "crashDetectedTip": m6,
     "crashTest": MessageLookupByLibrary.simpleMessage("クラッシュテスト"),
@@ -1495,6 +1503,24 @@ class MessageLookup extends MessageLookupByLibrary {
     "skipSrcAddress": MessageLookupByLibrary.simpleMessage("スキップする送信元アドレス"),
     "slide": MessageLookupByLibrary.simpleMessage("スライド"),
     "sliders": MessageLookupByLibrary.simpleMessage("スライダ"),
+    "smartAnchor": MessageLookupByLibrary.simpleMessage("Smart Anchor"),
+    "smartAnchorAggregationDesc": MessageLookupByLibrary.simpleMessage(
+      "Both modes add a unified group with all merged nodes. DNS always comes from the primary subscription only.",
+    ),
+    "smartAnchorDesc": MessageLookupByLibrary.simpleMessage(
+      "Per-service country lock, anchor memory and purity ranking.",
+    ),
+    "smartAnchorDiagnostics": MessageLookupByLibrary.simpleMessage(
+      "Diagnostics",
+    ),
+    "smartAnchorLockDesc": MessageLookupByLibrary.simpleMessage(
+      "No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; changing the lock country clears the old anchor.",
+    ),
+    "smartAnchorProbeNow": MessageLookupByLibrary.simpleMessage("Probe now"),
+    "smartAnchorResetAnchor": MessageLookupByLibrary.simpleMessage(
+      "Reset anchor",
+    ),
+    "smartAnchorServices": MessageLookupByLibrary.simpleMessage("Services"),
     "sniffProtocols": MessageLookupByLibrary.simpleMessage("プロトコル"),
     "sniffer": MessageLookupByLibrary.simpleMessage("スニッファー"),
     "snifferStatusDesc": MessageLookupByLibrary.simpleMessage(
@@ -1537,6 +1563,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "style": MessageLookupByLibrary.simpleMessage("スタイル"),
     "submit": MessageLookupByLibrary.simpleMessage("送信"),
+    "subscriptionAggregation": MessageLookupByLibrary.simpleMessage(
+      "Subscription Aggregation",
+    ),
     "subscriptionInfo": MessageLookupByLibrary.simpleMessage("サブスクリプション情報"),
     "sudoPasswordTitle": MessageLookupByLibrary.simpleMessage("sudo のパスワードを入力"),
     "suspended": MessageLookupByLibrary.simpleMessage("一時停止中…"),

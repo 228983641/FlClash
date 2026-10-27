@@ -8,4 +8,5 @@ export 'outbound_mode.dart';
 export 'profiles.dart';
 export 'proxy_groups.dart';
 export 'service_status.dart';
+export 'smart_anchor.dart';
 export 'traffic.dart';

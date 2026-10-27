@@ -322,6 +322,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "ageSecretKeyRequiredTip": MessageLookupByLibrary.simpleMessage(
       "Ce profil est chiffré avec age et nécessite une clé secrète age pour être déchiffré",
     ),
+    "aggregationMergeAll": MessageLookupByLibrary.simpleMessage("Merge all"),
+    "aggregationMode": MessageLookupByLibrary.simpleMessage("Aggregation mode"),
+    "aggregationPrimaryOnly": MessageLookupByLibrary.simpleMessage(
+      "Primary only",
+    ),
     "agree": MessageLookupByLibrary.simpleMessage("Accepter"),
     "allReferencedProxies": MessageLookupByLibrary.simpleMessage(
       "Tous les proxys référencés",
@@ -570,6 +575,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "coreStatus": MessageLookupByLibrary.simpleMessage("État du cœur"),
     "country": MessageLookupByLibrary.simpleMessage("Région"),
+    "countryLock": MessageLookupByLibrary.simpleMessage("Country lock"),
+    "countryLockNone": MessageLookupByLibrary.simpleMessage("No lock"),
+    "countryLockSingle": MessageLookupByLibrary.simpleMessage("Single country"),
     "crashDetected": MessageLookupByLibrary.simpleMessage("Plantage détecté"),
     "crashDetectedTip": m6,
     "crashTest": MessageLookupByLibrary.simpleMessage("Test de plantage"),
@@ -1027,9 +1035,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "inputRuleContent": MessageLookupByLibrary.simpleMessage(
       "Saisissez le contenu de la règle",
     ),
-    "installedAppsPermissionDeniedMessage": MessageLookupByLibrary.simpleMessage(
-      "L’autorisation de la liste des apps a été refusée ; les apps installées ne peuvent donc pas être listées. Veuillez l’accorder manuellement dans les réglages du système.",
-    ),
+    "installedAppsPermissionDeniedMessage":
+        MessageLookupByLibrary.simpleMessage(
+          "L’autorisation de la liste des apps a été refusée ; les apps installées ne peuvent donc pas être listées. Veuillez l’accorder manuellement dans les réglages du système.",
+        ),
     "installedAppsPermissionDesc": MessageLookupByLibrary.simpleMessage(
       "Ce système masque la liste des apps installées tant que l’autorisation n’est pas accordée. Accordez-la pour configurer le proxy par app.",
     ),
@@ -1880,6 +1889,24 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "slide": MessageLookupByLibrary.simpleMessage("Glissement"),
     "sliders": MessageLookupByLibrary.simpleMessage("Curseurs"),
+    "smartAnchor": MessageLookupByLibrary.simpleMessage("Smart Anchor"),
+    "smartAnchorAggregationDesc": MessageLookupByLibrary.simpleMessage(
+      "Both modes add a unified group with all merged nodes. DNS always comes from the primary subscription only.",
+    ),
+    "smartAnchorDesc": MessageLookupByLibrary.simpleMessage(
+      "Per-service country lock, anchor memory and purity ranking.",
+    ),
+    "smartAnchorDiagnostics": MessageLookupByLibrary.simpleMessage(
+      "Diagnostics",
+    ),
+    "smartAnchorLockDesc": MessageLookupByLibrary.simpleMessage(
+      "No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; changing the lock country clears the old anchor.",
+    ),
+    "smartAnchorProbeNow": MessageLookupByLibrary.simpleMessage("Probe now"),
+    "smartAnchorResetAnchor": MessageLookupByLibrary.simpleMessage(
+      "Reset anchor",
+    ),
+    "smartAnchorServices": MessageLookupByLibrary.simpleMessage("Services"),
     "sniffProtocols": MessageLookupByLibrary.simpleMessage("Protocoles"),
     "sniffer": MessageLookupByLibrary.simpleMessage("Sniffer"),
     "snifferStatusDesc": MessageLookupByLibrary.simpleMessage(
@@ -1928,6 +1955,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "style": MessageLookupByLibrary.simpleMessage("Style"),
     "submit": MessageLookupByLibrary.simpleMessage("Valider"),
+    "subscriptionAggregation": MessageLookupByLibrary.simpleMessage(
+      "Subscription Aggregation",
+    ),
     "subscriptionInfo": MessageLookupByLibrary.simpleMessage(
       "Infos d’abonnement",
     ),
