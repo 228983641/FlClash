@@ -40,7 +40,14 @@ class SmartAnchor extends _$SmartAnchor {
   }
 
   Future<void> restore() async {
-    final snapshot = await _store.load();
+    SmartAnchorSnapshot? snapshot;
+    try {
+      snapshot = await _store.load();
+    } catch (_) {
+      // A failed restore keeps the built-in defaults instead of failing
+      // startup; the next save rewrites the record.
+      return;
+    }
     if (snapshot == null) {
       return;
     }

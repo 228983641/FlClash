@@ -226,6 +226,14 @@ void main() {
     final position = positionOf(tester);
     position.jumpTo(position.maxScrollExtent - 330);
     await tester.pump();
+    // Park the viewport bottom just past the add row's center: the added
+    // card's room then starts below the viewport edge, so the reveal scroll
+    // has somewhere to go, while the row stays tappable. A fixed offset
+    // from the end no longer holds once more cards are registered.
+    final addRow = tester.getRect(find.byTooltip('Add Network speed'));
+    position.jumpTo(position.pixels + addRow.center.dy + 10 - 700);
+    await tester.pump();
+    await tester.pump();
     final before = position.pixels;
     final speed = find.byType(NetworkSpeedCard);
 

@@ -43,14 +43,21 @@ class ProxiesAction extends _$ProxiesAction {
 
   @override
   void build() {
-    _smartAnchorMonitorTimer ??= Timer.periodic(
-      const Duration(seconds: 30),
-      (_) => unawaited(smartAnchorMonitorTick()),
-    );
     ref.onDispose(() {
       _delayFlushTimer?.cancel();
       _smartAnchorMonitorTimer?.cancel();
     });
+    ref.listen(isStartProvider, (_, started) {
+      if (started) {
+        _smartAnchorMonitorTimer ??= Timer.periodic(
+          const Duration(seconds: 30),
+          (_) => unawaited(smartAnchorMonitorTick()),
+        );
+      } else {
+        _smartAnchorMonitorTimer?.cancel();
+        _smartAnchorMonitorTimer = null;
+      }
+    }, fireImmediately: true);
     ref.listen(coreStatusProvider, (_, next) {
       if (next != CoreStatus.connected) {
         cancelDelayTests();

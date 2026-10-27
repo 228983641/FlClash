@@ -49,7 +49,8 @@ class SetupAction extends _$SetupAction {
 
   @override
   void build() {
-    unawaited(ref.read(smartAnchorProvider.notifier).restore());
+    // The smart-anchor restore reads the database, so it runs from
+    // bootstrap once app paths are bound, not from build.
     ref.onDispose(_stopRuntimeTicker);
     ref.listen(appVisibleProvider, (_, _) => _syncRuntimeTicker());
     ref.listen(

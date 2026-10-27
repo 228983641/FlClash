@@ -154,6 +154,7 @@ const _$DashboardWidgetEnumMap = {
   DashboardWidget.intranetIp: 'intranetIp',
   DashboardWidget.memoryInfo: 'memoryInfo',
   DashboardWidget.smartAnchor: 'smartAnchor',
+  DashboardWidget.smartAnchorPath: 'smartAnchorPath',
   DashboardWidget.subscriptionAggregation: 'subscriptionAggregation',
 };
 
