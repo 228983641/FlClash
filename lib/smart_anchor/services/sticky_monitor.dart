@@ -1,9 +1,7 @@
 class StickyMonitor {
-  StickyMonitor({
-    required List<String> ranked,
-    int initialIndex = 0,
-  })  : _ranked = List<String>.of(ranked),
-        _currentIndex = initialIndex;
+  StickyMonitor({required List<String> ranked, int initialIndex = 0})
+    : _ranked = List<String>.of(ranked),
+      _currentIndex = initialIndex;
 
   final List<String> _ranked;
   int _currentIndex;

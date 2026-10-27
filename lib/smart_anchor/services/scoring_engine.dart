@@ -103,7 +103,8 @@ class ScoringEngine {
   ) {
     final dLat = _toRad(lat1 - lat0);
     final dLon = _toRad(lon1 - lon0);
-    final a = math.pow(math.sin(dLat / 2), 2) +
+    final a =
+        math.pow(math.sin(dLat / 2), 2) +
         math.cos(_toRad(lat0)) *
             math.cos(_toRad(lat1)) *
             math.pow(math.sin(dLon / 2), 2);

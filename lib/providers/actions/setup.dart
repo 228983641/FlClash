@@ -513,6 +513,10 @@ class SetupAction extends _$SetupAction {
     if (hasScript) {
       rawConfig = await handleEvaluate(scriptContent!, rawConfig);
     }
+    final smartAnchorInput = ref.read(smartAnchorProvider);
+    if (!isCustom && smartAnchorInput.hasWork) {
+      rawConfig = buildSmartConfig(rawConfig, smartAnchorInput);
+    }
     final directory = await appPath.profilesPath;
     final injected = await _resolveInjectedProviders(
       setupState,

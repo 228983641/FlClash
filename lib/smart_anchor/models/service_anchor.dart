@@ -26,18 +26,18 @@ class ServiceAnchor {
   final int confirmedAt;
 
   Map<String, dynamic> toJson() => {
-        'serviceTag': serviceTag,
-        'countryCode': countryCode,
-        'lastProxyName': lastProxyName,
-        'egressIp': egressIp,
-        'subnet24': subnet24,
-        'asn': asn,
-        'isp': isp,
-        'latitude': latitude,
-        'longitude': longitude,
-        'city': city,
-        'confirmedAt': confirmedAt,
-      };
+    'serviceTag': serviceTag,
+    'countryCode': countryCode,
+    'lastProxyName': lastProxyName,
+    'egressIp': egressIp,
+    'subnet24': subnet24,
+    'asn': asn,
+    'isp': isp,
+    'latitude': latitude,
+    'longitude': longitude,
+    'city': city,
+    'confirmedAt': confirmedAt,
+  };
 
   factory ServiceAnchor.fromJson(Map<String, dynamic> json) {
     return ServiceAnchor(

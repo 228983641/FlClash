@@ -16,40 +16,42 @@ void main() {
   test('cache returns fresh entries and drops expired ones', () {
     final cache = GeoIpCache();
     final now = DateTime.now().millisecondsSinceEpoch;
-    final fresh = parseIpApi({
-      'status': 'success',
-      'query': '1.2.3.4',
-      'countryCode': 'US',
-      'lat': 34.0,
-      'lon': -118.0,
-      'as': 'AS20057 Example',
-      'hosting': false,
-      'mobile': false,
-      'proxy': false,
-    })!.toNodeMetadata(
-      proxyName: 'US-01',
-      entryServer: 'entry.example',
-      wafPass: true,
-      updatedAt: now,
-    );
+    final fresh =
+        parseIpApi({
+          'status': 'success',
+          'query': '1.2.3.4',
+          'countryCode': 'US',
+          'lat': 34.0,
+          'lon': -118.0,
+          'as': 'AS20057 Example',
+          'hosting': false,
+          'mobile': false,
+          'proxy': false,
+        })!.toNodeMetadata(
+          proxyName: 'US-01',
+          entryServer: 'entry.example',
+          wafPass: true,
+          updatedAt: now,
+        );
     cache.put(fresh);
     expect(cache.lookup('1.2.3.4')?.countryCode, 'US');
-    final stale = parseIpApi({
-      'status': 'success',
-      'query': '5.6.7.8',
-      'countryCode': 'SG',
-      'lat': 1.0,
-      'lon': 104.0,
-      'as': 'AS9999 Example',
-      'hosting': true,
-      'mobile': false,
-      'proxy': false,
-    })!.toNodeMetadata(
-      proxyName: 'SG-01',
-      entryServer: 'entry.example',
-      wafPass: true,
-      updatedAt: now - 73 * 3600 * 1000,
-    );
+    final stale =
+        parseIpApi({
+          'status': 'success',
+          'query': '5.6.7.8',
+          'countryCode': 'SG',
+          'lat': 1.0,
+          'lon': 104.0,
+          'as': 'AS9999 Example',
+          'hosting': true,
+          'mobile': false,
+          'proxy': false,
+        })!.toNodeMetadata(
+          proxyName: 'SG-01',
+          entryServer: 'entry.example',
+          wafPass: true,
+          updatedAt: now - 73 * 3600 * 1000,
+        );
     cache.put(stale);
     expect(cache.lookup('5.6.7.8'), isNull);
   });
@@ -92,7 +94,9 @@ void main() {
     var calls = 0;
     final service = GeoIpService(
       cache: cache,
-      keyPools: {'ip-api': ApiKeyPool(['k1', 'k2'], cooldownMs: 60000)},
+      keyPools: {
+        'ip-api': ApiKeyPool(['k1', 'k2'], cooldownMs: 60000),
+      },
       fetcher: (ip, key, sourceId) async {
         calls++;
         if (key == 'k1') {

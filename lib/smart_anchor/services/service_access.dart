@@ -33,13 +33,13 @@ class ServiceAccessResult {
   bool get blocksRanking => reason == ServiceAccessReason.regionBlocked;
 
   Map<String, dynamic> toJson() => {
-        'serviceId': serviceId,
-        'proxyName': proxyName,
-        'egressIp': egressIp,
-        'reason': reason.name,
-        'checkedAt': checkedAt,
-        'ttlHours': ttlHours,
-      };
+    'serviceId': serviceId,
+    'proxyName': proxyName,
+    'egressIp': egressIp,
+    'reason': reason.name,
+    'checkedAt': checkedAt,
+    'ttlHours': ttlHours,
+  };
 
   factory ServiceAccessResult.fromJson(Map<String, dynamic> json) {
     return ServiceAccessResult(
@@ -61,10 +61,7 @@ class ServiceProbeEndpoint {
 }
 
 class ServiceProbeConfig {
-  const ServiceProbeConfig({
-    required this.serviceId,
-    required this.endpoints,
-  });
+  const ServiceProbeConfig({required this.serviceId, required this.endpoints});
 
   final String serviceId;
   final List<ServiceProbeEndpoint> endpoints;
@@ -82,7 +79,10 @@ const List<ServiceProbeConfig> defaultServiceProbeConfigs = [
     serviceId: 'openai',
     endpoints: [
       ServiceProbeEndpoint(url: 'https://chatgpt.com', chain: 'web'),
-      ServiceProbeEndpoint(url: 'https://api.openai.com/v1/models', chain: 'api'),
+      ServiceProbeEndpoint(
+        url: 'https://api.openai.com/v1/models',
+        chain: 'api',
+      ),
     ],
   ),
   ServiceProbeConfig(

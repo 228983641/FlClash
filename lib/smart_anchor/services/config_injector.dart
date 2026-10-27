@@ -6,11 +6,11 @@ class SmartConfigInjector {
     required List<ServiceToggleConfig> serviceConfigs,
     required Map<String, List<String>> rankedProxiesByService,
   }) {
-    final originalProxyGroups =
-        List<dynamic>.from(rawConfig['proxy-groups'] as List? ?? []);
+    final originalProxyGroups = List<dynamic>.from(
+      rawConfig['proxy-groups'] as List? ?? [],
+    );
     final originalRules = List<dynamic>.from(rawConfig['rules'] as List? ?? []);
-    final dnsConfig =
-        Map<String, dynamic>.from(rawConfig['dns'] as Map? ?? {});
+    final dnsConfig = Map<String, dynamic>.from(rawConfig['dns'] as Map? ?? {});
     final nameserverPolicy = Map<String, dynamic>.from(
       dnsConfig['nameserver-policy'] as Map? ?? {},
     );
@@ -33,8 +33,7 @@ class SmartConfigInjector {
       }
       if (service.dnsDomains.isNotEmpty) {
         final domainKey = service.dnsDomains.join(',');
-        nameserverPolicy[domainKey] =
-            'https://1.1.1.1/dns-query#$groupName';
+        nameserverPolicy[domainKey] = 'https://1.1.1.1/dns-query#$groupName';
       }
     }
     final result = Map<String, dynamic>.from(rawConfig);

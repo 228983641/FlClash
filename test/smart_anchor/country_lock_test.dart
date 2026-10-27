@@ -32,18 +32,16 @@ void main() {
 
   test('hard filter follows the user lock, not the anchor country', () {
     final nodes = [node('US'), node('SG'), node('JP')];
-    expect(
-      ScoringEngine.filterForTarget(nodes, []).map((n) => n.countryCode),
-      ['US', 'SG', 'JP'],
-    );
+    expect(ScoringEngine.filterForTarget(nodes, []).map((n) => n.countryCode), [
+      'US',
+      'SG',
+      'JP',
+    ]);
     expect(
       ScoringEngine.filterForTarget(nodes, ['SG']).map((n) => n.countryCode),
       ['SG'],
     );
-    expect(
-      ScoringEngine.passesHardFilterForTarget(node('SG'), ['US']),
-      false,
-    );
+    expect(ScoringEngine.passesHardFilterForTarget(node('SG'), ['US']), false);
     expect(ScoringEngine.passesHardFilter(node('US'), 'US'), true);
   });
 
@@ -59,10 +57,7 @@ void main() {
     expect(config.lockedCountries, isEmpty);
     expect(CountryLock.description(config.lockedCountries), contains('不限国家'));
     expect(CountryLock.description(['US']), contains('单国锁'));
-    expect(
-      CountryLock.description(['US']),
-      contains('改锁国会清空旧锚点'),
-    );
+    expect(CountryLock.description(['US']), contains('改锁国会清空旧锚点'));
   });
 
   test('toggle config reads a stored country list', () {

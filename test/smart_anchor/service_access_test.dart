@@ -22,10 +22,7 @@ NodeMetadataCache node(String name, String country) {
   );
 }
 
-ServiceAccessResult access(
-  String proxy,
-  ServiceAccessReason reason,
-) {
+ServiceAccessResult access(String proxy, ServiceAccessReason reason) {
   return ServiceAccessResult(
     serviceId: 'gemini',
     proxyName: proxy,
@@ -58,76 +55,74 @@ void main() {
     final geminiAccess = {
       'HK-01': access('HK-01', ServiceAccessReason.regionBlocked),
     };
+    expect(ScoringEngine.filterForService(nodes, [], youtubeAccess).length, 2);
     expect(
-      ScoringEngine.filterForService(nodes, [], youtubeAccess).length,
-      2,
-    );
-    expect(
-      ScoringEngine.filterForService(nodes, [], geminiAccess)
-          .map((n) => n.proxyName),
+      ScoringEngine.filterForService(
+        nodes,
+        [],
+        geminiAccess,
+      ).map((n) => n.proxyName),
       ['HK-02'],
     );
     expect(
-      ScoringEngine.rankForService(nodes, anchor, [], geminiAccess)
-          .map((n) => n.proxyName),
+      ScoringEngine.rankForService(
+        nodes,
+        anchor,
+        [],
+        geminiAccess,
+      ).map((n) => n.proxyName),
       ['HK-02'],
     );
   });
 
-  test('probe classification separates reachable, blocked, down and failed', () {
-    expect(
-      classifyProbeResponse(
-        statusCode: 401,
-        body: '',
-        networkError: false,
-      ),
-      ServiceAccessReason.accessible,
-    );
-    expect(
-      classifyProbeResponse(
-        statusCode: 403,
-        body: 'This service is not available in your country',
-        networkError: false,
-      ),
-      ServiceAccessReason.regionBlocked,
-    );
-    expect(
-      classifyProbeResponse(
-        statusCode: 403,
-        body: 'forbidden',
-        networkError: false,
-      ),
-      ServiceAccessReason.unknown,
-    );
-    expect(
-      classifyProbeResponse(
-        statusCode: 503,
-        body: '',
-        networkError: false,
-      ),
-      ServiceAccessReason.serviceDown,
-    );
-    expect(
-      classifyProbeResponse(
-        statusCode: null,
-        body: '',
-        networkError: true,
-      ),
-      ServiceAccessReason.networkFailed,
-    );
-  });
+  test(
+    'probe classification separates reachable, blocked, down and failed',
+    () {
+      expect(
+        classifyProbeResponse(statusCode: 401, body: '', networkError: false),
+        ServiceAccessReason.accessible,
+      );
+      expect(
+        classifyProbeResponse(
+          statusCode: 403,
+          body: 'This service is not available in your country',
+          networkError: false,
+        ),
+        ServiceAccessReason.regionBlocked,
+      );
+      expect(
+        classifyProbeResponse(
+          statusCode: 403,
+          body: 'forbidden',
+          networkError: false,
+        ),
+        ServiceAccessReason.unknown,
+      );
+      expect(
+        classifyProbeResponse(statusCode: 503, body: '', networkError: false),
+        ServiceAccessReason.serviceDown,
+      );
+      expect(
+        classifyProbeResponse(statusCode: null, body: '', networkError: true),
+        ServiceAccessReason.networkFailed,
+      );
+    },
+  );
 
-  test('outage guard suppresses failover only after repeated service downs', () {
-    final guard = ServiceOutageGuard();
-    expect(guard.suspectedOutage, false);
-    guard.recordFailure(ServiceAccessReason.serviceDown, 1000);
-    guard.recordFailure(ServiceAccessReason.serviceDown, 2000);
-    expect(guard.suspectedOutage, false);
-    guard.recordFailure(ServiceAccessReason.regionBlocked, 3000);
-    expect(guard.suspectedOutage, false);
-    guard.recordFailure(ServiceAccessReason.serviceDown, 4000);
-    expect(guard.suspectedOutage, true);
-  });
+  test(
+    'outage guard suppresses failover only after repeated service downs',
+    () {
+      final guard = ServiceOutageGuard();
+      expect(guard.suspectedOutage, false);
+      guard.recordFailure(ServiceAccessReason.serviceDown, 1000);
+      guard.recordFailure(ServiceAccessReason.serviceDown, 2000);
+      expect(guard.suspectedOutage, false);
+      guard.recordFailure(ServiceAccessReason.regionBlocked, 3000);
+      expect(guard.suspectedOutage, false);
+      guard.recordFailure(ServiceAccessReason.serviceDown, 4000);
+      expect(guard.suspectedOutage, true);
+    },
+  );
 
   test('trust tiers and leak diagnostics', () {
     expect(ScoringEngine.trustTier(85), 'safe');
@@ -161,10 +156,7 @@ void main() {
     final openai = defaultServiceProbeConfigs.firstWhere(
       (config) => config.serviceId == 'openai',
     );
-    expect(
-      openai.endpoints.map((endpoint) => endpoint.chain),
-      ['web', 'api'],
-    );
+    expect(openai.endpoints.map((endpoint) => endpoint.chain), ['web', 'api']);
     expect(
       openai.endpoints.map((endpoint) => endpoint.url),
       contains('https://api.openai.com/v1/models'),

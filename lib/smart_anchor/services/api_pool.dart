@@ -207,8 +207,8 @@ GeoIpResult? parseIpApi(Map<String, dynamic> json) {
   final ipType = json['mobile'] == true
       ? 'mobile'
       : json['hosting'] == true
-          ? 'hosting'
-          : 'isp';
+      ? 'hosting'
+      : 'isp';
   return GeoIpResult(
     ip: json['query'] as String? ?? '',
     countryCode: json['countryCode'] as String? ?? '',
@@ -230,9 +230,7 @@ GeoIpResult? parseIpInfo(Map<String, dynamic> json) {
   }
   final parts = loc.split(',');
   final org = json['org'];
-  final asn = org is String && org.startsWith('AS')
-      ? org.split(' ').first
-      : '';
+  final asn = org is String && org.startsWith('AS') ? org.split(' ').first : '';
   return GeoIpResult(
     ip: json['ip'] as String? ?? '',
     countryCode: json['country'] as String? ?? '',

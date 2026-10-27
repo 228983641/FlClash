@@ -47,22 +47,22 @@ class NodeMetadataCache {
   }
 
   Map<String, dynamic> toJson() => {
-        'proxyName': proxyName,
-        'entryServer': entryServer,
-        'egressIp': egressIp,
-        'countryCode': countryCode,
-        'latitude': latitude,
-        'longitude': longitude,
-        'asn': asn,
-        'ipType': ipType,
-        'fraudScore': fraudScore,
-        'purityScore': purityScore,
-        'wafPass': wafPass,
-        'updatedAt': updatedAt,
-        'ttlHours': ttlHours,
-        'sourceCount': sourceCount,
-        'countryDisputed': countryDisputed,
-      };
+    'proxyName': proxyName,
+    'entryServer': entryServer,
+    'egressIp': egressIp,
+    'countryCode': countryCode,
+    'latitude': latitude,
+    'longitude': longitude,
+    'asn': asn,
+    'ipType': ipType,
+    'fraudScore': fraudScore,
+    'purityScore': purityScore,
+    'wafPass': wafPass,
+    'updatedAt': updatedAt,
+    'ttlHours': ttlHours,
+    'sourceCount': sourceCount,
+    'countryDisputed': countryDisputed,
+  };
 
   factory NodeMetadataCache.fromJson(Map<String, dynamic> json) {
     return NodeMetadataCache(

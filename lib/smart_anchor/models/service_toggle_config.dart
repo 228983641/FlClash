@@ -32,13 +32,13 @@ class ServiceToggleConfig {
   }
 
   Map<String, dynamic> toJson() => {
-        'serviceId': serviceId,
-        'displayName': displayName,
-        'isEnabled': isEnabled,
-        'targetCountry': targetCountry,
-        'matchRules': matchRules,
-        'dnsDomains': dnsDomains,
-      };
+    'serviceId': serviceId,
+    'displayName': displayName,
+    'isEnabled': isEnabled,
+    'targetCountry': targetCountry,
+    'matchRules': matchRules,
+    'dnsDomains': dnsDomains,
+  };
 
   factory ServiceToggleConfig.fromJson(Map<String, dynamic> json) {
     final countries = json['targetCountries'];
@@ -49,8 +49,7 @@ class ServiceToggleConfig {
       serviceId: json['serviceId'] as String,
       displayName: json['displayName'] as String,
       isEnabled: json['isEnabled'] as bool,
-      targetCountry:
-          firstCountry ?? (json['targetCountry'] as String? ?? ''),
+      targetCountry: firstCountry ?? (json['targetCountry'] as String? ?? ''),
       matchRules: List<String>.from(json['matchRules'] as List),
       dnsDomains: List<String>.from(json['dnsDomains'] as List),
     );
