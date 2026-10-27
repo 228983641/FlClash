@@ -79,7 +79,8 @@ void main() {
 
   test('google family services belong to one group', () {
     expect(groupForService('youtube')?.id, 'google-group');
-    expect(groupForService('gemini')?.id, 'google-group');
+    expect(groupForService('google')?.id, 'google-group');
+    expect(groupForService('gemini')?.id, 'gemini-group');
     expect(groupForService('claude')?.id, 'anthropic-group');
     expect(groupForService('openai')?.id, 'openai-group');
   });

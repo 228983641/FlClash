@@ -54,7 +54,7 @@
 
 - Hard filter first (any failure drops a node to the emergency pool only):
   country outside the lock, WAF failure, or purity below 50.
-- Then `priority = purity − distance penalty + 15 (same ASN) + 10 (same /24)`.
+- Then `priority = purity − distance penalty + 15 (same ASN) + 10 (same /24) − delay penalty`, where the delay penalty is `min(10, delayMs / 100)` (untested nodes score 0, timed-out nodes score 10), so among nodes with good purity and location the lowest-delay node wins.
   Purity = 100 − IP-type deduction − fraud score × 0.5 − abuse deduction
   (residential/ISP 0, business 10, hosting/datacenter 30, public proxy/Tor/abuse
   history 25; bands: ≥70 safe, 50–70 occasional risk-control, <50 high risk).
@@ -130,10 +130,10 @@
 - [x] Step 3 real probing: through-tunnel egress and per-service probing.
 - [x] Step 4 UI: settings page + homepage cards (cards show status and quick
   toggles only; details live in settings).
-- [x] Service groups and multi-country lock: same-company services (Google, YouTube, Gemini) can share one set of locked countries and one anchor, toggled per group; locked countries are now a list per service group, synced across members while sharing is on.
+- [x] Service groups and multi-country lock: groups are formed by restriction profile, not by company alone — Google and YouTube share one group (neither refuses regions), while Gemini stands alone (it refuses some regions), so a restricted service never drags an open service into its lock; locked countries are a list per service group, synced across members while sharing is on.
 - [x] ip.net.coffee merge: Cloudflare edge info (colo/WARP/protocol) and official service status (Claude/OpenAI/Cloudflare) in diagnostics; DNS/WebRTC leaks stay device-level diagnostics, global Ping stays latency display only.
-- [x] Auto-failover switch and anti-bounce guard: auto-switching can be turned off; when on, a switch needs two consecutive failures of the node in use, never targets a region-blocked node, never follows a ranking change alone, a manual switch resets the failure count, and at most three switches happen per service in ten minutes before failover freezes in place. Lock or no lock, the rule is the same: a locked service only switches within its locked countries, an unlocked service switches by purity and anchor distance.
-- [x] More presets and user-editable services: Copilot, Meta AI, Grok, Perplexity, Mistral, Poe, DeepSeek, Kimi, Doubao, Qwen, ChatGLM, ERNIE, Yuanbao, Disney+ and Apple TV+ presets, all off by default; any preset or custom service can be edited from the services list (name, match rules, DNS domains, lock countries), and custom services can be added or deleted like scripts and subscriptions are edited.
+- [x] Auto-failover switch and anti-bounce guard: auto-switching can be turned off; when on, a 30-second loop probes the node in use for each enabled service, and a switch needs two consecutive failures of that node, never targets a region-blocked node, never follows a ranking change alone, a manual switch resets the failure count, and at most three switches happen per service in ten minutes before failover freezes in place. Lock or no lock, the rule is the same: a locked service only switches within its locked countries, an unlocked service switches by purity, anchor distance and delay.
+- [x] More presets and user-editable services: Copilot, Meta AI, Muse, Grok, Perplexity, Mistral, Poe, Disney+ and Apple TV+ presets, all off by default (Chinese AI services are intentionally not preset; they can be added as custom services); any preset or custom service can be edited from the services list (name, match rules, DNS domains, lock countries), and custom services can be added or deleted like scripts and subscriptions are edited.
 - [ ] After all features, a user-perspective review pass; Windows version later
   (Android first).
 

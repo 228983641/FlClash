@@ -171,8 +171,9 @@ List<String> _ruleStrings(Map<String, dynamic> config) {
 List<String> rankedProxiesForService(
   SmartAnchorInput input,
   ServiceToggleConfig service,
-  List<String> proxyNames,
-) {
+  List<String> proxyNames, {
+  Map<String, int> delays = const {},
+}) {
   final tested = <NodeMetadataCache>[];
   for (final name in proxyNames) {
     final metadata = input.metadataByProxy[name];
@@ -203,6 +204,7 @@ List<String> rankedProxiesForService(
     proxyNames,
     input,
     sharedAnchor: sharedAnchor,
+    delays: delays,
   );
 }
 
@@ -211,6 +213,7 @@ List<String> _rankForService(
   List<String> proxyNames,
   SmartAnchorInput input, {
   ServiceAnchor? sharedAnchor,
+  Map<String, int> delays = const {},
 }) {
   final tested = <NodeMetadataCache>[];
   final untested = <String>[];
@@ -229,7 +232,13 @@ List<String> _rankForService(
   if (anchor == null) {
     return [...tested.map((node) => node.proxyName), ...untested];
   }
-  final ranked = ScoringEngine.rankForService(tested, anchor, lock, access);
+  final ranked = ScoringEngine.rankForService(
+    tested,
+    anchor,
+    lock,
+    access,
+    delays: delays,
+  );
   return [...ranked.map((node) => node.proxyName), ...untested];
 }
 

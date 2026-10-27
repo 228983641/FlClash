@@ -108,6 +108,31 @@ void main() {
       final ranked = ScoringEngine.rank([far, same], a);
       expect(ranked.first.proxyName, 'same');
     });
+
+    test('equal quality and location prefers lower delay', () {
+      final a = anchor();
+      final fast = node(name: 'fast');
+      final slow = node(name: 'slow');
+      expect(
+        ScoringEngine.priority(fast, a, delayMs: 60) >
+            ScoringEngine.priority(slow, a, delayMs: 900),
+        isTrue,
+      );
+      final ranked = ScoringEngine.rank(
+        [slow, fast],
+        a,
+        delays: {'fast': 60, 'slow': 900},
+      );
+      expect(ranked.first.proxyName, 'fast');
+    });
+
+    test('delay penalty caps and ignores unknown delays', () {
+      expect(ScoringEngine.delayPenalty(null), 0);
+      expect(ScoringEngine.delayPenalty(0), 0);
+      expect(ScoringEngine.delayPenalty(-1), 10);
+      expect(ScoringEngine.delayPenalty(100), 1);
+      expect(ScoringEngine.delayPenalty(5000), 10);
+    });
   });
 
   group('StickyMonitor', () {

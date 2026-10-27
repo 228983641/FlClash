@@ -63,8 +63,9 @@ class ScoringEngine {
     List<NodeMetadataCache> nodes,
     ServiceAnchor anchor,
     List<String> lockedCountries,
-    Map<String, ServiceAccessResult> accessByProxy,
-  ) {
+    Map<String, ServiceAccessResult> accessByProxy, {
+    Map<String, int> delays = const {},
+  }) {
     final filtered = filterForService(nodes, lockedCountries, accessByProxy);
     final accessible = <NodeMetadataCache>[];
     final untested = <NodeMetadataCache>[];
@@ -76,7 +77,10 @@ class ScoringEngine {
         untested.add(node);
       }
     }
-    return [...rank(accessible, anchor), ...rank(untested, anchor)];
+    return [
+      ...rank(accessible, anchor, delays: delays),
+      ...rank(untested, anchor, delays: delays),
+    ];
   }
 
   static double purityScore({
@@ -117,7 +121,21 @@ class ScoringEngine {
     return math.min(25.0, 4.0 * math.log(distanceKm / 50.0 + 1));
   }
 
-  static double priority(NodeMetadataCache node, ServiceAnchor anchor) {
+  static double delayPenalty(int? delayMs) {
+    if (delayMs == null || delayMs == 0) {
+      return 0.0;
+    }
+    if (delayMs < 0) {
+      return 10.0;
+    }
+    return math.min(10.0, delayMs / 100.0);
+  }
+
+  static double priority(
+    NodeMetadataCache node,
+    ServiceAnchor anchor, {
+    int? delayMs,
+  }) {
     final distance = haversineKm(
       anchor.latitude,
       anchor.longitude,
@@ -127,15 +145,22 @@ class ScoringEngine {
     var score = node.purityScore - distancePenalty(distance);
     if (node.asn == anchor.asn) score += 15;
     if (node.sameSubnet24(anchor.subnet24)) score += 10;
-    return score;
+    return score - delayPenalty(delayMs);
   }
 
   static List<NodeMetadataCache> rank(
     List<NodeMetadataCache> nodes,
-    ServiceAnchor anchor,
-  ) {
+    ServiceAnchor anchor, {
+    Map<String, int> delays = const {},
+  }) {
     final sorted = List<NodeMetadataCache>.of(nodes);
-    sorted.sort((a, b) => priority(b, anchor).compareTo(priority(a, anchor)));
+    sorted.sort(
+      (a, b) => priority(
+        b,
+        anchor,
+        delayMs: delays[b.proxyName],
+      ).compareTo(priority(a, anchor, delayMs: delays[a.proxyName])),
+    );
     return sorted;
   }
 }

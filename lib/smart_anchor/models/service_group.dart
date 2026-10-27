@@ -14,7 +14,7 @@ const List<ServiceGroup> defaultServiceGroups = [
   ServiceGroup(
     id: 'google-group',
     displayName: 'Google',
-    serviceIds: ['google', 'youtube', 'gemini'],
+    serviceIds: ['google', 'youtube'],
   ),
   ServiceGroup(
     id: 'openai-group',
@@ -60,25 +60,6 @@ const List<ServiceGroup> defaultServiceGroups = [
   ),
   ServiceGroup(id: 'poe-group', displayName: 'Poe', serviceIds: ['poe']),
   ServiceGroup(
-    id: 'deepseek-group',
-    displayName: 'DeepSeek',
-    serviceIds: ['deepseek'],
-  ),
-  ServiceGroup(id: 'kimi-group', displayName: 'Kimi', serviceIds: ['kimi']),
-  ServiceGroup(
-    id: 'doubao-group',
-    displayName: 'Doubao',
-    serviceIds: ['doubao'],
-  ),
-  ServiceGroup(id: 'qwen-group', displayName: 'Qwen', serviceIds: ['qwen']),
-  ServiceGroup(id: 'glm-group', displayName: 'ChatGLM', serviceIds: ['glm']),
-  ServiceGroup(id: 'ernie-group', displayName: 'ERNIE', serviceIds: ['ernie']),
-  ServiceGroup(
-    id: 'yuanbao-group',
-    displayName: 'Yuanbao',
-    serviceIds: ['yuanbao'],
-  ),
-  ServiceGroup(
     id: 'disney-group',
     displayName: 'Disney+',
     serviceIds: ['disney'],
@@ -88,6 +69,12 @@ const List<ServiceGroup> defaultServiceGroups = [
     displayName: 'Apple TV+',
     serviceIds: ['appletv'],
   ),
+  ServiceGroup(
+    id: 'gemini-group',
+    displayName: 'Gemini',
+    serviceIds: ['gemini'],
+  ),
+  ServiceGroup(id: 'muse-group', displayName: 'Muse', serviceIds: ['muse']),
 ];
 
 ServiceGroup? groupForService(String serviceId) {

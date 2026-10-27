@@ -43,7 +43,14 @@ class ProxiesAction extends _$ProxiesAction {
 
   @override
   void build() {
-    ref.onDispose(() => _delayFlushTimer?.cancel());
+    _smartAnchorMonitorTimer ??= Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => unawaited(smartAnchorMonitorTick()),
+    );
+    ref.onDispose(() {
+      _delayFlushTimer?.cancel();
+      _smartAnchorMonitorTimer?.cancel();
+    });
     ref.listen(coreStatusProvider, (_, next) {
       if (next != CoreStatus.connected) {
         cancelDelayTests();
@@ -179,6 +186,27 @@ class ProxiesAction extends _$ProxiesAction {
 
   final FailoverGuard _failoverGuard = FailoverGuard();
 
+  Timer? _smartAnchorMonitorTimer;
+  bool _smartAnchorMonitorRunning = false;
+
+  Map<String, int> _flattenDelays(DelayMap delayMap) {
+    final delays = <String, int>{};
+    for (final byProxy in delayMap.values) {
+      for (final entry in byProxy.entries) {
+        final value = entry.value;
+        if (value == null) {
+          continue;
+        }
+        final existing = delays[entry.key];
+        if (existing == null ||
+            (value >= 0 && (existing < 0 || value < existing))) {
+          delays[entry.key] = value;
+        }
+      }
+    }
+    return delays;
+  }
+
   void smartAnchorFailoverCheck() {
     final smart = ref.read(smartAnchorProvider);
     if (!smart.autoFailoverEnabled) {
@@ -194,6 +222,7 @@ class ProxiesAction extends _$ProxiesAction {
         }
       }
     }
+    final delays = _flattenDelays(ref.read(delayDataSourceProvider));
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     for (final service in smart.services.where(
       (service) => service.isEnabled,
@@ -204,7 +233,12 @@ class ProxiesAction extends _$ProxiesAction {
       if (currentName == null) {
         continue;
       }
-      final ranked = rankedProxiesForService(smart, service, names);
+      final ranked = rankedProxiesForService(
+        smart,
+        service,
+        names,
+        delays: delays,
+      );
       final next = _failoverGuard.noteResult(
         serviceId: service.serviceId,
         currentName: currentName,
@@ -216,6 +250,44 @@ class ProxiesAction extends _$ProxiesAction {
       if (next != null) {
         changeProxyDebounce(groupName, next);
       }
+    }
+  }
+
+  Future<void> smartAnchorMonitorTick() async {
+    if (_smartAnchorMonitorRunning) {
+      return;
+    }
+    _smartAnchorMonitorRunning = true;
+    try {
+      if (!ref.read(isStartProvider)) {
+        return;
+      }
+      final smart = ref.read(smartAnchorProvider);
+      if (!smart.autoFailoverEnabled) {
+        return;
+      }
+      final groups = ref.read(groupsProvider);
+      final probed = <String>{};
+      for (final service in smart.services.where((s) => s.isEnabled)) {
+        final current = groups
+            .getGroup('🎯 Smart-${service.serviceId.toUpperCase()}')
+            ?.now;
+        if (current == null || !probed.add(current)) {
+          continue;
+        }
+        await ref
+            .read(smartAnchorProvider.notifier)
+            .probeNodes(
+              proxyNames: [current],
+              currentProxyName: current,
+              force: true,
+              updateThrottle: false,
+            );
+      }
+      smartAnchorFailoverCheck();
+    } catch (_) {
+    } finally {
+      _smartAnchorMonitorRunning = false;
     }
   }
 

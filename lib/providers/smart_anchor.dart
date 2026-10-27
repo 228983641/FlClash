@@ -224,6 +224,7 @@ class SmartAnchor extends _$SmartAnchor {
     required String currentProxyName,
     Map<String, String> entryServers = const {},
     bool force = false,
+    bool updateThrottle = true,
   }) async {
     final enabled = state.services.where((service) => service.isEnabled);
     if (enabled.isEmpty) {
@@ -235,7 +236,9 @@ class SmartAnchor extends _$SmartAnchor {
         now.difference(_lastProbeAt!) < const Duration(minutes: 10)) {
       return;
     }
-    _lastProbeAt = now;
+    if (updateThrottle) {
+      _lastProbeAt = now;
+    }
     final core = ref.read(coreHandlerProvider);
     final geoService = GeoIpService(
       cache: GeoIpCache(),
