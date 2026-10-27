@@ -1,3 +1,4 @@
+import '../models/anchor_path.dart';
 import '../models/node_metadata.dart';
 import '../models/service_anchor.dart';
 import '../models/service_group.dart';
@@ -29,6 +30,7 @@ class SmartAnchorInput {
     this.aggregationMode = AggregationGroupMode.primaryOnly,
     this.sharedLockGroupIds = const [],
     this.autoFailoverEnabled = true,
+    this.paths = const {},
   });
 
   final List<ServiceToggleConfig> services;
@@ -39,6 +41,7 @@ class SmartAnchorInput {
   final AggregationGroupMode aggregationMode;
   final List<String> sharedLockGroupIds;
   final bool autoFailoverEnabled;
+  final Map<String, List<AnchorPathPoint>> paths;
 
   bool get hasWork {
     return services.any((service) => service.isEnabled) ||
@@ -54,6 +57,7 @@ class SmartAnchorInput {
     AggregationGroupMode? aggregationMode,
     List<String>? sharedLockGroupIds,
     bool? autoFailoverEnabled,
+    Map<String, List<AnchorPathPoint>>? paths,
   }) {
     return SmartAnchorInput(
       services: services ?? this.services,
@@ -64,6 +68,7 @@ class SmartAnchorInput {
       aggregationMode: aggregationMode ?? this.aggregationMode,
       sharedLockGroupIds: sharedLockGroupIds ?? this.sharedLockGroupIds,
       autoFailoverEnabled: autoFailoverEnabled ?? this.autoFailoverEnabled,
+      paths: paths ?? this.paths,
     );
   }
 }

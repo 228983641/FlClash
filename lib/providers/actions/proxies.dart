@@ -188,6 +188,9 @@ class ProxiesAction extends _$ProxiesAction {
 
   Timer? _smartAnchorMonitorTimer;
   bool _smartAnchorMonitorRunning = false;
+  final Map<String, String> _lastObservedCurrent = {};
+  final Map<String, String> _pendingAutoSwitch = {};
+  final Map<String, (String, int)> _anchorStableSince = {};
 
   Map<String, int> _flattenDelays(DelayMap delayMap) {
     final delays = <String, int>{};
@@ -233,6 +236,31 @@ class ProxiesAction extends _$ProxiesAction {
       if (currentName == null) {
         continue;
       }
+      final currentMeta = smart.metadataByProxy[currentName];
+      if (_lastObservedCurrent[service.serviceId] != currentName &&
+          currentMeta != null) {
+        final note = _pendingAutoSwitch[service.serviceId] == currentName
+            ? 'auto'
+            : _lastObservedCurrent[service.serviceId] == null
+            ? 'start'
+            : 'manual';
+        ref
+            .read(smartAnchorProvider.notifier)
+            .recordPathPoint(
+              AnchorPathPoint(
+                serviceId: service.serviceId,
+                proxyName: currentName,
+                latitude: currentMeta.latitude,
+                longitude: currentMeta.longitude,
+                countryCode: currentMeta.countryCode,
+                city: '',
+                recordedAt: nowMs,
+                note: note,
+              ),
+            );
+        _lastObservedCurrent[service.serviceId] = currentName;
+      }
+      _pendingAutoSwitch.remove(service.serviceId);
       final ranked = rankedProxiesForService(
         smart,
         service,
@@ -248,7 +276,54 @@ class ProxiesAction extends _$ProxiesAction {
         nowMs: nowMs,
       );
       if (next != null) {
+        _pendingAutoSwitch[service.serviceId] = next;
         changeProxyDebounce(groupName, next);
+      }
+    }
+  }
+
+  void _trackAnchorStability(SmartAnchorInput smart) {
+    final groups = ref.read(groupsProvider);
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    for (final service in smart.services.where((s) => s.isEnabled)) {
+      final current = groups
+          .getGroup('🎯 Smart-${service.serviceId.toUpperCase()}')
+          ?.now;
+      final meta = current == null ? null : smart.metadataByProxy[current];
+      if (current == null || meta == null) {
+        _anchorStableSince.remove(service.serviceId);
+        continue;
+      }
+      final tracked = _anchorStableSince[service.serviceId];
+      if (tracked == null || tracked.$1 != current) {
+        _anchorStableSince[service.serviceId] = (current, nowMs);
+        continue;
+      }
+      final existing = smart.anchors[service.serviceId];
+      if (existing != null && existing.lastProxyName == current) {
+        continue;
+      }
+      if (nowMs - tracked.$2 >= 10 * 60 * 1000) {
+        ref
+            .read(smartAnchorProvider.notifier)
+            .setAnchor(
+              service.serviceId,
+              ServiceAnchor(
+                serviceTag: service.serviceId,
+                countryCode: meta.countryCode,
+                lastProxyName: current,
+                egressIp: meta.egressIp,
+                subnet24: meta.egressIp.contains('.')
+                    ? meta.egressIp.split('.').take(3).join('.')
+                    : '',
+                asn: meta.asn,
+                isp: '',
+                latitude: meta.latitude,
+                longitude: meta.longitude,
+                city: '',
+                confirmedAt: nowMs,
+              ),
+            );
       }
     }
   }
@@ -263,6 +338,7 @@ class ProxiesAction extends _$ProxiesAction {
         return;
       }
       final smart = ref.read(smartAnchorProvider);
+      _trackAnchorStability(smart);
       if (!smart.autoFailoverEnabled) {
         return;
       }

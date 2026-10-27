@@ -982,5 +982,13 @@
   "smartAnchorSharedLock": "Share lock and anchor within the same company",
   "smartAnchorSharedLockDesc": "Services from the same company share one set of locked countries and one anchor, so the login country and city stay consistent. Turn it off and each service can be set separately.",
   "smartAnchorAutoFailover": "Auto failover",
-  "smartAnchorAutoFailoverDesc": "When the node in use fails 2 consecutive probes, automatically switch to the next ranked node and never switch back. When off, a failing node is never switched away automatically."
+  "smartAnchorAutoFailoverDesc": "When the node in use fails 2 consecutive probes, automatically switch to the next ranked node and never switch back. When off, a failing node is never switched away automatically.",
+  "smartAnchorPath": "Node path",
+  "smartAnchorPathDesc": "Where each service group's nodes have moved, drawn as a schematic path.",
+  "smartAnchorPathEmpty": "No path recorded yet. Use a service for a while and its node moves will show up here.",
+  "smartAnchorBackToAnchor": "Back to anchor",
+  "smartAnchorPathClear": "Clear path",
+  "smartAnchorPathAuto": "Auto",
+  "smartAnchorPathManual": "Manual",
+  "smartAnchorPathStart": "Start"
 }

@@ -493,6 +493,7 @@ enum DashboardWidget {
   intranetIp,
   memoryInfo,
   smartAnchor,
+  smartAnchorPath,
   subscriptionAggregation;
 
   final List<SupportPlatform> platforms;

@@ -78,6 +78,7 @@ class SmartAnchorSettingsView extends ConsumerWidget {
                     service.isEnabled
                         ? '${appLocalizations.countryLock}: '
                               '${_lockSummary(service.lockedCountries, appLocalizations.countryLockNone)}'
+                              '${input.anchors[service.serviceId] == null ? '' : ' · ${input.anchors[service.serviceId]!.city.isEmpty ? input.anchors[service.serviceId]!.countryCode : input.anchors[service.serviceId]!.city}'}'
                         : appLocalizations.turnOff,
                   ),
                   trailing: CommonSwitch(

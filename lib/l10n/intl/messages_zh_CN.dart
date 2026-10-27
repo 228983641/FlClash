@@ -1368,11 +1368,23 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorAutoFailoverDesc": MessageLookupByLibrary.simpleMessage(
       "在用节点连续 2 次探测失败时自动切到下一顺位，且不回切；关闭后故障节点不会自动切换。",
     ),
+    "smartAnchorBackToAnchor": MessageLookupByLibrary.simpleMessage("回到锚点"),
     "smartAnchorDesc": MessageLookupByLibrary.simpleMessage("业务锁国、锚点记忆与纯净度排序。"),
     "smartAnchorDiagnostics": MessageLookupByLibrary.simpleMessage("诊断"),
     "smartAnchorLockDesc": MessageLookupByLibrary.simpleMessage(
       "不限表示不按国家过滤，风控风险最高。单国锁固定登录国家，风险最低；多国锁允许在几个国家内选节点，风险居中；改锁国会清空旧锚点。",
     ),
+    "smartAnchorPath": MessageLookupByLibrary.simpleMessage("节点位置路径"),
+    "smartAnchorPathAuto": MessageLookupByLibrary.simpleMessage("自动"),
+    "smartAnchorPathClear": MessageLookupByLibrary.simpleMessage("清除路径"),
+    "smartAnchorPathDesc": MessageLookupByLibrary.simpleMessage(
+      "各服务组的节点位置变化示意图。",
+    ),
+    "smartAnchorPathEmpty": MessageLookupByLibrary.simpleMessage(
+      "暂无路径记录，使用一段时间后，节点位置变化会画在这里。",
+    ),
+    "smartAnchorPathManual": MessageLookupByLibrary.simpleMessage("手动"),
+    "smartAnchorPathStart": MessageLookupByLibrary.simpleMessage("开始"),
     "smartAnchorProbeNow": MessageLookupByLibrary.simpleMessage("立即探测"),
     "smartAnchorResetAnchor": MessageLookupByLibrary.simpleMessage("重置锚点"),
     "smartAnchorServices": MessageLookupByLibrary.simpleMessage("业务"),

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:fl_clash/common/request.dart';
 import 'package:fl_clash/common/service_probe.dart';
 import 'package:fl_clash/providers/core.dart';
+import 'package:fl_clash/smart_anchor/models/anchor_path.dart';
+import 'package:fl_clash/smart_anchor/models/service_anchor.dart';
 import 'package:fl_clash/smart_anchor/services/api_pool.dart';
 import 'package:fl_clash/smart_anchor/models/service_group.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
@@ -49,6 +51,7 @@ class SmartAnchor extends _$SmartAnchor {
       accessByService: snapshot.accessByService,
       sharedLockGroupIds: snapshot.sharedLockGroupIds,
       autoFailoverEnabled: snapshot.autoFailoverEnabled,
+      paths: snapshot.paths,
     );
   }
 
@@ -94,6 +97,7 @@ class SmartAnchor extends _$SmartAnchor {
       ),
     );
     clearAnchor(serviceId);
+    clearPath(serviceId);
   }
 
   void updateService(
@@ -217,6 +221,24 @@ class SmartAnchor extends _$SmartAnchor {
     final anchors = Map.of(state.anchors)..remove(serviceId);
     state = state.copyWith(anchors: anchors);
     unawaited(_store.deleteAnchor(serviceId));
+  }
+
+  void setAnchor(String serviceId, ServiceAnchor anchor) {
+    update(state.copyWith(anchors: {...state.anchors, serviceId: anchor}));
+  }
+
+  void recordPathPoint(AnchorPathPoint point) {
+    final paths = Map.of(state.paths);
+    paths[point.serviceId] = appendPathPoint(
+      paths[point.serviceId] ?? const [],
+      point,
+    );
+    update(state.copyWith(paths: paths));
+  }
+
+  void clearPath(String serviceId) {
+    final paths = Map.of(state.paths)..remove(serviceId);
+    update(state.copyWith(paths: paths));
   }
 
   Future<void> probeNodes({

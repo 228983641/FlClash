@@ -8236,6 +8236,86 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Node path`
+  String get smartAnchorPath {
+    return Intl.message(
+      'Node path',
+      name: 'smartAnchorPath',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Where each service group's nodes have moved, drawn as a schematic path.`
+  String get smartAnchorPathDesc {
+    return Intl.message(
+      'Where each service group\'s nodes have moved, drawn as a schematic path.',
+      name: 'smartAnchorPathDesc',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No path recorded yet. Use a service for a while and its node moves will show up here.`
+  String get smartAnchorPathEmpty {
+    return Intl.message(
+      'No path recorded yet. Use a service for a while and its node moves will show up here.',
+      name: 'smartAnchorPathEmpty',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Back to anchor`
+  String get smartAnchorBackToAnchor {
+    return Intl.message(
+      'Back to anchor',
+      name: 'smartAnchorBackToAnchor',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Clear path`
+  String get smartAnchorPathClear {
+    return Intl.message(
+      'Clear path',
+      name: 'smartAnchorPathClear',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Auto`
+  String get smartAnchorPathAuto {
+    return Intl.message(
+      'Auto',
+      name: 'smartAnchorPathAuto',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Manual`
+  String get smartAnchorPathManual {
+    return Intl.message(
+      'Manual',
+      name: 'smartAnchorPathManual',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Start`
+  String get smartAnchorPathStart {
+    return Intl.message(
+      'Start',
+      name: 'smartAnchorPathStart',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

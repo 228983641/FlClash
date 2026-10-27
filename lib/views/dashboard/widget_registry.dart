@@ -18,6 +18,7 @@ extension DashboardWidgetView on DashboardWidget {
     DashboardWidget.intranetIp => const IntranetIpCard(),
     DashboardWidget.memoryInfo => const MemoryInfo(),
     DashboardWidget.smartAnchor => const SmartAnchorCard(),
+    DashboardWidget.smartAnchorPath => const SmartAnchorPathCard(),
     DashboardWidget.subscriptionAggregation => const AggregationCard(),
   };
 
@@ -34,6 +35,7 @@ extension DashboardWidgetView on DashboardWidget {
     DashboardWidget.intranetIp => AppGlyphs.devices,
     DashboardWidget.memoryInfo => AppGlyphs.memory,
     DashboardWidget.smartAnchor => AppGlyphs.verified,
+    DashboardWidget.smartAnchorPath => AppGlyphs.pin,
     DashboardWidget.subscriptionAggregation => AppGlyphs.layers,
   };
 
@@ -52,6 +54,7 @@ extension DashboardWidgetView on DashboardWidget {
       DashboardWidget.intranetIp => appLocalizations.intranetIP,
       DashboardWidget.memoryInfo => appLocalizations.memoryInfo,
       DashboardWidget.smartAnchor => appLocalizations.smartAnchor,
+      DashboardWidget.smartAnchorPath => appLocalizations.smartAnchorPath,
       DashboardWidget.subscriptionAggregation =>
         appLocalizations.subscriptionAggregation,
     };
@@ -64,6 +67,7 @@ extension DashboardWidgetView on DashboardWidget {
       DashboardWidget.connectionStats => appLocalizations.connectionStatsDesc,
       DashboardWidget.memoryInfo => appLocalizations.memoryInfoDesc,
       DashboardWidget.smartAnchor => appLocalizations.smartAnchorDesc,
+      DashboardWidget.smartAnchorPath => appLocalizations.smartAnchorPathDesc,
       _ => null,
     };
   }

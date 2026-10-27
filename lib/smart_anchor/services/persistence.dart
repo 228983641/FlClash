@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:fl_clash/database/database.dart';
+import 'package:fl_clash/smart_anchor/models/anchor_path.dart';
 import 'package:fl_clash/smart_anchor/models/node_metadata.dart';
 import 'package:fl_clash/smart_anchor/models/service_anchor.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
@@ -74,6 +75,7 @@ class SmartAnchorSnapshot {
     this.accessByService = const {},
     this.sharedLockGroupIds = const [],
     this.autoFailoverEnabled = true,
+    this.paths = const {},
   });
 
   final List<ServiceToggleConfig> services;
@@ -82,6 +84,7 @@ class SmartAnchorSnapshot {
   final Map<String, Map<String, ServiceAccessResult>> accessByService;
   final List<String> sharedLockGroupIds;
   final bool autoFailoverEnabled;
+  final Map<String, List<AnchorPathPoint>> paths;
 
   Map<String, dynamic> toJson() {
     return {
@@ -101,6 +104,10 @@ class SmartAnchorSnapshot {
             for (final inner in entry.value.entries)
               inner.key: inner.value.toJson(),
           },
+      },
+      'paths': {
+        for (final entry in paths.entries)
+          entry.key: [for (final point in entry.value) point.toJson()],
       },
     };
   }
@@ -154,6 +161,21 @@ class SmartAnchorSnapshot {
       }
     }
     final shared = json['sharedLockGroupIds'];
+    final paths = <String, List<AnchorPathPoint>>{};
+    for (final entry in (json['paths'] as Map? ?? {}).entries) {
+      if (entry.value is! List) {
+        continue;
+      }
+      final points = <AnchorPathPoint>[];
+      for (final item in entry.value as List) {
+        if (item is Map) {
+          points.add(AnchorPathPoint.fromJson(Map<String, dynamic>.from(item)));
+        }
+      }
+      if (points.isNotEmpty) {
+        paths[entry.key.toString()] = points;
+      }
+    }
     return SmartAnchorSnapshot(
       services: services,
       anchors: anchors,
@@ -163,6 +185,7 @@ class SmartAnchorSnapshot {
           ? [for (final id in shared) id.toString()]
           : const [],
       autoFailoverEnabled: json['autoFailoverEnabled'] as bool? ?? true,
+      paths: paths,
     );
   }
 
@@ -174,6 +197,7 @@ class SmartAnchorSnapshot {
       accessByService: accessByService,
       sharedLockGroupIds: sharedLockGroupIds,
       autoFailoverEnabled: autoFailoverEnabled,
+      paths: paths,
     );
   }
 }
@@ -200,6 +224,8 @@ class SmartAnchorStore {
 
   static const autoFailoverKey = 'config:autoFailover';
 
+  static String pathKey(String serviceId) => 'path:$serviceId';
+
   Future<SmartAnchorSnapshot?> load() async {
     final all = await records.readAll();
     if (all.isEmpty) {
@@ -222,6 +248,7 @@ class SmartAnchorStore {
     final anchors = <String, ServiceAnchor>{};
     final metadata = <String, NodeMetadataCache>{};
     final access = <String, Map<String, ServiceAccessResult>>{};
+    final paths = <String, List<AnchorPathPoint>>{};
     final autoFailoverRaw = all[autoFailoverKey];
     var autoFailoverEnabled = true;
     if (autoFailoverRaw != null) {
@@ -245,6 +272,22 @@ class SmartAnchorStore {
     for (final entry in all.entries) {
       final key = entry.key;
       final decoded = json.decode(entry.value);
+      if (key.startsWith('path:')) {
+        if (decoded is List) {
+          final points = <AnchorPathPoint>[];
+          for (final item in decoded) {
+            if (item is Map) {
+              points.add(
+                AnchorPathPoint.fromJson(Map<String, dynamic>.from(item)),
+              );
+            }
+          }
+          if (points.isNotEmpty) {
+            paths[key.substring('path:'.length)] = points;
+          }
+        }
+        continue;
+      }
       if (decoded is! Map) {
         continue;
       }
@@ -278,6 +321,7 @@ class SmartAnchorStore {
       accessByService: access,
       sharedLockGroupIds: sharedIds,
       autoFailoverEnabled: autoFailoverEnabled,
+      paths: paths,
     );
   }
 
@@ -306,6 +350,14 @@ class SmartAnchorStore {
           inner.value.toJson(),
         );
       }
+    }
+    for (final entry in input.paths.entries) {
+      if (entry.value.isEmpty) {
+        continue;
+      }
+      fresh[pathKey(entry.key)] = json.encode([
+        for (final point in entry.value) point.toJson(),
+      ]);
     }
     final existing = await records.readAll();
     for (final key in existing.keys) {

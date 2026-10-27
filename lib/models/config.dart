@@ -121,6 +121,7 @@ const List<DashboardWidget> defaultDashboardWidgets = [
   DashboardWidget.proxyGroups,
   DashboardWidget.connectionStats,
   DashboardWidget.smartAnchor,
+  DashboardWidget.smartAnchorPath,
   DashboardWidget.subscriptionAggregation,
 ];
 
@@ -134,6 +135,7 @@ final List<DashboardWidget> platformDefaultDashboardWidgets = system.isAndroid
         DashboardWidget.profiles,
         DashboardWidget.proxyGroups,
         DashboardWidget.smartAnchor,
+        DashboardWidget.smartAnchorPath,
         DashboardWidget.subscriptionAggregation,
       ]
     : defaultDashboardWidgets;

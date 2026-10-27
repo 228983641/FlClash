@@ -1513,6 +1513,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorAutoFailoverDesc": MessageLookupByLibrary.simpleMessage(
       "When the node in use fails 2 consecutive probes, automatically switch to the next ranked node and never switch back. When off, a failing node is never switched away automatically.",
     ),
+    "smartAnchorBackToAnchor": MessageLookupByLibrary.simpleMessage(
+      "Back to anchor",
+    ),
     "smartAnchorDesc": MessageLookupByLibrary.simpleMessage(
       "Per-service country lock, anchor memory and purity ranking.",
     ),
@@ -1522,6 +1525,17 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorLockDesc": MessageLookupByLibrary.simpleMessage(
       "No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; several countries allow nodes within those countries, with risk in between. Changing the locked countries clears the old anchor.",
     ),
+    "smartAnchorPath": MessageLookupByLibrary.simpleMessage("Node path"),
+    "smartAnchorPathAuto": MessageLookupByLibrary.simpleMessage("Auto"),
+    "smartAnchorPathClear": MessageLookupByLibrary.simpleMessage("Clear path"),
+    "smartAnchorPathDesc": MessageLookupByLibrary.simpleMessage(
+      "Where each service group\'s nodes have moved, drawn as a schematic path.",
+    ),
+    "smartAnchorPathEmpty": MessageLookupByLibrary.simpleMessage(
+      "No path recorded yet. Use a service for a while and its node moves will show up here.",
+    ),
+    "smartAnchorPathManual": MessageLookupByLibrary.simpleMessage("Manual"),
+    "smartAnchorPathStart": MessageLookupByLibrary.simpleMessage("Start"),
     "smartAnchorProbeNow": MessageLookupByLibrary.simpleMessage("Probe now"),
     "smartAnchorResetAnchor": MessageLookupByLibrary.simpleMessage(
       "Reset anchor",
