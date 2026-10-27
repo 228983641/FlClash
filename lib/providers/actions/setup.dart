@@ -515,7 +515,9 @@ class SetupAction extends _$SetupAction {
     if (hasScript) {
       rawConfig = await handleEvaluate(scriptContent!, rawConfig);
     }
-    final smartAnchorInput = ref.read(smartAnchorProvider);
+    final smartAnchorInput = await ref
+        .read(smartAnchorProvider.notifier)
+        .refreshAggregationSources();
     if (!isCustom && smartAnchorInput.hasWork) {
       rawConfig = buildSmartConfig(rawConfig, smartAnchorInput);
     }

@@ -5,8 +5,10 @@ import 'package:fl_clash/smart_anchor/models/anchor_path.dart';
 import 'package:fl_clash/smart_anchor/models/node_metadata.dart';
 import 'package:fl_clash/smart_anchor/models/service_anchor.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
+import 'package:fl_clash/smart_anchor/models/switch_event.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:fl_clash/smart_anchor/services/service_access.dart';
+import 'package:fl_clash/smart_anchor/services/subscription_merger.dart';
 
 abstract class SmartAnchorRecordStore {
   Future<Map<String, String>> readAll();
@@ -76,6 +78,9 @@ class SmartAnchorSnapshot {
     this.sharedLockGroupIds = const [],
     this.autoFailoverEnabled = true,
     this.paths = const {},
+    this.aggregationMode = AggregationGroupMode.primaryOnly,
+    this.aggregationSources = const [],
+    this.switchEvents = const {},
   });
 
   final List<ServiceToggleConfig> services;
@@ -85,6 +90,9 @@ class SmartAnchorSnapshot {
   final List<String> sharedLockGroupIds;
   final bool autoFailoverEnabled;
   final Map<String, List<AnchorPathPoint>> paths;
+  final AggregationGroupMode aggregationMode;
+  final List<AggregationSourceInput> aggregationSources;
+  final Map<String, List<SwitchEvent>> switchEvents;
 
   Map<String, dynamic> toJson() {
     return {
@@ -108,6 +116,15 @@ class SmartAnchorSnapshot {
       'paths': {
         for (final entry in paths.entries)
           entry.key: [for (final point in entry.value) point.toJson()],
+      },
+      'aggregationMode': aggregationMode.name,
+      'aggregationSources': [
+        for (final source in aggregationSources)
+          {'sourceId': source.sourceId, 'sourceLabel': source.sourceLabel},
+      ],
+      'switchEvents': {
+        for (final entry in switchEvents.entries)
+          entry.key: [for (final event in entry.value) event.toJson()],
       },
     };
   }
@@ -161,6 +178,42 @@ class SmartAnchorSnapshot {
       }
     }
     final shared = json['sharedLockGroupIds'];
+    final modeRaw = json['aggregationMode'];
+    final mode = AggregationGroupMode.values.firstWhere(
+      (candidate) => candidate.name == modeRaw,
+      orElse: () => AggregationGroupMode.primaryOnly,
+    );
+    final sources = <AggregationSourceInput>[];
+    for (final item in json['aggregationSources'] as List? ?? []) {
+      if (item is Map) {
+        final map = Map<String, dynamic>.from(item);
+        final sourceId = map['sourceId'];
+        if (sourceId is String && sourceId.isNotEmpty) {
+          sources.add(
+            AggregationSourceInput(
+              sourceId: sourceId,
+              sourceLabel: map['sourceLabel']?.toString() ?? '',
+              config: const {},
+            ),
+          );
+        }
+      }
+    }
+    final switchEvents = <String, List<SwitchEvent>>{};
+    for (final entry in (json['switchEvents'] as Map? ?? {}).entries) {
+      if (entry.value is! List) {
+        continue;
+      }
+      final events = <SwitchEvent>[];
+      for (final item in entry.value as List) {
+        if (item is Map) {
+          events.add(SwitchEvent.fromJson(Map<String, dynamic>.from(item)));
+        }
+      }
+      if (events.isNotEmpty) {
+        switchEvents[entry.key.toString()] = events;
+      }
+    }
     final paths = <String, List<AnchorPathPoint>>{};
     for (final entry in (json['paths'] as Map? ?? {}).entries) {
       if (entry.value is! List) {
@@ -186,6 +239,9 @@ class SmartAnchorSnapshot {
           : const [],
       autoFailoverEnabled: json['autoFailoverEnabled'] as bool? ?? true,
       paths: paths,
+      aggregationMode: mode,
+      aggregationSources: sources,
+      switchEvents: switchEvents,
     );
   }
 
@@ -198,6 +254,9 @@ class SmartAnchorSnapshot {
       sharedLockGroupIds: sharedLockGroupIds,
       autoFailoverEnabled: autoFailoverEnabled,
       paths: paths,
+      aggregationMode: aggregationMode,
+      aggregationSources: aggregationSources,
+      switchEvents: switchEvents,
     );
   }
 }
@@ -224,7 +283,13 @@ class SmartAnchorStore {
 
   static const autoFailoverKey = 'config:autoFailover';
 
+  static const aggregationModeKey = 'config:aggregationMode';
+
+  static const aggregationSourcesKey = 'config:aggregationSources';
+
   static String pathKey(String serviceId) => 'path:$serviceId';
+
+  static String switchKey(String serviceId) => 'switch:$serviceId';
 
   Future<SmartAnchorSnapshot?> load() async {
     final all = await records.readAll();
@@ -249,12 +314,46 @@ class SmartAnchorStore {
     final metadata = <String, NodeMetadataCache>{};
     final access = <String, Map<String, ServiceAccessResult>>{};
     final paths = <String, List<AnchorPathPoint>>{};
+    final switchEvents = <String, List<SwitchEvent>>{};
     final autoFailoverRaw = all[autoFailoverKey];
     var autoFailoverEnabled = true;
     if (autoFailoverRaw != null) {
       final decoded = json.decode(autoFailoverRaw);
       if (decoded is bool) {
         autoFailoverEnabled = decoded;
+      }
+    }
+    var aggregationMode = AggregationGroupMode.primaryOnly;
+    final modeRaw = all[aggregationModeKey];
+    if (modeRaw != null) {
+      final decoded = json.decode(modeRaw);
+      if (decoded is String) {
+        aggregationMode = AggregationGroupMode.values.firstWhere(
+          (candidate) => candidate.name == decoded,
+          orElse: () => AggregationGroupMode.primaryOnly,
+        );
+      }
+    }
+    final aggregationSources = <AggregationSourceInput>[];
+    final sourcesRaw = all[aggregationSourcesKey];
+    if (sourcesRaw != null) {
+      final decoded = json.decode(sourcesRaw);
+      if (decoded is List) {
+        for (final item in decoded) {
+          if (item is Map) {
+            final map = Map<String, dynamic>.from(item);
+            final sourceId = map['sourceId'];
+            if (sourceId is String && sourceId.isNotEmpty) {
+              aggregationSources.add(
+                AggregationSourceInput(
+                  sourceId: sourceId,
+                  sourceLabel: map['sourceLabel']?.toString() ?? '',
+                  config: const {},
+                ),
+              );
+            }
+          }
+        }
       }
     }
     final sharedRaw = all[sharedGroupsKey];
@@ -284,6 +383,20 @@ class SmartAnchorStore {
           }
           if (points.isNotEmpty) {
             paths[key.substring('path:'.length)] = points;
+          }
+        }
+        continue;
+      }
+      if (key.startsWith('switch:')) {
+        if (decoded is List) {
+          final events = <SwitchEvent>[];
+          for (final item in decoded) {
+            if (item is Map) {
+              events.add(SwitchEvent.fromJson(Map<String, dynamic>.from(item)));
+            }
+          }
+          if (events.isNotEmpty) {
+            switchEvents[key.substring('switch:'.length)] = events;
           }
         }
         continue;
@@ -322,6 +435,9 @@ class SmartAnchorStore {
       sharedLockGroupIds: sharedIds,
       autoFailoverEnabled: autoFailoverEnabled,
       paths: paths,
+      aggregationMode: aggregationMode,
+      aggregationSources: aggregationSources,
+      switchEvents: switchEvents,
     );
   }
 
@@ -332,6 +448,13 @@ class SmartAnchorStore {
     ]);
     fresh[sharedGroupsKey] = json.encode(input.sharedLockGroupIds);
     fresh[autoFailoverKey] = json.encode(input.autoFailoverEnabled);
+    fresh[aggregationModeKey] = json.encode(input.aggregationMode.name);
+    if (input.aggregationSources.isNotEmpty) {
+      fresh[aggregationSourcesKey] = json.encode([
+        for (final source in input.aggregationSources)
+          {'sourceId': source.sourceId, 'sourceLabel': source.sourceLabel},
+      ]);
+    }
     for (final entry in input.anchors.entries) {
       fresh[anchorKey(entry.key)] = json.encode(entry.value.toJson());
     }
@@ -357,6 +480,14 @@ class SmartAnchorStore {
       }
       fresh[pathKey(entry.key)] = json.encode([
         for (final point in entry.value) point.toJson(),
+      ]);
+    }
+    for (final entry in input.switchEvents.entries) {
+      if (entry.value.isEmpty) {
+        continue;
+      }
+      fresh[switchKey(entry.key)] = json.encode([
+        for (final event in entry.value) event.toJson(),
       ]);
     }
     final existing = await records.readAll();

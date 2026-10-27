@@ -8387,6 +8387,326 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Last auto switch`
+  String get smartAnchorLastSwitch {
+    return Intl.message(
+      'Last auto switch',
+      name: 'smartAnchorLastSwitch',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Auto switch frozen after 3 switches in 10 minutes`
+  String get smartAnchorSwitchFrozen {
+    return Intl.message(
+      'Auto switch frozen after 3 switches in 10 minutes',
+      name: 'smartAnchorSwitchFrozen',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No usable node under the current lock; falls back to DIRECT`
+  String get smartAnchorNoUsableNodes {
+    return Intl.message(
+      'No usable node under the current lock; falls back to DIRECT',
+      name: 'smartAnchorNoUsableNodes',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Enabling unifies every member's lock to the first member's setting; the previous settings will not be restored. Continue?`
+  String get smartAnchorSharedLockConfirm {
+    return Intl.message(
+      'Enabling unifies every member\'s lock to the first member\'s setting; the previous settings will not be restored. Continue?',
+      name: 'smartAnchorSharedLockConfirm',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Removing the lock stops country filtering and carries the highest risk-control risk. Remove it?`
+  String get smartAnchorUnlockConfirm {
+    return Intl.message(
+      'Removing the lock stops country filtering and carries the highest risk-control risk. Remove it?',
+      name: 'smartAnchorUnlockConfirm',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Country codes outside this list can be entered on the service edit page.`
+  String get smartAnchorCountryPickerFootnote {
+    return Intl.message(
+      'Country codes outside this list can be entered on the service edit page.',
+      name: 'smartAnchorCountryPickerFootnote',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Country codes must be 2 letters, e.g. US, JP.`
+  String get smartAnchorInvalidCountryCode {
+    return Intl.message(
+      'Country codes must be 2 letters, e.g. US, JP.',
+      name: 'smartAnchorInvalidCountryCode',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `United States`
+  String get smartAnchorCountryUS {
+    return Intl.message(
+      'United States',
+      name: 'smartAnchorCountryUS',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Singapore`
+  String get smartAnchorCountrySG {
+    return Intl.message(
+      'Singapore',
+      name: 'smartAnchorCountrySG',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Japan`
+  String get smartAnchorCountryJP {
+    return Intl.message(
+      'Japan',
+      name: 'smartAnchorCountryJP',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Hong Kong`
+  String get smartAnchorCountryHK {
+    return Intl.message(
+      'Hong Kong',
+      name: 'smartAnchorCountryHK',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `South Korea`
+  String get smartAnchorCountryKR {
+    return Intl.message(
+      'South Korea',
+      name: 'smartAnchorCountryKR',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Taiwan`
+  String get smartAnchorCountryTW {
+    return Intl.message(
+      'Taiwan',
+      name: 'smartAnchorCountryTW',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Germany`
+  String get smartAnchorCountryDE {
+    return Intl.message(
+      'Germany',
+      name: 'smartAnchorCountryDE',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `United Kingdom`
+  String get smartAnchorCountryGB {
+    return Intl.message(
+      'United Kingdom',
+      name: 'smartAnchorCountryGB',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Netherlands`
+  String get smartAnchorCountryNL {
+    return Intl.message(
+      'Netherlands',
+      name: 'smartAnchorCountryNL',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Deleting this service also clears its anchor and path records. Delete it?`
+  String get smartAnchorDeleteConfirm {
+    return Intl.message(
+      'Deleting this service also clears its anchor and path records. Delete it?',
+      name: 'smartAnchorDeleteConfirm',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Clear all path records of this service group?`
+  String get smartAnchorClearPathConfirm {
+    return Intl.message(
+      'Clear all path records of this service group?',
+      name: 'smartAnchorClearPathConfirm',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Resetting the anchor elects a new one next time. Reset it?`
+  String get smartAnchorResetAnchorConfirm {
+    return Intl.message(
+      'Resetting the anchor elects a new one next time. Reset it?',
+      name: 'smartAnchorResetAnchorConfirm',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Primary subscription`
+  String get smartAnchorPrimarySubscription {
+    return Intl.message(
+      'Primary subscription',
+      name: 'smartAnchorPrimarySubscription',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Only the primary subscription's groups and rules are kept; other subscriptions contribute nodes only.`
+  String get aggregationPrimaryOnlyDesc {
+    return Intl.message(
+      'Only the primary subscription\'s groups and rules are kept; other subscriptions contribute nodes only.',
+      name: 'aggregationPrimaryOnlyDesc',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Same-name groups of the same type merge members; same-name groups of other types are renamed and kept; rules are concatenated primary-first and deduplicated.`
+  String get aggregationMergeAllDesc {
+    return Intl.message(
+      'Same-name groups of the same type merge members; same-name groups of other types are renamed and kept; rules are concatenated primary-first and deduplicated.',
+      name: 'aggregationMergeAllDesc',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Failed to load that subscription; aggregation was not enabled.`
+  String get smartAnchorAggregationLoadFailed {
+    return Intl.message(
+      'Failed to load that subscription; aggregation was not enabled.',
+      name: 'smartAnchorAggregationLoadFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Added. Enable it in the list.`
+  String get smartAnchorServiceAddedHint {
+    return Intl.message(
+      'Added. Enable it in the list.',
+      name: 'smartAnchorServiceAddedHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Rules must be TYPE,value, e.g. GEOSITE,openai.`
+  String get smartAnchorInvalidRule {
+    return Intl.message(
+      'Rules must be TYPE,value, e.g. GEOSITE,openai.',
+      name: 'smartAnchorInvalidRule',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Probe finished, {count} nodes updated.`
+  String smartAnchorProbeDone(Object count) {
+    return Intl.message(
+      'Probe finished, $count nodes updated.',
+      name: 'smartAnchorProbeDone',
+      desc: '',
+      args: [count],
+    );
+  }
+
+  /// `Probing…`
+  String get smartAnchorProbing {
+    return Intl.message(
+      'Probing…',
+      name: 'smartAnchorProbing',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No anchor yet`
+  String get smartAnchorNoAnchor {
+    return Intl.message(
+      'No anchor yet',
+      name: 'smartAnchorNoAnchor',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Safe`
+  String get smartAnchorTrustSafe {
+    return Intl.message(
+      'Safe',
+      name: 'smartAnchorTrustSafe',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Watch`
+  String get smartAnchorTrustWatch {
+    return Intl.message(
+      'Watch',
+      name: 'smartAnchorTrustWatch',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Risky`
+  String get smartAnchorTrustRisky {
+    return Intl.message(
+      'Risky',
+      name: 'smartAnchorTrustRisky',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Unknown`
+  String get smartAnchorUnknown {
+    return Intl.message(
+      'Unknown',
+      name: 'smartAnchorUnknown',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

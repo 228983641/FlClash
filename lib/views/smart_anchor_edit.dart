@@ -2,6 +2,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/providers/smart_anchor.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
+import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,6 +40,7 @@ class _SmartAnchorServiceEditViewState
     );
     _nameController.addListener(_refresh);
     _rulesController.addListener(_refresh);
+    _lockController.addListener(_refresh);
   }
 
   void _refresh() {
@@ -70,6 +72,18 @@ class _SmartAnchorServiceEditViewState
     ];
   }
 
+  bool _countryValid(String code) {
+    return RegExp(r'^[A-Z]{2}$').hasMatch(code);
+  }
+
+  bool get _countriesValid {
+    return _countries().every(_countryValid);
+  }
+
+  bool get _rulesValid {
+    return _lines(_rulesController).every(isValidMatchRule);
+  }
+
   bool get _isPreset {
     final service = widget.service;
     if (service == null) {
@@ -83,18 +97,23 @@ class _SmartAnchorServiceEditViewState
   void _save() {
     final name = _nameController.text.trim();
     final rules = _lines(_rulesController);
-    if (name.isEmpty || rules.isEmpty) {
+    if (name.isEmpty || rules.isEmpty || !_countriesValid || !_rulesValid) {
       return;
     }
     final countries = _countries();
     final existing = widget.service;
+    final lockChanged =
+        existing != null &&
+        (existing.lockedCountries.length != countries.length ||
+            !countries.every(existing.lockedCountries.contains));
+    final serviceId =
+        existing?.serviceId ??
+        'custom_${DateTime.now().millisecondsSinceEpoch}';
     ref
         .read(smartAnchorProvider.notifier)
         .upsertService(
           ServiceToggleConfig(
-            serviceId:
-                existing?.serviceId ??
-                'custom_${DateTime.now().millisecondsSinceEpoch}',
+            serviceId: serviceId,
             displayName: name,
             isEnabled: existing?.isEnabled ?? false,
             targetCountry: countries.isEmpty ? '' : countries.first,
@@ -103,8 +122,11 @@ class _SmartAnchorServiceEditViewState
             dnsDomains: _lines(_dnsController),
           ),
         );
+    if (lockChanged) {
+      ref.read(smartAnchorProvider.notifier).clearAnchor(serviceId);
+    }
     ref.read(setupActionProvider.notifier).applyProfileDebounce(silence: true);
-    Navigator.of(context).pop();
+    Navigator.of(context).pop(existing == null);
   }
 
   @override
@@ -139,6 +161,9 @@ class _SmartAnchorServiceEditViewState
                   decoration: InputDecoration(
                     labelText: appLocalizations.rules,
                     helperText: 'GEOSITE,openai',
+                    errorText: _rulesValid
+                        ? null
+                        : appLocalizations.smartAnchorInvalidRule,
                   ),
                 ),
               ),
@@ -159,6 +184,9 @@ class _SmartAnchorServiceEditViewState
                   decoration: InputDecoration(
                     labelText: appLocalizations.countryLock,
                     helperText: 'US,JP',
+                    errorText: _countriesValid
+                        ? null
+                        : appLocalizations.smartAnchorInvalidCountryCode,
                   ),
                 ),
               ),
@@ -168,7 +196,9 @@ class _SmartAnchorServiceEditViewState
           FilledButton(
             onPressed:
                 _nameController.text.trim().isEmpty ||
-                    _lines(_rulesController).isEmpty
+                    _lines(_rulesController).isEmpty ||
+                    !_countriesValid ||
+                    !_rulesValid
                 ? null
                 : _save,
             child: Text(appLocalizations.save),
@@ -180,7 +210,20 @@ class _SmartAnchorServiceEditViewState
                 backgroundColor: context.colorScheme.error,
                 foregroundColor: context.colorScheme.onError,
               ),
-              onPressed: () {
+              onPressed: () async {
+                final confirmed = await dialogs.showMessage(
+                  title: appLocalizations.delete,
+                  message: TextSpan(
+                    text: appLocalizations.smartAnchorDeleteConfirm,
+                  ),
+                  destructive: true,
+                );
+                if (confirmed != true) {
+                  return;
+                }
+                if (!context.mounted) {
+                  return;
+                }
                 ref
                     .read(smartAnchorProvider.notifier)
                     .deleteService(service.serviceId);

@@ -218,23 +218,11 @@ class ProxiesAction extends _$ProxiesAction {
     return delays;
   }
 
-  void smartAnchorFailoverCheck() {
-    final smart = ref.read(smartAnchorProvider);
-    if (!smart.autoFailoverEnabled) {
-      return;
-    }
-    final groups = ref.read(groupsProvider);
-    final groupNames = {for (final group in groups) group.name};
-    final names = <String>[];
-    for (final group in groups) {
-      for (final proxy in group.all) {
-        if (!groupNames.contains(proxy.name) && !names.contains(proxy.name)) {
-          names.add(proxy.name);
-        }
-      }
-    }
-    final delays = _flattenDelays(ref.read(delayDataSourceProvider));
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
+  void _observePathPoints(
+    SmartAnchorInput smart,
+    List<Group> groups,
+    int nowMs,
+  ) {
     for (final service in smart.services.where(
       (service) => service.isEnabled,
     )) {
@@ -269,6 +257,36 @@ class ProxiesAction extends _$ProxiesAction {
             );
         _lastObservedCurrent[service.serviceId] = currentName;
       }
+    }
+  }
+
+  void smartAnchorFailoverCheck() {
+    final smart = ref.read(smartAnchorProvider);
+    final groups = ref.read(groupsProvider);
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    _observePathPoints(smart, groups, nowMs);
+    if (!smart.autoFailoverEnabled) {
+      return;
+    }
+    final groupNames = {for (final group in groups) group.name};
+    final names = <String>[];
+    for (final group in groups) {
+      for (final proxy in group.all) {
+        if (!groupNames.contains(proxy.name) && !names.contains(proxy.name)) {
+          names.add(proxy.name);
+        }
+      }
+    }
+    final delays = _flattenDelays(ref.read(delayDataSourceProvider));
+    for (final service in smart.services.where(
+      (service) => service.isEnabled,
+    )) {
+      final groupName = '🎯 Smart-${service.serviceId.toUpperCase()}';
+      final group = groups.getGroup(groupName);
+      final currentName = group?.now;
+      if (currentName == null) {
+        continue;
+      }
       _pendingAutoSwitch.remove(service.serviceId);
       _pendingAutoReason.remove(service.serviceId);
       final ranked = rankedProxiesForService(
@@ -288,6 +306,17 @@ class ProxiesAction extends _$ProxiesAction {
         nowMs: nowMs,
       );
       if (next != null) {
+        ref
+            .read(smartAnchorProvider.notifier)
+            .recordSwitchEvent(
+              SwitchEvent(
+                serviceId: service.serviceId,
+                fromProxy: currentName,
+                toProxy: next,
+                reason: currentReason?.name ?? 'unknown',
+                switchedAt: nowMs,
+              ),
+            );
         _pendingAutoSwitch[service.serviceId] = next;
         _pendingAutoReason[service.serviceId] =
             currentReason?.name ?? 'unknown';
@@ -353,10 +382,11 @@ class ProxiesAction extends _$ProxiesAction {
       }
       final smart = ref.read(smartAnchorProvider);
       _trackAnchorStability(smart);
+      final groups = ref.read(groupsProvider);
+      _observePathPoints(smart, groups, DateTime.now().millisecondsSinceEpoch);
       if (!smart.autoFailoverEnabled) {
         return;
       }
-      final groups = ref.read(groupsProvider);
       final probed = <String>{};
       for (final service in smart.services.where((s) => s.isEnabled)) {
         final current = groups

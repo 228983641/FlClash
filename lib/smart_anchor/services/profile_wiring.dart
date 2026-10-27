@@ -1,5 +1,6 @@
 import '../models/anchor_path.dart';
 import '../models/node_metadata.dart';
+import '../models/switch_event.dart';
 import '../models/service_anchor.dart';
 import '../models/service_group.dart';
 import '../models/service_toggle_config.dart';
@@ -31,6 +32,7 @@ class SmartAnchorInput {
     this.sharedLockGroupIds = const [],
     this.autoFailoverEnabled = true,
     this.paths = const {},
+    this.switchEvents = const {},
   });
 
   final List<ServiceToggleConfig> services;
@@ -42,6 +44,7 @@ class SmartAnchorInput {
   final List<String> sharedLockGroupIds;
   final bool autoFailoverEnabled;
   final Map<String, List<AnchorPathPoint>> paths;
+  final Map<String, List<SwitchEvent>> switchEvents;
 
   bool get hasWork {
     return services.any((service) => service.isEnabled) ||
@@ -58,6 +61,7 @@ class SmartAnchorInput {
     List<String>? sharedLockGroupIds,
     bool? autoFailoverEnabled,
     Map<String, List<AnchorPathPoint>>? paths,
+    Map<String, List<SwitchEvent>>? switchEvents,
   }) {
     return SmartAnchorInput(
       services: services ?? this.services,
@@ -69,8 +73,20 @@ class SmartAnchorInput {
       sharedLockGroupIds: sharedLockGroupIds ?? this.sharedLockGroupIds,
       autoFailoverEnabled: autoFailoverEnabled ?? this.autoFailoverEnabled,
       paths: paths ?? this.paths,
+      switchEvents: switchEvents ?? this.switchEvents,
     );
   }
+}
+
+bool serviceHasNoUsableNodes(
+  SmartAnchorInput input,
+  ServiceToggleConfig service,
+  List<String> proxyNames,
+) {
+  if (!service.isEnabled || proxyNames.isEmpty) {
+    return false;
+  }
+  return rankedProxiesForService(input, service, proxyNames).isEmpty;
 }
 
 Map<String, dynamic> buildSmartConfig(
@@ -235,7 +251,9 @@ List<String> _rankForService(
   var anchor = sharedAnchor ?? input.anchors[service.serviceId];
   anchor ??= _electAnchor(tested, lock, access);
   if (anchor == null) {
-    return [...tested.map((node) => node.proxyName), ...untested];
+    // No node passes the lock, so no known node may serve this service.
+    // Only nodes without metadata stay as the emergency pool.
+    return untested;
   }
   final ranked = ScoringEngine.rankForService(
     tested,
@@ -273,4 +291,40 @@ ServiceAnchor? _electAnchor(
     city: '',
     confirmedAt: 0,
   );
+}
+
+const _matchRuleTypes = {
+  'DOMAIN',
+  'DOMAIN-SUFFIX',
+  'DOMAIN-KEYWORD',
+  'DOMAIN-REGEX',
+  'IP-CIDR',
+  'IP-CIDR6',
+  'IP-ASN',
+  'SRC-IP-CIDR',
+  'SRC-IP-CIDR6',
+  'DST-PORT',
+  'SRC-PORT',
+  'PROCESS-NAME',
+  'PROCESS-PATH',
+  'GEOIP',
+  'GEOSITE',
+  'FINAL',
+  'MATCH',
+  'AND',
+  'OR',
+  'NOT',
+  'RULE-SET',
+};
+
+bool isValidMatchRule(String line) {
+  final comma = line.indexOf(',');
+  if (comma <= 0) {
+    return false;
+  }
+  final type = line.substring(0, comma).trim().toUpperCase();
+  if (!_matchRuleTypes.contains(type)) {
+    return false;
+  }
+  return line.substring(comma + 1).trim().isNotEmpty;
 }

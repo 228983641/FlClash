@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/l10n/l10n.dart';
 import 'package:flutter/rendering.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -10,6 +11,7 @@ import 'package:fl_clash/smart_anchor/models/anchor_path.dart';
 import 'package:fl_clash/smart_anchor/models/node_metadata.dart';
 import 'package:fl_clash/smart_anchor/models/service_anchor.dart';
 import 'package:fl_clash/smart_anchor/models/service_group.dart';
+import 'package:fl_clash/smart_anchor/models/switch_event.dart';
 import 'package:fl_clash/smart_anchor/services/scoring_engine.dart';
 import 'package:fl_clash/smart_anchor/services/subscription_merger.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
@@ -40,6 +42,22 @@ class SmartAnchorCard extends ConsumerWidget {
     final firstAnchor = enabled.isEmpty
         ? null
         : anchors[enabled.first.serviceId];
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    SwitchEvent? lastEvent;
+    var frozen = false;
+    for (final service in enabled) {
+      final events = input.switchEvents[service.serviceId] ?? const [];
+      if (events.isEmpty) {
+        continue;
+      }
+      if (isSwitchFrozen(events, nowMs)) {
+        frozen = true;
+      }
+      final last = events.last;
+      if (lastEvent == null || last.switchedAt > lastEvent.switchedAt) {
+        lastEvent = last;
+      }
+    }
     return DashboardCard(
       semanticLabel: appLocalizations.smartAnchor,
       onTap: () => _showSmartAnchorSettings(context),
@@ -68,6 +86,27 @@ class SmartAnchorCard extends ConsumerWidget {
               style: AppTextStyle.footnote.of(context),
             ),
           ],
+          if (lastEvent != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              '${appLocalizations.smartAnchorLastSwitch}: '
+              '${lastEvent.fromProxy} → ${lastEvent.toProxy} '
+              '(${_switchReasonLabel(appLocalizations, lastEvent.reason)} '
+              '${_hhmm(lastEvent.switchedAt)})',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyle.footnote.of(context),
+            ),
+          ],
+          if (frozen) ...[
+            const SizedBox(height: 6),
+            Text(
+              appLocalizations.smartAnchorSwitchFrozen,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyle.footnote.of(context, emphasized: true),
+            ),
+          ],
         ],
       ),
     );
@@ -78,6 +117,17 @@ String _hhmm(int ms) {
   final time = DateTime.fromMillisecondsSinceEpoch(ms);
   return '${time.hour.toString().padLeft(2, '0')}:'
       '${time.minute.toString().padLeft(2, '0')}';
+}
+
+String _switchReasonLabel(AppLocalizations appLocalizations, String reason) {
+  switch (reason) {
+    case 'regionBlocked':
+      return appLocalizations.smartAnchorReasonRegionBlocked;
+    case 'networkFailed':
+      return appLocalizations.smartAnchorReasonNetworkFailed;
+    default:
+      return reason;
+  }
 }
 
 class _RawMemberPath {
@@ -450,6 +500,20 @@ class _SmartAnchorPathCardState extends ConsumerState<SmartAnchorPathCard> {
     ];
     final selected =
         entries.where((entry) => entry.id == _selectedId).firstOrNull ??
+        entries
+            .where(
+              (entry) => entry.members.any(
+                (member) => (input.paths[member] ?? const []).isNotEmpty,
+              ),
+            )
+            .firstOrNull ??
+        entries
+            .where(
+              (entry) => entry.members.any(
+                (member) => serviceById[member]?.isEnabled == true,
+              ),
+            )
+            .firstOrNull ??
         entries.firstOrNull;
     final palette = [
       context.colorScheme.primary,
@@ -704,17 +768,30 @@ class _SmartAnchorPathCardState extends ConsumerState<SmartAnchorPathCard> {
                     child: Text(appLocalizations.smartAnchorSetAnchor),
                   ),
                 FilledButton.tonal(
-                  onPressed: _exportDiagram,
+                  onPressed: hasPoints ? _exportDiagram : null,
                   child: Text(appLocalizations.smartAnchorPathExport),
                 ),
                 TextButton(
-                  onPressed: () {
-                    for (final memberId in selected.members) {
-                      ref
-                          .read(smartAnchorProvider.notifier)
-                          .clearPath(memberId);
-                    }
-                  },
+                  onPressed: hasPoints
+                      ? () async {
+                          final confirmed = await dialogs.showMessage(
+                            title: appLocalizations.smartAnchorPathClear,
+                            message: TextSpan(
+                              text:
+                                  appLocalizations.smartAnchorClearPathConfirm,
+                            ),
+                            destructive: true,
+                          );
+                          if (confirmed != true) {
+                            return;
+                          }
+                          for (final memberId in selected.members) {
+                            ref
+                                .read(smartAnchorProvider.notifier)
+                                .clearPath(memberId);
+                          }
+                        }
+                      : null,
                   child: Text(appLocalizations.smartAnchorPathClear),
                 ),
               ],

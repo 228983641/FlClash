@@ -1,5 +1,7 @@
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/l10n/l10n.dart';
+import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/providers/smart_anchor.dart';
@@ -19,6 +21,36 @@ const _lockCountries = ['US', 'SG', 'JP', 'HK', 'KR', 'TW', 'DE', 'GB', 'NL'];
 
 String _lockSummary(List<String> lockedCountries, String noneLabel) {
   return lockedCountries.isEmpty ? noneLabel : lockedCountries.join(', ');
+}
+
+String _profileHost(String url) {
+  final host = Uri.tryParse(url)?.host ?? '';
+  return host.isEmpty ? url : host;
+}
+
+String _countryName(AppLocalizations appLocalizations, String code) {
+  switch (code) {
+    case 'US':
+      return appLocalizations.smartAnchorCountryUS;
+    case 'SG':
+      return appLocalizations.smartAnchorCountrySG;
+    case 'JP':
+      return appLocalizations.smartAnchorCountryJP;
+    case 'HK':
+      return appLocalizations.smartAnchorCountryHK;
+    case 'KR':
+      return appLocalizations.smartAnchorCountryKR;
+    case 'TW':
+      return appLocalizations.smartAnchorCountryTW;
+    case 'DE':
+      return appLocalizations.smartAnchorCountryDE;
+    case 'GB':
+      return appLocalizations.smartAnchorCountryGB;
+    case 'NL':
+      return appLocalizations.smartAnchorCountryNL;
+    default:
+      return code;
+  }
 }
 
 List<ServiceToggleConfig> effectiveSmartServices(SmartAnchorInput input) {
@@ -46,6 +78,16 @@ class SmartAnchorSettingsView extends ConsumerWidget {
     final input = ref.watch(smartAnchorProvider);
     final services = effectiveSmartServices(input);
     final groups = ref.watch(groupsProvider);
+    final groupNames = {for (final group in groups) group.name};
+    final proxyNames = <String>[];
+    for (final group in groups) {
+      for (final proxy in group.all) {
+        if (!groupNames.contains(proxy.name) &&
+            !proxyNames.contains(proxy.name)) {
+          proxyNames.add(proxy.name);
+        }
+      }
+    }
     final profiles = ref.watch(profilesProvider);
     final currentProfileId = ref.watch(currentProfileProvider)?.id;
     return CommonScaffold(
@@ -79,6 +121,7 @@ class SmartAnchorSettingsView extends ConsumerWidget {
                         ? '${appLocalizations.countryLock}: '
                               '${_lockSummary(service.lockedCountries, appLocalizations.countryLockNone)}'
                               '${input.anchors[service.serviceId] == null ? '' : ' · ${input.anchors[service.serviceId]!.city.isEmpty ? input.anchors[service.serviceId]!.countryCode : input.anchors[service.serviceId]!.city}'}'
+                              '${serviceHasNoUsableNodes(input, service, proxyNames) ? ' · ${appLocalizations.smartAnchorNoUsableNodes}' : ''}'
                         : appLocalizations.turnOff,
                   ),
                   trailing: CommonSwitch(
@@ -101,12 +144,23 @@ class SmartAnchorSettingsView extends ConsumerWidget {
                     );
                   },
                 ),
-              ListItem.open(
+              DecorationListItem(
                 leading: const GlyphIcon(AppGlyphs.add),
                 title: Text(
                   '${appLocalizations.add} ${appLocalizations.smartAnchorServices}',
                 ),
-                widget: const SmartAnchorServiceEditView(),
+                onPressed: () async {
+                  final created = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) => const SmartAnchorServiceEditView(),
+                    ),
+                  );
+                  if (created == true) {
+                    dialogs.showNotifier(
+                      appLocalizations.smartAnchorServiceAddedHint,
+                    );
+                  }
+                },
               ),
             ],
           ),
@@ -117,22 +171,26 @@ class SmartAnchorSettingsView extends ConsumerWidget {
                 if (group.serviceIds.length > 1)
                   DecorationListItem(
                     title: Text(
-                      '${group.displayName} ${appLocalizations.smartAnchorSharedLock}',
+                      '${group.displayName} ${appLocalizations.smartAnchorSharedLock} '
+                      '(${group.serviceIds.map((id) => services.firstWhere((service) => service.serviceId == id).displayName).join(', ')})',
                     ),
-                    subtitle: Text(
-                      group.serviceIds
-                          .map(
-                            (id) => services
-                                .firstWhere(
-                                  (service) => service.serviceId == id,
-                                )
-                                .displayName,
-                          )
-                          .join(', '),
-                    ),
+                    subtitle: Text(appLocalizations.smartAnchorSharedLockDesc),
                     trailing: CommonSwitch(
                       value: input.sharedLockGroupIds.contains(group.id),
-                      onChanged: (value) {
+                      onChanged: (value) async {
+                        if (value) {
+                          final confirmed = await dialogs.showMessage(
+                            title: appLocalizations.smartAnchorSharedLock,
+                            message: TextSpan(
+                              text:
+                                  appLocalizations.smartAnchorSharedLockConfirm,
+                            ),
+                            destructive: true,
+                          );
+                          if (confirmed != true) {
+                            return;
+                          }
+                        }
                         ref
                             .read(smartAnchorProvider.notifier)
                             .setSharedLockGroup(group.id, value);
@@ -182,35 +240,44 @@ class SmartAnchorSettingsView extends ConsumerWidget {
                       ),
                       widget: SmartAnchorCountryPickerView(serviceId: memberId),
                     ),
-                for (final service in services)
-                  if (groupForService(service.serviceId) == null)
-                    ListItem.open(
-                      title: Text(
-                        '${service.displayName} ${appLocalizations.countryLock}',
-                      ),
-                      subtitle: Text(
-                        _lockSummary(
-                          service.lockedCountries,
-                          appLocalizations.countryLockNone,
-                        ),
-                      ),
-                      widget: SmartAnchorCountryPickerView(
-                        serviceId: service.serviceId,
+              ],
+              for (final service in services)
+                if (groupForService(service.serviceId) == null)
+                  ListItem.open(
+                    title: Text(
+                      '${service.displayName} ${appLocalizations.countryLock}',
+                    ),
+                    subtitle: Text(
+                      _lockSummary(
+                        service.lockedCountries,
+                        appLocalizations.countryLockNone,
                       ),
                     ),
-              ],
+                    widget: SmartAnchorCountryPickerView(
+                      serviceId: service.serviceId,
+                    ),
+                  ),
             ],
             footer: appLocalizations.smartAnchorLockDesc,
           ),
           generateSection(
             title: appLocalizations.subscriptionAggregation,
             items: [
+              if (ref.watch(currentProfileProvider) case final current?)
+                DecorationListItem(
+                  title: Text(
+                    '${appLocalizations.smartAnchorPrimarySubscription}: '
+                    '${current.label.isEmpty ? _profileHost(current.url) : current.label}',
+                  ),
+                ),
               for (final profile in profiles)
                 if (profile.id != currentProfileId &&
                     profile.type != ProfileType.custom)
                   DecorationListItem(
                     title: Text(
-                      profile.label.isEmpty ? profile.url : profile.label,
+                      profile.label.isEmpty
+                          ? _profileHost(profile.url)
+                          : profile.label,
                     ),
                     trailing: CommonSwitch(
                       value: input.aggregationSources.any(
@@ -223,7 +290,7 @@ class SmartAnchorSettingsView extends ConsumerWidget {
                               .setAggregationSource(
                                 sourceId: 'profile:${profile.id}',
                                 sourceLabel: profile.label.isEmpty
-                                    ? profile.url
+                                    ? _profileHost(profile.url)
                                     : profile.label,
                                 config: const {},
                                 enabled: false,
@@ -238,12 +305,16 @@ class SmartAnchorSettingsView extends ConsumerWidget {
                                 .setAggregationSource(
                                   sourceId: 'profile:${profile.id}',
                                   sourceLabel: profile.label.isEmpty
-                                      ? profile.url
+                                      ? _profileHost(profile.url)
                                       : profile.label,
                                   config: config,
                                   enabled: true,
                                 );
                           } catch (_) {
+                            dialogs.showNotifier(
+                              appLocalizations.smartAnchorAggregationLoadFailed,
+                              level: MessageLevel.error,
+                            );
                             return;
                           }
                         }
@@ -266,38 +337,14 @@ class SmartAnchorSettingsView extends ConsumerWidget {
                       .setAggregationMode(mode);
                 },
               ),
-              DecorationListItem(
-                title: Text(appLocalizations.smartAnchorProbeNow),
-                onPressed: () {
-                  final groupNames = {for (final group in groups) group.name};
-                  final names = <String>{};
-                  var current = '';
-                  for (final group in groups) {
-                    if (group.name.startsWith('🎯 Smart-') &&
-                        group.now != null) {
-                      current = group.now!;
-                    }
-                    for (final proxy in group.all) {
-                      if (!groupNames.contains(proxy.name)) {
-                        names.add(proxy.name);
-                      }
-                    }
-                  }
-                  ref
-                      .read(smartAnchorProvider.notifier)
-                      .probeNodes(
-                        proxyNames: names.toList(),
-                        currentProxyName: current,
-                        force: true,
-                      );
-                },
-              ),
             ],
-            footer: appLocalizations.smartAnchorAggregationDesc,
+            footer:
+                '${appLocalizations.smartAnchorAggregationDesc}\n${input.aggregationMode == AggregationGroupMode.primaryOnly ? appLocalizations.aggregationPrimaryOnlyDesc : appLocalizations.aggregationMergeAllDesc}',
           ),
           generateSection(
             title: appLocalizations.smartAnchorDiagnostics,
             items: [
+              _ProbeNowRow(groups: groups),
               for (final service in services)
                 if (input.anchors[service.serviceId] case final anchor?)
                   DecorationListItem(
@@ -305,16 +352,33 @@ class SmartAnchorSettingsView extends ConsumerWidget {
                     subtitle: Text(
                       '${anchor.city.isEmpty ? anchor.countryCode : anchor.city} · '
                       '${anchor.asn} · '
-                      '${ScoringEngine.trustTier(_anchorPurity(input, service.serviceId))}',
+                      '${_trustTierLabel(appLocalizations, input, service.serviceId)}',
                     ),
                     trailing: FilledButton(
-                      onPressed: () {
+                      onPressed: () async {
+                        final confirmed = await dialogs.showMessage(
+                          title: appLocalizations.smartAnchorResetAnchor,
+                          message: TextSpan(
+                            text:
+                                appLocalizations.smartAnchorResetAnchorConfirm,
+                          ),
+                          destructive: true,
+                        );
+                        if (confirmed != true) {
+                          return;
+                        }
                         ref
                             .read(smartAnchorProvider.notifier)
                             .clearAnchor(service.serviceId);
                       },
                       child: Text(appLocalizations.smartAnchorResetAnchor),
                     ),
+                  ),
+              for (final service in services)
+                if (input.anchors[service.serviceId] == null)
+                  DecorationListItem(
+                    title: Text(service.displayName),
+                    subtitle: Text(appLocalizations.smartAnchorNoAnchor),
                   ),
               const _CloudflareEdgeRow(),
               for (final entry in officialStatusEndpoints.entries)
@@ -350,7 +414,20 @@ class SmartAnchorCountryPickerView extends ConsumerWidget {
       (candidate) => candidate.serviceId == serviceId,
     );
     final selected = service.lockedCountries;
-    void apply(List<String> next) {
+    Future<void> apply(List<String> next) async {
+      if (next.length == selected.length && next.every(selected.contains)) {
+        return;
+      }
+      if (next.isEmpty && selected.isNotEmpty) {
+        final confirmed = await dialogs.showMessage(
+          title: appLocalizations.countryLock,
+          message: TextSpan(text: appLocalizations.smartAnchorUnlockConfirm),
+          destructive: true,
+        );
+        if (confirmed != true) {
+          return;
+        }
+      }
       ref.read(smartAnchorProvider.notifier).setLockCountries(serviceId, next);
       ref
           .read(setupActionProvider.notifier)
@@ -370,18 +447,19 @@ class SmartAnchorCountryPickerView extends ConsumerWidget {
             items: [
               DecorationListItem(
                 title: Text(appLocalizations.countryLockNone),
-                trailing: CommonSwitch(
-                  value: selected.isEmpty,
-                  onChanged: (value) {
-                    if (value) {
-                      apply(const []);
-                    }
-                  },
-                ),
+                trailing: selected.isEmpty
+                    ? GlyphIcon(
+                        AppGlyphs.check,
+                        color: Theme.of(context).colorScheme.primary,
+                      )
+                    : null,
+                onPressed: () => apply(const []),
               ),
               for (final code in _lockCountries)
                 DecorationListItem(
-                  title: Text(code),
+                  title: Text(
+                    '${_countryName(appLocalizations, code)} ($code)',
+                  ),
                   trailing: CommonSwitch(
                     value: selected.contains(code),
                     onChanged: (value) {
@@ -397,7 +475,8 @@ class SmartAnchorCountryPickerView extends ConsumerWidget {
                   ),
                 ),
             ],
-            footer: appLocalizations.smartAnchorLockDesc,
+            footer:
+                '${appLocalizations.smartAnchorLockDesc}\n${appLocalizations.smartAnchorCountryPickerFootnote}',
           ),
         ],
       ),
@@ -520,10 +599,97 @@ class _OfficialStatusRowState extends State<_OfficialStatusRow> {
   }
 }
 
-double _anchorPurity(SmartAnchorInput input, String serviceId) {
+double? _anchorPurity(SmartAnchorInput input, String serviceId) {
   final anchor = input.anchors[serviceId];
   if (anchor == null) {
-    return 0;
+    return null;
   }
-  return input.metadataByProxy[anchor.lastProxyName]?.purityScore ?? 0;
+  return input.metadataByProxy[anchor.lastProxyName]?.purityScore;
+}
+
+String _trustTierLabel(
+  AppLocalizations appLocalizations,
+  SmartAnchorInput input,
+  String serviceId,
+) {
+  final purity = _anchorPurity(input, serviceId);
+  if (purity == null) {
+    return appLocalizations.smartAnchorUnknown;
+  }
+  return switch (ScoringEngine.trustTier(purity)) {
+    'safe' => appLocalizations.smartAnchorTrustSafe,
+    'watch' => appLocalizations.smartAnchorTrustWatch,
+    _ => appLocalizations.smartAnchorTrustRisky,
+  };
+}
+
+class _ProbeNowRow extends ConsumerStatefulWidget {
+  const _ProbeNowRow({required this.groups});
+
+  final List<Group> groups;
+
+  @override
+  ConsumerState<_ProbeNowRow> createState() => _ProbeNowRowState();
+}
+
+class _ProbeNowRowState extends ConsumerState<_ProbeNowRow> {
+  var _probing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final appLocalizations = context.appLocalizations;
+    return DecorationListItem(
+      title: Text(appLocalizations.smartAnchorProbeNow),
+      subtitle: _probing ? Text(appLocalizations.smartAnchorProbing) : null,
+      trailing: _probing
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : null,
+      onPressed: _probing
+          ? null
+          : () async {
+              setState(() {
+                _probing = true;
+              });
+              try {
+                final groupNames = {
+                  for (final group in widget.groups) group.name,
+                };
+                final names = <String>{};
+                var current = '';
+                for (final group in widget.groups) {
+                  if (group.name.startsWith('🎯 Smart-') && group.now != null) {
+                    current = group.now!;
+                  }
+                  for (final proxy in group.all) {
+                    if (!groupNames.contains(proxy.name)) {
+                      names.add(proxy.name);
+                    }
+                  }
+                }
+                final updated = await ref
+                    .read(smartAnchorProvider.notifier)
+                    .probeNodes(
+                      proxyNames: names.toList(),
+                      currentProxyName: current,
+                      force: true,
+                    );
+                if (context.mounted) {
+                  dialogs.showNotifier(
+                    appLocalizations.smartAnchorProbeDone(updated),
+                  );
+                }
+              } finally {
+                if (mounted) {
+                  setState(() {
+                    _probing = false;
+                  });
+                }
+              }
+            },
+    );
+  }
 }

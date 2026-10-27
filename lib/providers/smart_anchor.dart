@@ -5,6 +5,7 @@ import 'package:fl_clash/common/service_probe.dart';
 import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/smart_anchor/models/anchor_path.dart';
 import 'package:fl_clash/smart_anchor/models/service_anchor.dart';
+import 'package:fl_clash/smart_anchor/models/switch_event.dart';
 import 'package:fl_clash/smart_anchor/services/api_pool.dart';
 import 'package:fl_clash/smart_anchor/models/service_group.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
@@ -59,7 +60,58 @@ class SmartAnchor extends _$SmartAnchor {
       sharedLockGroupIds: snapshot.sharedLockGroupIds,
       autoFailoverEnabled: snapshot.autoFailoverEnabled,
       paths: snapshot.paths,
+      aggregationMode: snapshot.aggregationMode,
+      aggregationSources: snapshot.aggregationSources,
+      switchEvents: snapshot.switchEvents,
     );
+  }
+
+  Future<SmartAnchorInput> refreshAggregationSources() async {
+    final stubs = [
+      for (final source in state.aggregationSources)
+        if (source.config.isEmpty) source,
+    ];
+    if (stubs.isEmpty) {
+      return state;
+    }
+    final core = ref.read(coreHandlerProvider);
+    final sources = <AggregationSourceInput>[];
+    var changed = false;
+    for (final source in state.aggregationSources) {
+      if (!stubs.contains(source)) {
+        sources.add(source);
+        continue;
+      }
+      final sourceId = source.sourceId;
+      if (!sourceId.startsWith('profile:')) {
+        sources.add(source);
+        continue;
+      }
+      final profileId = int.tryParse(sourceId.substring('profile:'.length));
+      if (profileId == null) {
+        sources.add(source);
+        continue;
+      }
+      try {
+        final config = await core.getConfig(profileId);
+        sources.add(
+          AggregationSourceInput(
+            sourceId: source.sourceId,
+            sourceLabel: source.sourceLabel,
+            config: config,
+          ),
+        );
+        changed = true;
+      } catch (_) {
+        changed = true;
+      }
+    }
+    if (!changed) {
+      return state;
+    }
+    final next = state.copyWith(aggregationSources: sources);
+    update(next);
+    return next;
   }
 
   void setAutoFailover(bool enabled) {
@@ -234,6 +286,15 @@ class SmartAnchor extends _$SmartAnchor {
     update(state.copyWith(anchors: {...state.anchors, serviceId: anchor}));
   }
 
+  void recordSwitchEvent(SwitchEvent event) {
+    final events = Map.of(state.switchEvents);
+    events[event.serviceId] = appendSwitchEvent(
+      events[event.serviceId] ?? const [],
+      event,
+    );
+    update(state.copyWith(switchEvents: events));
+  }
+
   void recordPathPoint(AnchorPathPoint point) {
     final paths = Map.of(state.paths);
     paths[point.serviceId] = appendPathPoint(
@@ -248,7 +309,7 @@ class SmartAnchor extends _$SmartAnchor {
     update(state.copyWith(paths: paths));
   }
 
-  Future<void> probeNodes({
+  Future<int> probeNodes({
     required List<String> proxyNames,
     required String currentProxyName,
     Map<String, String> entryServers = const {},
@@ -257,17 +318,18 @@ class SmartAnchor extends _$SmartAnchor {
   }) async {
     final enabled = state.services.where((service) => service.isEnabled);
     if (enabled.isEmpty) {
-      return;
+      return 0;
     }
     final now = DateTime.now();
     if (!force &&
         _lastProbeAt != null &&
         now.difference(_lastProbeAt!) < const Duration(minutes: 10)) {
-      return;
+      return 0;
     }
     if (updateThrottle) {
       _lastProbeAt = now;
     }
+    var updated = 0;
     final core = ref.read(coreHandlerProvider);
     final geoService = GeoIpService(
       cache: GeoIpCache(),
@@ -296,6 +358,7 @@ class SmartAnchor extends _$SmartAnchor {
       final metadata = Map.of(state.metadataByProxy);
       if (outcome.metadata != null) {
         metadata[name] = outcome.metadata!;
+        updated++;
       }
       final access = <String, Map<String, ServiceAccessResult>>{};
       for (final entry in state.accessByService.entries) {
@@ -308,6 +371,7 @@ class SmartAnchor extends _$SmartAnchor {
         state.copyWith(metadataByProxy: metadata, accessByService: access),
       );
     }
+    return updated;
   }
 }
 

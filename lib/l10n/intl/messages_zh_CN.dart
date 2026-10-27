@@ -192,17 +192,19 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m79(label) => "${label}只能是一项";
 
-  static String m80(value) => "峰值 ${value}";
+  static String m80(count) => "探测完成，更新了 ${count} 个节点。";
 
-  static String m81(value) => "累计 ${value}";
+  static String m81(value) => "峰值 ${value}";
 
-  static String m82(transport) => "${transport} 请求头";
+  static String m82(value) => "累计 ${value}";
 
-  static String m83(label) => "${label}必须为URL";
+  static String m83(transport) => "${transport} 请求头";
 
-  static String m84(count) => "${count} 年前";
+  static String m84(label) => "${label}必须为URL";
 
   static String m85(count) => "${count} 年前";
+
+  static String m86(count) => "${count} 年前";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -262,8 +264,14 @@ class MessageLookup extends MessageLookupByLibrary {
       "该配置已用 age 加密，需要 age 私钥才能解密",
     ),
     "aggregationMergeAll": MessageLookupByLibrary.simpleMessage("全部合并模式"),
+    "aggregationMergeAllDesc": MessageLookupByLibrary.simpleMessage(
+      "同名同类型组合并成员，同名不同类型组改名后保留；规则按主订阅在前拼接去重。",
+    ),
     "aggregationMode": MessageLookupByLibrary.simpleMessage("聚合模式"),
     "aggregationPrimaryOnly": MessageLookupByLibrary.simpleMessage("主订阅模式"),
+    "aggregationPrimaryOnlyDesc": MessageLookupByLibrary.simpleMessage(
+      "仅保留主订阅的分组与规则，其他订阅只提供节点。",
+    ),
     "agree": MessageLookupByLibrary.simpleMessage("同意"),
     "allReferencedProxies": MessageLookupByLibrary.simpleMessage("全部被引用的代理"),
     "allReferencedProxyProviders": MessageLookupByLibrary.simpleMessage(
@@ -1364,15 +1372,47 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorAggregationDesc": MessageLookupByLibrary.simpleMessage(
       "两种模式都会额外生成一个聚合全部节点统一组，DNS 两种模式都只用主订阅的。",
     ),
+    "smartAnchorAggregationLoadFailed": MessageLookupByLibrary.simpleMessage(
+      "拉取该订阅失败，未启用聚合。",
+    ),
     "smartAnchorAutoFailover": MessageLookupByLibrary.simpleMessage("自动切换"),
     "smartAnchorAutoFailoverDesc": MessageLookupByLibrary.simpleMessage(
       "在用节点连续 2 次探测失败时自动切到下一顺位，且不回切；关闭后故障节点不会自动切换。",
     ),
     "smartAnchorBackToAnchor": MessageLookupByLibrary.simpleMessage("回到锚点"),
+    "smartAnchorClearPathConfirm": MessageLookupByLibrary.simpleMessage(
+      "清除该服务组的全部路径记录吗？",
+    ),
+    "smartAnchorCountryDE": MessageLookupByLibrary.simpleMessage("德国"),
+    "smartAnchorCountryGB": MessageLookupByLibrary.simpleMessage("英国"),
+    "smartAnchorCountryHK": MessageLookupByLibrary.simpleMessage("香港"),
+    "smartAnchorCountryJP": MessageLookupByLibrary.simpleMessage("日本"),
+    "smartAnchorCountryKR": MessageLookupByLibrary.simpleMessage("韩国"),
+    "smartAnchorCountryNL": MessageLookupByLibrary.simpleMessage("荷兰"),
+    "smartAnchorCountryPickerFootnote": MessageLookupByLibrary.simpleMessage(
+      "列表外的国家代码可在业务编辑页中输入。",
+    ),
+    "smartAnchorCountrySG": MessageLookupByLibrary.simpleMessage("新加坡"),
+    "smartAnchorCountryTW": MessageLookupByLibrary.simpleMessage("台湾"),
+    "smartAnchorCountryUS": MessageLookupByLibrary.simpleMessage("美国"),
+    "smartAnchorDeleteConfirm": MessageLookupByLibrary.simpleMessage(
+      "删除该业务后，其锚点和路径记录也会一并清除。确定删除吗？",
+    ),
     "smartAnchorDesc": MessageLookupByLibrary.simpleMessage("业务锁国、锚点记忆与纯净度排序。"),
     "smartAnchorDiagnostics": MessageLookupByLibrary.simpleMessage("诊断"),
+    "smartAnchorInvalidCountryCode": MessageLookupByLibrary.simpleMessage(
+      "国家代码须为 2 位字母，如 US、JP。",
+    ),
+    "smartAnchorInvalidRule": MessageLookupByLibrary.simpleMessage(
+      "规则格式须为 类型,值，如 GEOSITE,openai。",
+    ),
+    "smartAnchorLastSwitch": MessageLookupByLibrary.simpleMessage("最近一次自动切换"),
     "smartAnchorLockDesc": MessageLookupByLibrary.simpleMessage(
       "不限表示不按国家过滤，风控风险最高。单国锁固定登录国家，风险最低；多国锁允许在几个国家内选节点，风险居中；改锁国会清空旧锚点。",
+    ),
+    "smartAnchorNoAnchor": MessageLookupByLibrary.simpleMessage("暂无锚点"),
+    "smartAnchorNoUsableNodes": MessageLookupByLibrary.simpleMessage(
+      "当前锁国下暂无可用节点，将回退直连",
     ),
     "smartAnchorPath": MessageLookupByLibrary.simpleMessage("节点位置路径"),
     "smartAnchorPathAnchor": MessageLookupByLibrary.simpleMessage("锚点"),
@@ -1391,7 +1431,12 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorPathTapHint": MessageLookupByLibrary.simpleMessage(
       "轻点一条记录可将其节点设为锚点。",
     ),
+    "smartAnchorPrimarySubscription": MessageLookupByLibrary.simpleMessage(
+      "主订阅",
+    ),
+    "smartAnchorProbeDone": m80,
     "smartAnchorProbeNow": MessageLookupByLibrary.simpleMessage("立即探测"),
+    "smartAnchorProbing": MessageLookupByLibrary.simpleMessage("探测中…"),
     "smartAnchorReasonNetworkFailed": MessageLookupByLibrary.simpleMessage(
       "网络失败",
     ),
@@ -1399,11 +1444,30 @@ class MessageLookup extends MessageLookupByLibrary {
       "地区封锁",
     ),
     "smartAnchorResetAnchor": MessageLookupByLibrary.simpleMessage("重置锚点"),
+    "smartAnchorResetAnchorConfirm": MessageLookupByLibrary.simpleMessage(
+      "重置锚点后，下次将重新选举锚点。确定重置吗？",
+    ),
+    "smartAnchorServiceAddedHint": MessageLookupByLibrary.simpleMessage(
+      "已添加，请在列表中开启。",
+    ),
     "smartAnchorServices": MessageLookupByLibrary.simpleMessage("业务"),
     "smartAnchorSetAnchor": MessageLookupByLibrary.simpleMessage("设当前节点为锚点"),
     "smartAnchorSharedLock": MessageLookupByLibrary.simpleMessage("同公司共用锁国与锚点"),
+    "smartAnchorSharedLockConfirm": MessageLookupByLibrary.simpleMessage(
+      "开启后，组内各业务的锁国会被统一为第一个业务的设置，原有设置不会恢复。确定开启吗？",
+    ),
     "smartAnchorSharedLockDesc": MessageLookupByLibrary.simpleMessage(
       "同公司不同业务共用同一组锁国国家与同一个锚点，登录国家与城市保持一致；关闭后各业务可分别设置。",
+    ),
+    "smartAnchorSwitchFrozen": MessageLookupByLibrary.simpleMessage(
+      "10 分钟内已切换 3 次，自动切换已冻结",
+    ),
+    "smartAnchorTrustRisky": MessageLookupByLibrary.simpleMessage("高危"),
+    "smartAnchorTrustSafe": MessageLookupByLibrary.simpleMessage("放心"),
+    "smartAnchorTrustWatch": MessageLookupByLibrary.simpleMessage("留意"),
+    "smartAnchorUnknown": MessageLookupByLibrary.simpleMessage("未知"),
+    "smartAnchorUnlockConfirm": MessageLookupByLibrary.simpleMessage(
+      "取消锁国后不再按国家过滤，风控风险最高。确定取消吗？",
     ),
     "sniffProtocols": MessageLookupByLibrary.simpleMessage("协议"),
     "sniffer": MessageLookupByLibrary.simpleMessage("域名嗅探"),
@@ -1481,11 +1545,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "totalUpload": MessageLookupByLibrary.simpleMessage("上传总量"),
     "tproxyPort": MessageLookupByLibrary.simpleMessage("Tproxy端口"),
     "traffic": MessageLookupByLibrary.simpleMessage("流量"),
-    "trafficPeak": m80,
-    "trafficTotal": m81,
+    "trafficPeak": m81,
+    "trafficTotal": m82,
     "trafficUsage": MessageLookupByLibrary.simpleMessage("流量统计"),
     "transport": MessageLookupByLibrary.simpleMessage("传输协议"),
-    "transportHeaders": m82,
+    "transportHeaders": m83,
     "tun": MessageLookupByLibrary.simpleMessage("虚拟网卡"),
     "tunAuthorizationFailed": MessageLookupByLibrary.simpleMessage(
       "虚拟网卡授权失败，已关闭。",
@@ -1513,7 +1577,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "upload": MessageLookupByLibrary.simpleMessage("上传"),
     "uploadBandwidth": MessageLookupByLibrary.simpleMessage("上行带宽"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
-    "urlTip": m83,
+    "urlTip": m84,
     "useHosts": MessageLookupByLibrary.simpleMessage("使用Hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage("使用系统Hosts"),
     "usedShort": MessageLookupByLibrary.simpleMessage("已用"),
@@ -1536,8 +1600,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "写入系统会同时设置系统时钟，Android 上不生效。",
     ),
-    "yearsAgo": m84,
-    "yearsAgoShort": m85,
+    "yearsAgo": m85,
+    "yearsAgoShort": m86,
     "yes": MessageLookupByLibrary.simpleMessage("是"),
     "zhCN": MessageLookupByLibrary.simpleMessage("中文简体"),
   };

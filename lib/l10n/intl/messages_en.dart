@@ -220,18 +220,20 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m79(label) => "${label} must be a single item";
 
-  static String m80(value) => "Peak ${value}";
+  static String m80(count) => "Probe finished, ${count} nodes updated.";
 
-  static String m81(value) => "Total ${value}";
+  static String m81(value) => "Peak ${value}";
 
-  static String m82(transport) => "${transport} Headers";
+  static String m82(value) => "Total ${value}";
 
-  static String m83(label) => "${label} must be a URL";
+  static String m83(transport) => "${transport} Headers";
 
-  static String m84(count) =>
+  static String m84(label) => "${label} must be a URL";
+
+  static String m85(count) =>
       "${Intl.plural(count, one: '1 year ago', other: '${count} years ago')}";
 
-  static String m85(count) => "${Intl.plural(count, other: '${count}y ago')}";
+  static String m86(count) => "${Intl.plural(count, other: '${count}y ago')}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -307,9 +309,15 @@ class MessageLookup extends MessageLookupByLibrary {
       "This profile is encrypted with age and needs an age secret key to decrypt",
     ),
     "aggregationMergeAll": MessageLookupByLibrary.simpleMessage("Merge all"),
+    "aggregationMergeAllDesc": MessageLookupByLibrary.simpleMessage(
+      "Same-name groups of the same type merge members; same-name groups of other types are renamed and kept; rules are concatenated primary-first and deduplicated.",
+    ),
     "aggregationMode": MessageLookupByLibrary.simpleMessage("Aggregation mode"),
     "aggregationPrimaryOnly": MessageLookupByLibrary.simpleMessage(
       "Primary only",
+    ),
+    "aggregationPrimaryOnlyDesc": MessageLookupByLibrary.simpleMessage(
+      "Only the primary subscription\'s groups and rules are kept; other subscriptions contribute nodes only.",
     ),
     "agree": MessageLookupByLibrary.simpleMessage("Agree"),
     "allReferencedProxies": MessageLookupByLibrary.simpleMessage(
@@ -1752,6 +1760,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorAggregationDesc": MessageLookupByLibrary.simpleMessage(
       "Both modes add a unified group with all merged nodes. DNS always comes from the primary subscription only.",
     ),
+    "smartAnchorAggregationLoadFailed": MessageLookupByLibrary.simpleMessage(
+      "Failed to load that subscription; aggregation was not enabled.",
+    ),
     "smartAnchorAutoFailover": MessageLookupByLibrary.simpleMessage(
       "Auto failover",
     ),
@@ -1761,14 +1772,51 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorBackToAnchor": MessageLookupByLibrary.simpleMessage(
       "Back to anchor",
     ),
+    "smartAnchorClearPathConfirm": MessageLookupByLibrary.simpleMessage(
+      "Clear all path records of this service group?",
+    ),
+    "smartAnchorCountryDE": MessageLookupByLibrary.simpleMessage("Germany"),
+    "smartAnchorCountryGB": MessageLookupByLibrary.simpleMessage(
+      "United Kingdom",
+    ),
+    "smartAnchorCountryHK": MessageLookupByLibrary.simpleMessage("Hong Kong"),
+    "smartAnchorCountryJP": MessageLookupByLibrary.simpleMessage("Japan"),
+    "smartAnchorCountryKR": MessageLookupByLibrary.simpleMessage("South Korea"),
+    "smartAnchorCountryNL": MessageLookupByLibrary.simpleMessage("Netherlands"),
+    "smartAnchorCountryPickerFootnote": MessageLookupByLibrary.simpleMessage(
+      "Country codes outside this list can be entered on the service edit page.",
+    ),
+    "smartAnchorCountrySG": MessageLookupByLibrary.simpleMessage("Singapore"),
+    "smartAnchorCountryTW": MessageLookupByLibrary.simpleMessage("Taiwan"),
+    "smartAnchorCountryUS": MessageLookupByLibrary.simpleMessage(
+      "United States",
+    ),
+    "smartAnchorDeleteConfirm": MessageLookupByLibrary.simpleMessage(
+      "Deleting this service also clears its anchor and path records. Delete it?",
+    ),
     "smartAnchorDesc": MessageLookupByLibrary.simpleMessage(
       "Per-service country lock, anchor memory and purity ranking.",
     ),
     "smartAnchorDiagnostics": MessageLookupByLibrary.simpleMessage(
       "Diagnostics",
     ),
+    "smartAnchorInvalidCountryCode": MessageLookupByLibrary.simpleMessage(
+      "Country codes must be 2 letters, e.g. US, JP.",
+    ),
+    "smartAnchorInvalidRule": MessageLookupByLibrary.simpleMessage(
+      "Rules must be TYPE,value, e.g. GEOSITE,openai.",
+    ),
+    "smartAnchorLastSwitch": MessageLookupByLibrary.simpleMessage(
+      "Last auto switch",
+    ),
     "smartAnchorLockDesc": MessageLookupByLibrary.simpleMessage(
       "No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; several countries allow nodes within those countries, with risk in between. Changing the locked countries clears the old anchor.",
+    ),
+    "smartAnchorNoAnchor": MessageLookupByLibrary.simpleMessage(
+      "No anchor yet",
+    ),
+    "smartAnchorNoUsableNodes": MessageLookupByLibrary.simpleMessage(
+      "No usable node under the current lock; falls back to DIRECT",
     ),
     "smartAnchorPath": MessageLookupByLibrary.simpleMessage("Node path"),
     "smartAnchorPathAnchor": MessageLookupByLibrary.simpleMessage("Anchor"),
@@ -1791,7 +1839,12 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorPathTapHint": MessageLookupByLibrary.simpleMessage(
       "Tap a record to set that node as anchor.",
     ),
+    "smartAnchorPrimarySubscription": MessageLookupByLibrary.simpleMessage(
+      "Primary subscription",
+    ),
+    "smartAnchorProbeDone": m80,
     "smartAnchorProbeNow": MessageLookupByLibrary.simpleMessage("Probe now"),
+    "smartAnchorProbing": MessageLookupByLibrary.simpleMessage("Probing…"),
     "smartAnchorReasonNetworkFailed": MessageLookupByLibrary.simpleMessage(
       "Network failed",
     ),
@@ -1801,6 +1854,12 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorResetAnchor": MessageLookupByLibrary.simpleMessage(
       "Reset anchor",
     ),
+    "smartAnchorResetAnchorConfirm": MessageLookupByLibrary.simpleMessage(
+      "Resetting the anchor elects a new one next time. Reset it?",
+    ),
+    "smartAnchorServiceAddedHint": MessageLookupByLibrary.simpleMessage(
+      "Added. Enable it in the list.",
+    ),
     "smartAnchorServices": MessageLookupByLibrary.simpleMessage("Services"),
     "smartAnchorSetAnchor": MessageLookupByLibrary.simpleMessage(
       "Set current node as anchor",
@@ -1808,8 +1867,21 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorSharedLock": MessageLookupByLibrary.simpleMessage(
       "Share lock and anchor within the same company",
     ),
+    "smartAnchorSharedLockConfirm": MessageLookupByLibrary.simpleMessage(
+      "Enabling unifies every member\'s lock to the first member\'s setting; the previous settings will not be restored. Continue?",
+    ),
     "smartAnchorSharedLockDesc": MessageLookupByLibrary.simpleMessage(
       "Services from the same company share one set of locked countries and one anchor, so the login country and city stay consistent. Turn it off and each service can be set separately.",
+    ),
+    "smartAnchorSwitchFrozen": MessageLookupByLibrary.simpleMessage(
+      "Auto switch frozen after 3 switches in 10 minutes",
+    ),
+    "smartAnchorTrustRisky": MessageLookupByLibrary.simpleMessage("Risky"),
+    "smartAnchorTrustSafe": MessageLookupByLibrary.simpleMessage("Safe"),
+    "smartAnchorTrustWatch": MessageLookupByLibrary.simpleMessage("Watch"),
+    "smartAnchorUnknown": MessageLookupByLibrary.simpleMessage("Unknown"),
+    "smartAnchorUnlockConfirm": MessageLookupByLibrary.simpleMessage(
+      "Removing the lock stops country filtering and carries the highest risk-control risk. Remove it?",
     ),
     "sniffProtocols": MessageLookupByLibrary.simpleMessage("Protocols"),
     "sniffer": MessageLookupByLibrary.simpleMessage("Sniffer"),
@@ -1905,11 +1977,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "totalUpload": MessageLookupByLibrary.simpleMessage("Uploaded"),
     "tproxyPort": MessageLookupByLibrary.simpleMessage("TProxy port"),
     "traffic": MessageLookupByLibrary.simpleMessage("Traffic"),
-    "trafficPeak": m80,
-    "trafficTotal": m81,
+    "trafficPeak": m81,
+    "trafficTotal": m82,
     "trafficUsage": MessageLookupByLibrary.simpleMessage("Traffic usage"),
     "transport": MessageLookupByLibrary.simpleMessage("Transport"),
-    "transportHeaders": m82,
+    "transportHeaders": m83,
     "tun": MessageLookupByLibrary.simpleMessage("TUN"),
     "tunAuthorizationFailed": MessageLookupByLibrary.simpleMessage(
       "TUN could not be authorized, so it was turned off.",
@@ -1941,7 +2013,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "upload": MessageLookupByLibrary.simpleMessage("Upload"),
     "uploadBandwidth": MessageLookupByLibrary.simpleMessage("Upload bandwidth"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
-    "urlTip": m83,
+    "urlTip": m84,
     "useHosts": MessageLookupByLibrary.simpleMessage("Use hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage("Use system hosts"),
     "usedShort": MessageLookupByLibrary.simpleMessage("used"),
@@ -1966,8 +2038,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "Write to system also sets the system clock; Android ignores it.",
     ),
-    "yearsAgo": m84,
-    "yearsAgoShort": m85,
+    "yearsAgo": m85,
+    "yearsAgoShort": m86,
     "yes": MessageLookupByLibrary.simpleMessage("Yes"),
     "zhCN": MessageLookupByLibrary.simpleMessage("Simplified Chinese"),
   };

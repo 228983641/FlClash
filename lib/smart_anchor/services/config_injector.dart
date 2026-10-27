@@ -21,8 +21,10 @@ class SmartConfigInjector {
         continue;
       }
       final groupName = '🎯 Smart-${service.serviceId.toUpperCase()}';
-      final sortedNodes =
-          rankedProxiesByService[service.serviceId] ?? const ['DIRECT'];
+      final ranked = rankedProxiesByService[service.serviceId];
+      final sortedNodes = ranked == null || ranked.isEmpty
+          ? const ['DIRECT']
+          : ranked;
       injectedGroups.add({
         'name': groupName,
         'type': 'select',
