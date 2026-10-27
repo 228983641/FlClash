@@ -20,7 +20,7 @@ class SmartConfigInjector {
       if (!service.isEnabled) {
         continue;
       }
-      final groupName = '🎯 Smart-${service.serviceId.toUpperCase()}';
+      final groupName = smartGroupName(service);
       final ranked = rankedProxiesByService[service.serviceId];
       final sortedNodes = ranked == null || ranked.isEmpty
           ? const ['DIRECT']

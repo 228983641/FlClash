@@ -1031,5 +1031,17 @@
   "smartAnchorTrustRisky": "Risky",
   "smartAnchorUnknown": "Unknown",
   "smartAnchorPathGlobe": "Globe",
-  "smartAnchorGlobeHint": "Drag to rotate the globe"
+  "smartAnchorGlobeHint": "Drag to rotate the globe",
+  "smartAnchorRegionFilter": "Region filter",
+  "smartAnchorRegionBlacklist": "Blacklist",
+  "smartAnchorRegionWhitelist": "Whitelist",
+  "smartAnchorRegionBlacklistDesc": "Checked regions are banned for this service.",
+  "smartAnchorRegionWhitelistDesc": "Only checked regions are used for this service.",
+  "smartAnchorRegionUnsupported": "Unsupported",
+  "smartAnchorRegionReset": "Reset to detected",
+  "smartAnchorRegionFootnote": "Regions follow the node's egress country. Unprobed nodes are not filtered; with an empty blacklist the detected unsupported regions apply automatically.",
+  "smartAnchorRegionEmpty": "No regions to list yet. Probe nodes first.",
+  "smartAnchorRegionCountBlacklist": "Blacklist: {count} regions",
+  "smartAnchorRegionCountWhitelist": "Whitelist: {count} regions",
+  "smartAnchorRegionAuto": "Auto (detected unsupported regions)"
 }

@@ -269,14 +269,26 @@ class _ProfilesGridState extends ConsumerState<_ProfilesGrid> {
     if (!widget.showAggregation) {
       return grid;
     }
-    return Column(
-      children: [
-        Padding(
-          padding: EdgeInsets.only(top: context.contentTopPadding),
-          child: const SmartAnchorAggregationCard(),
-        ),
-        Expanded(child: grid),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxCardHeight = constraints.maxHeight.isFinite
+            ? constraints.maxHeight * 0.5
+            : 400.0;
+        return Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.only(top: context.contentTopPadding),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxCardHeight),
+                child: const SingleChildScrollView(
+                  child: SmartAnchorAggregationCard(),
+                ),
+              ),
+            ),
+            Expanded(child: grid),
+          ],
+        );
+      },
     );
   }
 }

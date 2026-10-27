@@ -11,7 +11,9 @@ import 'package:fl_clash/smart_anchor/models/anchor_path.dart';
 import 'package:fl_clash/smart_anchor/models/node_metadata.dart';
 import 'package:fl_clash/smart_anchor/models/service_anchor.dart';
 import 'package:fl_clash/smart_anchor/models/service_group.dart';
+import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
 import 'package:fl_clash/smart_anchor/models/switch_event.dart';
+import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:fl_clash/smart_anchor/services/scoring_engine.dart';
 import 'package:fl_clash/smart_anchor/services/subscription_merger.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
@@ -557,7 +559,9 @@ class _SmartAnchorPathCardState extends ConsumerState<SmartAnchorPathCard> {
     String? setAnchorProxy;
     if (selected != null) {
       for (final memberId in selected.members) {
-        final group = groups.getGroup('🎯 Smart-${memberId.toUpperCase()}');
+        final group = groups.getGroup(
+          smartGroupNameForId(memberId, serviceById),
+        );
         final current = group?.now;
         final meta = current == null ? null : input.metadataByProxy[current];
         if (current != null && meta != null) {
@@ -574,7 +578,9 @@ class _SmartAnchorPathCardState extends ConsumerState<SmartAnchorPathCard> {
         if (anchor == null) {
           continue;
         }
-        final group = groups.getGroup('🎯 Smart-${memberId.toUpperCase()}');
+        final group = groups.getGroup(
+          smartGroupNameForId(memberId, serviceById),
+        );
         if (group == null) {
           continue;
         }

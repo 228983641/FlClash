@@ -84,6 +84,13 @@ void main() {
         },
         accessByService: {
           'claude': {
+            'US-near': ServiceAccessResult(
+              serviceId: 'claude',
+              proxyName: 'US-near',
+              egressIp: '1.2.3.4',
+              reason: ServiceAccessReason.accessible,
+              checkedAt: now,
+            ),
             'US-blocked': ServiceAccessResult(
               serviceId: 'claude',
               proxyName: 'US-blocked',
@@ -96,14 +103,14 @@ void main() {
       ),
     );
     final groups = result['proxy-groups'] as List;
-    expect(groups.first['name'], '🎯 Smart-CLAUDE');
+    expect(groups.first['name'], '🎯 Smart-Claude');
     expect(groups.first['proxies'], ['US-near', 'US-far', 'US-unknown']);
     final rules = result['rules'] as List;
-    expect(rules.first, 'DOMAIN-SUFFIX,claude.ai,🎯 Smart-CLAUDE');
+    expect(rules.first, 'DOMAIN-SUFFIX,claude.ai,🎯 Smart-Claude');
     final dns = result['dns'] as Map;
     expect(
       (dns['nameserver-policy'] as Map)['claude.ai'],
-      'https://1.1.1.1/dns-query#🎯 Smart-CLAUDE',
+      'https://1.1.1.1/dns-query#🎯 Smart-Claude',
     );
   });
 
@@ -214,6 +221,13 @@ void main() {
         },
         accessByService: {
           'claude': {
+            'US-near': ServiceAccessResult(
+              serviceId: 'claude',
+              proxyName: 'US-near',
+              egressIp: '1.2.3.4',
+              reason: ServiceAccessReason.accessible,
+              checkedAt: now,
+            ),
             'US-blocked': ServiceAccessResult(
               serviceId: 'claude',
               proxyName: 'US-blocked',
@@ -240,7 +254,7 @@ void main() {
     );
     final groups = result['proxy-groups'] as List;
     final smart = groups.firstWhere(
-      (group) => group['name'] == '🎯 Smart-CLAUDE',
+      (group) => group['name'] == '🎯 Smart-Claude',
     );
     expect(smart['proxies'], [
       '[主订阅] US-near',

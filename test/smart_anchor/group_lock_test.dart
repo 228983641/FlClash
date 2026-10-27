@@ -123,7 +123,7 @@ void main() {
     final groups = result['proxy-groups'] as List;
     final youtubeGroup =
         groups.firstWhere(
-              (group) => (group as Map)['name'] == '🎯 Smart-YOUTUBE',
+              (group) => (group as Map)['name'] == '🎯 Smart-youtube',
             )
             as Map;
     final members = (youtubeGroup['proxies'] as List).cast<String>();

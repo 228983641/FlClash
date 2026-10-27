@@ -7,6 +7,9 @@ class ServiceToggleConfig {
     required this.matchRules,
     required this.dnsDomains,
     this.targetCountries = const [],
+    this.officialName = '',
+    this.regionMode = 'blacklist',
+    this.regionCountries = const [],
   });
 
   final String serviceId;
@@ -16,6 +19,22 @@ class ServiceToggleConfig {
   final List<String> matchRules;
   final List<String> dnsDomains;
   final List<String> targetCountries;
+
+  /// The vendor's own spelling, used for proxy group names. Empty means the
+  /// display name already is the official spelling.
+  final String officialName;
+
+  /// Region filter mode for this service: 'blacklist' bans the listed
+  /// regions, 'whitelist' allows only the listed regions.
+  final String regionMode;
+
+  /// Regions (country codes) checked in the region filter.
+  final List<String> regionCountries;
+
+  String get groupLabel => officialName.isEmpty ? displayName : officialName;
+
+  String get effectiveRegionMode =>
+      regionMode == 'whitelist' ? 'whitelist' : 'blacklist';
 
   List<String> get lockedCountries {
     if (targetCountries.isNotEmpty) {
@@ -37,6 +56,8 @@ class ServiceToggleConfig {
     bool? isEnabled,
     String? targetCountry,
     List<String>? targetCountries,
+    String? regionMode,
+    List<String>? regionCountries,
   }) {
     return ServiceToggleConfig(
       serviceId: serviceId,
@@ -46,6 +67,9 @@ class ServiceToggleConfig {
       matchRules: matchRules,
       dnsDomains: dnsDomains,
       targetCountries: targetCountries ?? this.targetCountries,
+      officialName: officialName,
+      regionMode: regionMode ?? this.regionMode,
+      regionCountries: regionCountries ?? this.regionCountries,
     );
   }
 
@@ -57,12 +81,19 @@ class ServiceToggleConfig {
     'matchRules': matchRules,
     'dnsDomains': dnsDomains,
     'targetCountries': targetCountries,
+    'officialName': officialName,
+    'regionMode': regionMode,
+    'regionCountries': regionCountries,
   };
 
   factory ServiceToggleConfig.fromJson(Map<String, dynamic> json) {
     final countries = json['targetCountries'];
     final countryList = countries is List
         ? [for (final country in countries) country.toString()]
+        : const <String>[];
+    final regionRaw = json['regionCountries'];
+    final regionList = regionRaw is List
+        ? [for (final country in regionRaw) country.toString()]
         : const <String>[];
     return ServiceToggleConfig(
       serviceId: json['serviceId'] as String,
@@ -74,15 +105,33 @@ class ServiceToggleConfig {
       matchRules: List<String>.from(json['matchRules'] as List),
       dnsDomains: List<String>.from(json['dnsDomains'] as List),
       targetCountries: countryList,
+      officialName: json['officialName'] as String? ?? '',
+      regionMode: json['regionMode'] as String? ?? 'blacklist',
+      regionCountries: regionList,
     );
   }
+}
+
+String smartGroupName(ServiceToggleConfig service) =>
+    '🎯 Smart-${service.groupLabel}';
+
+String smartGroupNameForId(
+  String serviceId,
+  Map<String, ServiceToggleConfig> serviceById,
+) {
+  final service = serviceById[serviceId];
+  if (service == null) {
+    return '🎯 Smart-${serviceId.toUpperCase()}';
+  }
+  return smartGroupName(service);
 }
 
 const List<ServiceToggleConfig> defaultServiceToggles = [
   ServiceToggleConfig(
     serviceId: 'claude',
     displayName: 'Claude (克劳德)',
-    isEnabled: true,
+    officialName: 'Claude',
+    isEnabled: false,
     targetCountry: 'US',
     matchRules: [
       'GEOSITE,anthropic',
@@ -94,7 +143,8 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
   ServiceToggleConfig(
     serviceId: 'openai',
     displayName: 'ChatGPT (OpenAI)',
-    isEnabled: true,
+    officialName: 'ChatGPT',
+    isEnabled: false,
     targetCountry: 'US',
     matchRules: [
       'GEOSITE,openai',
@@ -106,7 +156,8 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
   ServiceToggleConfig(
     serviceId: 'gemini',
     displayName: 'Google Gemini',
-    isEnabled: true,
+    officialName: 'Gemini',
+    isEnabled: false,
     targetCountry: 'US',
     matchRules: [
       'GEOSITE,google-gemini',
@@ -118,7 +169,8 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
   ServiceToggleConfig(
     serviceId: 'cloudflare',
     displayName: 'Cloudflare 护盾站点',
-    isEnabled: true,
+    officialName: 'Cloudflare',
+    isEnabled: false,
     targetCountry: 'US',
     matchRules: [
       'GEOSITE,cloudflare',
@@ -130,6 +182,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
   ServiceToggleConfig(
     serviceId: 'netflix',
     displayName: 'Netflix (奈飞)',
+    officialName: 'Netflix',
     isEnabled: false,
     targetCountry: 'SG',
     matchRules: [
@@ -142,6 +195,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
   ServiceToggleConfig(
     serviceId: 'google',
     displayName: 'Google 综合服务',
+    officialName: 'Google',
     isEnabled: false,
     targetCountry: 'US',
     matchRules: ['GEOSITE,google'],
@@ -158,6 +212,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
   ServiceToggleConfig(
     serviceId: 'x',
     displayName: 'X (Twitter)',
+    officialName: 'X',
     isEnabled: false,
     targetCountry: '',
     matchRules: ['GEOSITE,twitter'],
@@ -182,6 +237,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
   ServiceToggleConfig(
     serviceId: 'grok',
     displayName: 'Grok (xAI)',
+    officialName: 'Grok',
     isEnabled: false,
     targetCountry: 'US',
     matchRules: ['DOMAIN-SUFFIX,grok.com', 'DOMAIN-SUFFIX,x.ai'],
@@ -233,6 +289,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
   ServiceToggleConfig(
     serviceId: 'muse',
     displayName: 'Muse (Meta)',
+    officialName: 'Muse',
     isEnabled: false,
     targetCountry: 'US',
     matchRules: ['DOMAIN-SUFFIX,muse.ai'],

@@ -280,9 +280,9 @@ void main() {
           },
         );
         final groups = result['proxy-groups'] as List;
-        expect(groups.first['name'], '🎯 Smart-CLAUDE');
+        expect(groups.first['name'], '🎯 Smart-Claude');
         final rules = result['rules'] as List;
-        expect(rules.first, 'GEOSITE,anthropic,🎯 Smart-CLAUDE');
+        expect(rules.first, 'GEOSITE,anthropic,🎯 Smart-Claude');
         expect(rules, contains('MATCH,DIRECT'));
         final policy = (result['dns'] as Map)['nameserver-policy'] as Map;
         expect(policy.containsKey('claude.ai'), isTrue);

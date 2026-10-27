@@ -52,8 +52,22 @@ class SmartAnchor extends _$SmartAnchor {
     if (snapshot == null) {
       return;
     }
+    final mergedServices = snapshot.services.isEmpty
+        ? null
+        : [
+            for (final def in defaultServiceToggles)
+              snapshot.services.firstWhere(
+                (service) => service.serviceId == def.serviceId,
+                orElse: () => def,
+              ),
+            for (final service in snapshot.services)
+              if (!defaultServiceToggles.any(
+                (def) => def.serviceId == service.serviceId,
+              ))
+                service,
+          ];
     state = state.copyWith(
-      services: snapshot.services.isEmpty ? null : snapshot.services,
+      services: mergedServices,
       anchors: snapshot.anchors,
       metadataByProxy: snapshot.metadataByProxy,
       accessByService: snapshot.accessByService,

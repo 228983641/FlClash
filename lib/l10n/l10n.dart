@@ -8727,6 +8727,126 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Region filter`
+  String get smartAnchorRegionFilter {
+    return Intl.message(
+      'Region filter',
+      name: 'smartAnchorRegionFilter',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Blacklist`
+  String get smartAnchorRegionBlacklist {
+    return Intl.message(
+      'Blacklist',
+      name: 'smartAnchorRegionBlacklist',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Whitelist`
+  String get smartAnchorRegionWhitelist {
+    return Intl.message(
+      'Whitelist',
+      name: 'smartAnchorRegionWhitelist',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Checked regions are banned for this service.`
+  String get smartAnchorRegionBlacklistDesc {
+    return Intl.message(
+      'Checked regions are banned for this service.',
+      name: 'smartAnchorRegionBlacklistDesc',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Only checked regions are used for this service.`
+  String get smartAnchorRegionWhitelistDesc {
+    return Intl.message(
+      'Only checked regions are used for this service.',
+      name: 'smartAnchorRegionWhitelistDesc',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Unsupported`
+  String get smartAnchorRegionUnsupported {
+    return Intl.message(
+      'Unsupported',
+      name: 'smartAnchorRegionUnsupported',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Reset to detected`
+  String get smartAnchorRegionReset {
+    return Intl.message(
+      'Reset to detected',
+      name: 'smartAnchorRegionReset',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Regions follow the node's egress country. Unprobed nodes are not filtered; with an empty blacklist the detected unsupported regions apply automatically.`
+  String get smartAnchorRegionFootnote {
+    return Intl.message(
+      'Regions follow the node\'s egress country. Unprobed nodes are not filtered; with an empty blacklist the detected unsupported regions apply automatically.',
+      name: 'smartAnchorRegionFootnote',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No regions to list yet. Probe nodes first.`
+  String get smartAnchorRegionEmpty {
+    return Intl.message(
+      'No regions to list yet. Probe nodes first.',
+      name: 'smartAnchorRegionEmpty',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Blacklist: {count} regions`
+  String smartAnchorRegionCountBlacklist(Object count) {
+    return Intl.message(
+      'Blacklist: $count regions',
+      name: 'smartAnchorRegionCountBlacklist',
+      desc: '',
+      args: [count],
+    );
+  }
+
+  /// `Whitelist: {count} regions`
+  String smartAnchorRegionCountWhitelist(Object count) {
+    return Intl.message(
+      'Whitelist: $count regions',
+      name: 'smartAnchorRegionCountWhitelist',
+      desc: '',
+      args: [count],
+    );
+  }
+
+  /// `Auto (detected unsupported regions)`
+  String get smartAnchorRegionAuto {
+    return Intl.message(
+      'Auto (detected unsupported regions)',
+      name: 'smartAnchorRegionAuto',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

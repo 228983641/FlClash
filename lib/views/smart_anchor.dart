@@ -46,22 +46,6 @@ String _countryName(AppLocalizations appLocalizations, String code) {
   }
 }
 
-List<ServiceToggleConfig> effectiveSmartServices(SmartAnchorInput input) {
-  final byId = {
-    for (final service in defaultServiceToggles) service.serviceId: service,
-    for (final service in input.services) service.serviceId: service,
-  };
-  final defaultIds = {
-    for (final service in defaultServiceToggles) service.serviceId,
-  };
-  return [
-    for (final service in defaultServiceToggles) byId[service.serviceId]!,
-    for (final service in input.services)
-      if (!defaultIds.contains(service.serviceId))
-        byId[service.serviceId] ?? service,
-  ];
-}
-
 class SmartAnchorSettingsView extends ConsumerWidget {
   const SmartAnchorSettingsView({super.key});
 

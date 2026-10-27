@@ -1,8 +1,10 @@
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/providers/smart_anchor.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
+import 'package:fl_clash/views/smart_anchor_region.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -120,6 +122,9 @@ class _SmartAnchorServiceEditViewState
             targetCountries: countries,
             matchRules: rules,
             dnsDomains: _lines(_dnsController),
+            officialName: existing?.officialName ?? '',
+            regionMode: existing?.regionMode ?? 'blacklist',
+            regionCountries: existing?.regionCountries ?? const [],
           ),
         );
     if (lockChanged) {
@@ -127,6 +132,21 @@ class _SmartAnchorServiceEditViewState
     }
     ref.read(setupActionProvider.notifier).applyProfileDebounce(silence: true);
     Navigator.of(context).pop(existing == null);
+  }
+
+  String _regionSummary(
+    ServiceToggleConfig current,
+    AppLocalizations appLocalizations,
+  ) {
+    final stored = current.regionCountries;
+    if (stored.isNotEmpty) {
+      return current.effectiveRegionMode == 'whitelist'
+          ? appLocalizations.smartAnchorRegionCountWhitelist(stored.length)
+          : appLocalizations.smartAnchorRegionCountBlacklist(stored.length);
+    }
+    return current.effectiveRegionMode == 'whitelist'
+        ? appLocalizations.smartAnchorRegionWhitelist
+        : appLocalizations.smartAnchorRegionAuto;
   }
 
   @override
@@ -192,6 +212,36 @@ class _SmartAnchorServiceEditViewState
               ),
             ],
           ),
+          if (service != null) ...[
+            const SizedBox(height: 16),
+            generateSection(
+              title: appLocalizations.smartAnchorRegionFilter,
+              items: [
+                DecorationListItem(
+                  title: Text(appLocalizations.smartAnchorRegionFilter),
+                  subtitle: Text(
+                    _regionSummary(
+                      effectiveSmartServices(
+                        ref.watch(smartAnchorProvider),
+                      ).firstWhere(
+                        (candidate) => candidate.serviceId == service.serviceId,
+                        orElse: () => service,
+                      ),
+                      appLocalizations,
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            SmartAnchorRegionView(serviceId: service.serviceId),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 16),
           FilledButton(
             onPressed:

@@ -197,17 +197,21 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m80(count) => "Probe finished, ${count} nodes updated.";
 
-  static String m81(value) => "ピーク ${value}";
+  static String m81(count) => "Blacklist: ${count} regions";
 
-  static String m82(value) => "累計 ${value}";
+  static String m82(count) => "Whitelist: ${count} regions";
 
-  static String m83(transport) => "${transport} リクエストヘッダー";
+  static String m83(value) => "ピーク ${value}";
 
-  static String m84(label) => "${label}はURLである必要があります";
+  static String m84(value) => "累計 ${value}";
 
-  static String m85(count) => "${count} 年前";
+  static String m85(transport) => "${transport} リクエストヘッダー";
 
-  static String m86(count) => "${count} 年前";
+  static String m86(label) => "${label}はURLである必要があります";
+
+  static String m87(count) => "${count} 年前";
+
+  static String m88(count) => "${count} 年前";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -1610,6 +1614,38 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorReasonRegionBlocked": MessageLookupByLibrary.simpleMessage(
       "Region blocked",
     ),
+    "smartAnchorRegionAuto": MessageLookupByLibrary.simpleMessage(
+      "Auto (detected unsupported regions)",
+    ),
+    "smartAnchorRegionBlacklist": MessageLookupByLibrary.simpleMessage(
+      "Blacklist",
+    ),
+    "smartAnchorRegionBlacklistDesc": MessageLookupByLibrary.simpleMessage(
+      "Checked regions are banned for this service.",
+    ),
+    "smartAnchorRegionCountBlacklist": m81,
+    "smartAnchorRegionCountWhitelist": m82,
+    "smartAnchorRegionEmpty": MessageLookupByLibrary.simpleMessage(
+      "No regions to list yet. Probe nodes first.",
+    ),
+    "smartAnchorRegionFilter": MessageLookupByLibrary.simpleMessage(
+      "Region filter",
+    ),
+    "smartAnchorRegionFootnote": MessageLookupByLibrary.simpleMessage(
+      "Regions follow the node\'s egress country. Unprobed nodes are not filtered; with an empty blacklist the detected unsupported regions apply automatically.",
+    ),
+    "smartAnchorRegionReset": MessageLookupByLibrary.simpleMessage(
+      "Reset to detected",
+    ),
+    "smartAnchorRegionUnsupported": MessageLookupByLibrary.simpleMessage(
+      "Unsupported",
+    ),
+    "smartAnchorRegionWhitelist": MessageLookupByLibrary.simpleMessage(
+      "Whitelist",
+    ),
+    "smartAnchorRegionWhitelistDesc": MessageLookupByLibrary.simpleMessage(
+      "Only checked regions are used for this service.",
+    ),
     "smartAnchorResetAnchor": MessageLookupByLibrary.simpleMessage(
       "Reset anchor",
     ),
@@ -1726,11 +1762,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "totalUpload": MessageLookupByLibrary.simpleMessage("アップロード量"),
     "tproxyPort": MessageLookupByLibrary.simpleMessage("TProxyポート"),
     "traffic": MessageLookupByLibrary.simpleMessage("通信量"),
-    "trafficPeak": m81,
-    "trafficTotal": m82,
+    "trafficPeak": m83,
+    "trafficTotal": m84,
     "trafficUsage": MessageLookupByLibrary.simpleMessage("トラフィック統計"),
     "transport": MessageLookupByLibrary.simpleMessage("トランスポート"),
-    "transportHeaders": m83,
+    "transportHeaders": m85,
     "tun": MessageLookupByLibrary.simpleMessage("TUN"),
     "tunAuthorizationFailed": MessageLookupByLibrary.simpleMessage(
       "TUN の権限を取得できなかったため、オフにしました。",
@@ -1758,7 +1794,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "upload": MessageLookupByLibrary.simpleMessage("アップロード"),
     "uploadBandwidth": MessageLookupByLibrary.simpleMessage("アップロード帯域幅"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
-    "urlTip": m84,
+    "urlTip": m86,
     "useHosts": MessageLookupByLibrary.simpleMessage("Hostsを使用"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage("システムのHostsを使用"),
     "usedShort": MessageLookupByLibrary.simpleMessage("使用済み"),
@@ -1781,8 +1817,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "システムに書き込むを有効にするとシステムクロックも設定します。Android では無視されます。",
     ),
-    "yearsAgo": m85,
-    "yearsAgoShort": m86,
+    "yearsAgo": m87,
+    "yearsAgoShort": m88,
     "yes": MessageLookupByLibrary.simpleMessage("はい"),
     "zhCN": MessageLookupByLibrary.simpleMessage("簡体字中国語"),
   };

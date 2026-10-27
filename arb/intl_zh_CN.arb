@@ -1031,5 +1031,17 @@
   "smartAnchorTrustRisky": "高危",
   "smartAnchorUnknown": "未知",
   "smartAnchorPathGlobe": "地球",
-  "smartAnchorGlobeHint": "拖动可旋转地球"
+  "smartAnchorGlobeHint": "拖动可旋转地球",
+  "smartAnchorRegionFilter": "地区过滤",
+  "smartAnchorRegionBlacklist": "黑名单",
+  "smartAnchorRegionWhitelist": "白名单",
+  "smartAnchorRegionBlacklistDesc": "勾选的地区将对该业务禁用。",
+  "smartAnchorRegionWhitelistDesc": "该业务只使用勾选的地区。",
+  "smartAnchorRegionUnsupported": "不支持",
+  "smartAnchorRegionReset": "恢复为自动检测",
+  "smartAnchorRegionFootnote": "地区按节点出口国家判断。未探测的节点不受过滤影响；黑名单为空时，自动沿用已探测到的不支持地区。",
+  "smartAnchorRegionEmpty": "暂无可列出的地区，请先探测节点。",
+  "smartAnchorRegionCountBlacklist": "黑名单：{count} 个地区",
+  "smartAnchorRegionCountWhitelist": "白名单：{count} 个地区",
+  "smartAnchorRegionAuto": "自动（已探测到的不支持地区）"
 }

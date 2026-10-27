@@ -194,17 +194,21 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m80(count) => "探测完成，更新了 ${count} 个节点。";
 
-  static String m81(value) => "峰值 ${value}";
+  static String m81(count) => "黑名单：${count} 个地区";
 
-  static String m82(value) => "累计 ${value}";
+  static String m82(count) => "白名单：${count} 个地区";
 
-  static String m83(transport) => "${transport} 请求头";
+  static String m83(value) => "峰值 ${value}";
 
-  static String m84(label) => "${label}必须为URL";
+  static String m84(value) => "累计 ${value}";
 
-  static String m85(count) => "${count} 年前";
+  static String m85(transport) => "${transport} 请求头";
 
-  static String m86(count) => "${count} 年前";
+  static String m86(label) => "${label}必须为URL";
+
+  static String m87(count) => "${count} 年前";
+
+  static String m88(count) => "${count} 年前";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -1445,6 +1449,28 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorReasonRegionBlocked": MessageLookupByLibrary.simpleMessage(
       "地区封锁",
     ),
+    "smartAnchorRegionAuto": MessageLookupByLibrary.simpleMessage(
+      "自动（已探测到的不支持地区）",
+    ),
+    "smartAnchorRegionBlacklist": MessageLookupByLibrary.simpleMessage("黑名单"),
+    "smartAnchorRegionBlacklistDesc": MessageLookupByLibrary.simpleMessage(
+      "勾选的地区将对该业务禁用。",
+    ),
+    "smartAnchorRegionCountBlacklist": m81,
+    "smartAnchorRegionCountWhitelist": m82,
+    "smartAnchorRegionEmpty": MessageLookupByLibrary.simpleMessage(
+      "暂无可列出的地区，请先探测节点。",
+    ),
+    "smartAnchorRegionFilter": MessageLookupByLibrary.simpleMessage("地区过滤"),
+    "smartAnchorRegionFootnote": MessageLookupByLibrary.simpleMessage(
+      "地区按节点出口国家判断。未探测的节点不受过滤影响；黑名单为空时，自动沿用已探测到的不支持地区。",
+    ),
+    "smartAnchorRegionReset": MessageLookupByLibrary.simpleMessage("恢复为自动检测"),
+    "smartAnchorRegionUnsupported": MessageLookupByLibrary.simpleMessage("不支持"),
+    "smartAnchorRegionWhitelist": MessageLookupByLibrary.simpleMessage("白名单"),
+    "smartAnchorRegionWhitelistDesc": MessageLookupByLibrary.simpleMessage(
+      "该业务只使用勾选的地区。",
+    ),
     "smartAnchorResetAnchor": MessageLookupByLibrary.simpleMessage("重置锚点"),
     "smartAnchorResetAnchorConfirm": MessageLookupByLibrary.simpleMessage(
       "重置锚点后，下次将重新选举锚点。确定重置吗？",
@@ -1547,11 +1573,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "totalUpload": MessageLookupByLibrary.simpleMessage("上传总量"),
     "tproxyPort": MessageLookupByLibrary.simpleMessage("Tproxy端口"),
     "traffic": MessageLookupByLibrary.simpleMessage("流量"),
-    "trafficPeak": m81,
-    "trafficTotal": m82,
+    "trafficPeak": m83,
+    "trafficTotal": m84,
     "trafficUsage": MessageLookupByLibrary.simpleMessage("流量统计"),
     "transport": MessageLookupByLibrary.simpleMessage("传输协议"),
-    "transportHeaders": m83,
+    "transportHeaders": m85,
     "tun": MessageLookupByLibrary.simpleMessage("虚拟网卡"),
     "tunAuthorizationFailed": MessageLookupByLibrary.simpleMessage(
       "虚拟网卡授权失败，已关闭。",
@@ -1579,7 +1605,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "upload": MessageLookupByLibrary.simpleMessage("上传"),
     "uploadBandwidth": MessageLookupByLibrary.simpleMessage("上行带宽"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
-    "urlTip": m84,
+    "urlTip": m86,
     "useHosts": MessageLookupByLibrary.simpleMessage("使用Hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage("使用系统Hosts"),
     "usedShort": MessageLookupByLibrary.simpleMessage("已用"),
@@ -1602,8 +1628,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "写入系统会同时设置系统时钟，Android 上不生效。",
     ),
-    "yearsAgo": m85,
-    "yearsAgoShort": m86,
+    "yearsAgo": m87,
+    "yearsAgoShort": m88,
     "yes": MessageLookupByLibrary.simpleMessage("是"),
     "zhCN": MessageLookupByLibrary.simpleMessage("中文简体"),
   };

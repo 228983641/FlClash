@@ -2,6 +2,8 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/providers/smart_anchor.dart';
+import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/widgets/widgets.dart';
@@ -144,13 +146,32 @@ class ProxyCard extends ConsumerWidget {
           overflow: TextOverflow.ellipsis,
           color: context.colorScheme.onSurface.opacity80,
         );
+    final isGroupEntry = GroupType.values.any(
+      (type) => type.name == proxy.type,
+    );
+    final remark = isGroupEntry
+        ? ''
+        : smartNodeRemark(
+            ref.watch(
+              smartAnchorProvider.select(
+                (input) => metadataForDisplayProxy(input, proxy.name),
+              ),
+            ),
+          );
+    final typeWithRemark = remark.isEmpty
+        ? proxy.type
+        : '${proxy.type} · $remark';
     final details = isLoose
         ? Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
                 height: measure.textHeight(AppTextStyle.footnote),
-                child: _ProxyDesc(proxy: proxy, style: typeStyle),
+                child: _ProxyDesc(
+                  proxy: proxy,
+                  style: typeStyle,
+                  suffix: remark,
+                ),
               ),
               const SizedBox(height: 6),
               delayText,
@@ -165,7 +186,7 @@ class ProxyCard extends ConsumerWidget {
                 Flexible(
                   flex: 1,
                   child: TooltipText(
-                    text: Text(proxy.type, maxLines: 1, style: typeStyle),
+                    text: Text(typeWithRemark, maxLines: 1, style: typeStyle),
                   ),
                 ),
                 delayText,
@@ -234,10 +255,15 @@ class ProxyCard extends ConsumerWidget {
 }
 
 class _ProxyDesc extends ConsumerWidget {
-  const _ProxyDesc({required this.proxy, required this.style});
+  const _ProxyDesc({
+    required this.proxy,
+    required this.style,
+    this.suffix = '',
+  });
 
   final Proxy proxy;
   final TextStyle style;
+  final String suffix;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -249,8 +275,11 @@ class _ProxyDesc extends ConsumerWidget {
             ).select((state) => state.proxyName),
           )
         : proxy.name;
+    final base = nodeName == proxy.name
+        ? proxy.type
+        : '${proxy.type}($nodeName)';
     return EmojiText(
-      nodeName == proxy.name ? proxy.type : '${proxy.type}($nodeName)',
+      suffix.isEmpty ? base : '$base · $suffix',
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: style,

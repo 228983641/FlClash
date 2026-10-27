@@ -226,7 +226,7 @@ class ProxiesAction extends _$ProxiesAction {
     for (final service in smart.services.where(
       (service) => service.isEnabled,
     )) {
-      final groupName = '🎯 Smart-${service.serviceId.toUpperCase()}';
+      final groupName = smartGroupName(service);
       final group = groups.getGroup(groupName);
       final currentName = group?.now;
       if (currentName == null) {
@@ -281,7 +281,7 @@ class ProxiesAction extends _$ProxiesAction {
     for (final service in smart.services.where(
       (service) => service.isEnabled,
     )) {
-      final groupName = '🎯 Smart-${service.serviceId.toUpperCase()}';
+      final groupName = smartGroupName(service);
       final group = groups.getGroup(groupName);
       final currentName = group?.now;
       if (currentName == null) {
@@ -329,11 +329,8 @@ class ProxiesAction extends _$ProxiesAction {
     final groups = ref.read(groupsProvider);
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     for (final service in smart.services.where((s) => s.isEnabled)) {
-      final current = groups
-          .getGroup('🎯 Smart-${service.serviceId.toUpperCase()}')
-          ?.now;
-      final meta = current == null ? null : smart.metadataByProxy[current];
-      if (current == null || meta == null) {
+      final current = groups.getGroup(smartGroupName(service))?.now;
+      if (current == null) {
         _anchorStableSince.remove(service.serviceId);
         continue;
       }
@@ -344,6 +341,10 @@ class ProxiesAction extends _$ProxiesAction {
       }
       final existing = smart.anchors[service.serviceId];
       if (existing != null && existing.lastProxyName == current) {
+        continue;
+      }
+      final meta = smart.metadataByProxy[current];
+      if (meta == null) {
         continue;
       }
       if (nowMs - tracked.$2 >= 10 * 60 * 1000) {
@@ -389,9 +390,7 @@ class ProxiesAction extends _$ProxiesAction {
       }
       final probed = <String>{};
       for (final service in smart.services.where((s) => s.isEnabled)) {
-        final current = groups
-            .getGroup('🎯 Smart-${service.serviceId.toUpperCase()}')
-            ?.now;
+        final current = groups.getGroup(smartGroupName(service))?.now;
         if (current == null || !probed.add(current)) {
           continue;
         }

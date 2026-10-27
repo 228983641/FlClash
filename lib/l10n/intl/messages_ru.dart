@@ -219,18 +219,22 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m80(count) => "Probe finished, ${count} nodes updated.";
 
-  static String m81(value) => "Пик ${value}";
+  static String m81(count) => "Blacklist: ${count} regions";
 
-  static String m82(value) => "Всего ${value}";
+  static String m82(count) => "Whitelist: ${count} regions";
 
-  static String m83(transport) => "Заголовки ${transport}";
+  static String m83(value) => "Пик ${value}";
 
-  static String m84(label) => "Значение «${label}» должно быть URL";
+  static String m84(value) => "Всего ${value}";
 
-  static String m85(count) =>
+  static String m85(transport) => "Заголовки ${transport}";
+
+  static String m86(label) => "Значение «${label}» должно быть URL";
+
+  static String m87(count) =>
       "${Intl.plural(count, one: '${count} год назад', few: '${count} года назад', many: '${count} лет назад', other: '${count} года назад')}";
 
-  static String m86(count) =>
+  static String m88(count) =>
       "${Intl.plural(count, one: '${count} г. назад', few: '${count} г. назад', many: '${count} л. назад', other: '${count} г. назад')}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
@@ -1935,6 +1939,38 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorReasonRegionBlocked": MessageLookupByLibrary.simpleMessage(
       "Region blocked",
     ),
+    "smartAnchorRegionAuto": MessageLookupByLibrary.simpleMessage(
+      "Auto (detected unsupported regions)",
+    ),
+    "smartAnchorRegionBlacklist": MessageLookupByLibrary.simpleMessage(
+      "Blacklist",
+    ),
+    "smartAnchorRegionBlacklistDesc": MessageLookupByLibrary.simpleMessage(
+      "Checked regions are banned for this service.",
+    ),
+    "smartAnchorRegionCountBlacklist": m81,
+    "smartAnchorRegionCountWhitelist": m82,
+    "smartAnchorRegionEmpty": MessageLookupByLibrary.simpleMessage(
+      "No regions to list yet. Probe nodes first.",
+    ),
+    "smartAnchorRegionFilter": MessageLookupByLibrary.simpleMessage(
+      "Region filter",
+    ),
+    "smartAnchorRegionFootnote": MessageLookupByLibrary.simpleMessage(
+      "Regions follow the node\'s egress country. Unprobed nodes are not filtered; with an empty blacklist the detected unsupported regions apply automatically.",
+    ),
+    "smartAnchorRegionReset": MessageLookupByLibrary.simpleMessage(
+      "Reset to detected",
+    ),
+    "smartAnchorRegionUnsupported": MessageLookupByLibrary.simpleMessage(
+      "Unsupported",
+    ),
+    "smartAnchorRegionWhitelist": MessageLookupByLibrary.simpleMessage(
+      "Whitelist",
+    ),
+    "smartAnchorRegionWhitelistDesc": MessageLookupByLibrary.simpleMessage(
+      "Only checked regions are used for this service.",
+    ),
     "smartAnchorResetAnchor": MessageLookupByLibrary.simpleMessage(
       "Reset anchor",
     ),
@@ -2071,11 +2107,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "totalUpload": MessageLookupByLibrary.simpleMessage("Отдано"),
     "tproxyPort": MessageLookupByLibrary.simpleMessage("Порт TProxy"),
     "traffic": MessageLookupByLibrary.simpleMessage("Трафик"),
-    "trafficPeak": m81,
-    "trafficTotal": m82,
+    "trafficPeak": m83,
+    "trafficTotal": m84,
     "trafficUsage": MessageLookupByLibrary.simpleMessage("Статистика трафика"),
     "transport": MessageLookupByLibrary.simpleMessage("Транспорт"),
-    "transportHeaders": m83,
+    "transportHeaders": m85,
     "tun": MessageLookupByLibrary.simpleMessage("TUN"),
     "tunAuthorizationFailed": MessageLookupByLibrary.simpleMessage(
       "Не удалось получить права для TUN, поэтому он выключен.",
@@ -2109,7 +2145,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "upload": MessageLookupByLibrary.simpleMessage("Отдача"),
     "uploadBandwidth": MessageLookupByLibrary.simpleMessage("Скорость отдачи"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
-    "urlTip": m84,
+    "urlTip": m86,
     "useHosts": MessageLookupByLibrary.simpleMessage("Использовать hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage(
       "Использовать системный hosts",
@@ -2142,8 +2178,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "«Записывать в систему» также устанавливает системные часы; Android это игнорирует.",
     ),
-    "yearsAgo": m85,
-    "yearsAgoShort": m86,
+    "yearsAgo": m87,
+    "yearsAgoShort": m88,
     "yes": MessageLookupByLibrary.simpleMessage("Да"),
     "zhCN": MessageLookupByLibrary.simpleMessage("Упрощённый китайский"),
   };

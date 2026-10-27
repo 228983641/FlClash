@@ -9,6 +9,22 @@ import 'scoring_engine.dart';
 import 'service_access.dart';
 import 'subscription_merger.dart';
 
+List<ServiceToggleConfig> effectiveSmartServices(SmartAnchorInput input) {
+  final byId = {
+    for (final service in defaultServiceToggles) service.serviceId: service,
+    for (final service in input.services) service.serviceId: service,
+  };
+  final defaultIds = {
+    for (final service in defaultServiceToggles) service.serviceId,
+  };
+  return [
+    for (final service in defaultServiceToggles) byId[service.serviceId]!,
+    for (final service in input.services)
+      if (!defaultIds.contains(service.serviceId))
+        byId[service.serviceId] ?? service,
+  ];
+}
+
 class AggregationSourceInput {
   const AggregationSourceInput({
     required this.sourceId,
@@ -303,6 +319,28 @@ SmartAnchorInput _remapInputForMergedConfig(
   );
 }
 
+NodeMetadataCache? metadataForDisplayProxy(
+  SmartAnchorInput input,
+  String displayName,
+) {
+  return input.metadataByProxy[displayName] ??
+      input.metadataByProxy[_strippedProxyName(displayName)];
+}
+
+String smartNodeRemark(NodeMetadataCache? metadata) {
+  if (metadata == null) {
+    return '';
+  }
+  final typeLabel = switch (metadata.ipType) {
+    'residential' || 'isp' || 'mobile' => '家宽',
+    'business' => '商业',
+    'hosting' || 'datacenter' => '机房',
+    _ => '',
+  };
+  final score = '纯净度 ${metadata.purityScore.round()}';
+  return typeLabel.isEmpty ? score : '$score · $typeLabel';
+}
+
 String _strippedProxyName(String name) {
   if (!name.startsWith('[')) {
     return name;
@@ -314,6 +352,73 @@ String _strippedProxyName(String name) {
   return name.substring(close + 2);
 }
 
+Set<String> detectedUnsupportedRegions(
+  SmartAnchorInput input,
+  String serviceId,
+) {
+  final access = input.accessByService[serviceId] ?? const {};
+  final blocked = <String>{};
+  final working = <String>{};
+  for (final entry in access.entries) {
+    final country = input.metadataByProxy[entry.key]?.countryCode;
+    if (country == null || country.isEmpty) {
+      continue;
+    }
+    if (entry.value.blocksRanking) {
+      blocked.add(country);
+    } else if (entry.value.isAccessible) {
+      working.add(country);
+    }
+  }
+  return blocked.difference(working);
+}
+
+List<String> applyRegionFilter(
+  SmartAnchorInput input,
+  ServiceToggleConfig service,
+  List<String> proxyNames,
+) {
+  final stored = {
+    for (final country in service.regionCountries) country.trim().toUpperCase(),
+  }..remove('');
+  Set<String>? banned;
+  Set<String>? allowed;
+  if (service.effectiveRegionMode == 'whitelist') {
+    if (stored.isNotEmpty) {
+      allowed = stored;
+    }
+  } else {
+    banned = stored.isNotEmpty
+        ? stored
+        : detectedUnsupportedRegions(input, service.serviceId);
+  }
+  if (banned == null && allowed == null) {
+    return proxyNames;
+  }
+  return [
+    for (final name in proxyNames)
+      if (_regionPasses(
+        input.metadataByProxy[name]?.countryCode,
+        banned,
+        allowed,
+      ))
+        name,
+  ];
+}
+
+bool _regionPasses(String? country, Set<String>? banned, Set<String>? allowed) {
+  if (country == null || country.isEmpty) {
+    return true;
+  }
+  if (banned != null) {
+    return !banned.contains(country);
+  }
+  if (allowed != null) {
+    return allowed.contains(country);
+  }
+  return true;
+}
+
 List<String> rankedProxiesForService(
   SmartAnchorInput input,
   ServiceToggleConfig service,
@@ -321,6 +426,7 @@ List<String> rankedProxiesForService(
   Map<String, int> delays = const {},
 }) {
   input = _remapInputForMergedConfig(input, proxyNames);
+  proxyNames = applyRegionFilter(input, service, proxyNames);
   final tested = <NodeMetadataCache>[];
   for (final name in proxyNames) {
     final metadata = input.metadataByProxy[name];
