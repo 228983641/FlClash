@@ -1,3 +1,149 @@
+> ⚠️ **This is a modified version, not stock FlClash.**
+>
+> This fork is based on FlClash v0.9.2 (Mihomo core) and adds a
+> **per-service country lock + anchor memory + purity/distance ranking**
+> smart routing system on top of it. Everything else in the original README
+> below (download, build, support, license) is unchanged.
+>
+> **The problem it solves, in one paragraph:** with stock rule-based routing,
+> services like Claude, ChatGPT, Gemini, Cloudflare and Netflix can land on a
+> node in a different country and city on every launch, and a jumping login
+> location is what triggers risk-control bans; the stock `fallback` group also
+> flaps back and forth whenever the primary node recovers. This fork locks each
+> service to its own country, remembers the city and ASN where it last landed
+> stably, ranks nodes by how clean they are and how close they are to that
+> anchor, and fails over stickily — once it moves away, it never switches back.
+
+# Smart Anchor (new features in this fork, in detail)
+
+## Default state: everything off, stock behaviour unchanged
+
+- Every new feature is off by default: no rule, group or DNS entry is injected,
+  and traffic follows the original subscription exactly as before.
+- Only a service explicitly enabled in settings takes the smart path below;
+  disabling it restores the original rules at once, with its anchor frozen and
+  kept for re-enabling.
+
+## 1. Per-service country lock: each service locks its own country
+
+- Claude, ChatGPT, Gemini and Cloudflare default to a US lock and enabled;
+  Netflix defaults to a Singapore lock but disabled; Google, YouTube and X
+  default to disabled with no lock.
+- The lock country is chosen by the user in advance and does **not** have to
+  equal the anchor country. Three modes: no lock (0 countries — no country
+  filtering, login location may jump across countries, highest risk-control
+  risk), single-country lock (the default — fixed login country, lowest risk;
+  if that country has no usable node, only the tail emergency pool remains),
+  and multi-country lock (risk in between).
+- Changing the lock country clears the old anchor, because the old anchor's
+  city/ASN belongs to another country.
+- Effect: a service stops logging in from a different country every time, which
+  removes a major trigger for risk-control bans.
+
+## 2. Anchor memory: remember where it last landed stably
+
+- The last stable egress IP's latitude/longitude, ASN and /24 subnet are kept
+  across sessions. The next start ranks around that anchor: the original node
+  first, then same-subnet, same-ASN and same-city clean nodes, then nearby cities.
+- Anti-poisoning: a new node only overwrites the anchor after carrying real
+  service traffic stably for 10 minutes; if 3 switches happen within 10 minutes
+  in one session, anchor updates freeze and the last healthy anchor is kept.
+- Effect: the login city stays put instead of drifting on every restart.
+
+## 3. Purity and distance ranking: not latency
+
+- Hard filter first (any failure drops a node to the emergency pool only):
+  country outside the lock, WAF failure, or purity below 50.
+- Then `priority = purity − distance penalty + 15 (same ASN) + 10 (same /24)`.
+  Purity = 100 − IP-type deduction − fraud score × 0.5 − abuse deduction
+  (residential/ISP 0, business 10, hosting/datacenter 30, public proxy/Tor/abuse
+  history 25; bands: ≥70 safe, 50–70 occasional risk-control, <50 high risk).
+  Distance penalty = min(25, 4 × ln(distance/50 + 1)) km from the anchor
+  (about 2.7 points at 50 km, 9.6 at 500 km, 16.5 at 3000 km, capped at 25).
+  Delay is only a tie-break when electing a cold-start anchor.
+- Effect: nodes are picked for being clean and close to where the service last
+  saw you, not merely for being fast.
+
+## 4. Multi-source aggregation: never trust a single source
+
+- Several free lookup sources are queried and aggregated: country by majority
+  vote, latitude/longitude averaged only over sources agreeing with the
+  consensus country, ASN by same-country majority, IP type takes the strictest
+  value, fraud score takes the maximum, any source reporting abuse counts as
+  abuse, and country disagreement is flagged `countryDisputed`.
+- Free API keys are pooled round-robin (a key hitting 429/quota is cooled for
+  the day) and results are cached locally for 72 hours, so cached IPs cost no
+  quota and cold start is not blocked.
+- Effect: one bad or stale data source can no longer misrank a node.
+
+## 5. Per-node × per-service connectivity: tested per service, not per country
+
+- Geo and purity are per-node, but whether a node can reach a service is per
+  node × service: the same Hong Kong node can reach YouTube but not Gemini, and
+  GPT's web chain (`chatgpt.com`) and API chain (`api.openai.com`) can differ,
+  so each service is probed on both chains separately.
+- Only a region-block result removes a node from that service's ranking;
+  network failures and service-side outages never permanently exclude a node,
+  and a service-outage guard stops failover from blaming nodes when the service
+  itself is down. Connectivity cache is about 24 hours.
+- Effect: no more country-wide assumptions that break one service while another
+  works, and no wrongful switching during a service outage.
+
+## 6. Sticky failover: never switch back
+
+- The in-use node is probed every 30 seconds; only 2 consecutive timeouts count
+  as failure, the next ranked node takes over, and the old node is never returned
+  to even if it recovers. The anchor is updated only after 10 stable minutes.
+- Effect: the flapping of the stock `fallback` group is gone.
+
+## 7. Multi-subscription aggregation: pool nodes from several subscriptions
+
+- One dead subscription no longer forces a manual switch: each source updates
+  independently and only a successful parse replaces its old nodes; the merged
+  set is rebuilt only when it actually changes.
+- Two switchable group modes: primary-only (keep only the primary subscription's
+  groups and rules, other sources contribute nodes) and merge-all (same-name
+  same-type groups merge, same-name different-type groups are renamed
+  `[source label] name`, rules concatenated primary-first and de-duplicated).
+  Both modes add a `🔗 聚合全部节点` unified group, and DNS always comes from
+  the primary subscription only.
+
+## 8. Config injection: only when enabled
+
+- An enabled service gets a `🎯 Smart-<SERVICE>` select group at the top, its
+  match rules prepended ahead of all original rules, and a `nameserver-policy`
+  entry pointing its domains at that group. A disabled service gets nothing.
+
+## 9. Device-level diagnostics: shown only, never ranked on
+
+- DNS leaks (any DNS egress country ≠ proxy country) and WebRTC leaks (any
+  WebRTC IP ≠ proxy egress IP) are device-level problems (browser/system traffic
+  bypassing the proxy), not a node problem, so they are diagnostics only and
+  **do not affect node ranking**.
+
+## Implementation status (this fork, right now)
+
+- [x] Step 1 wiring: ranking, locking, aggregation and injection logic wired
+  into profile generation, behind the default-off switch; custom
+  (non-subscription) profiles are not wired yet.
+- [ ] Step 2 persistence: anchors, node data and connectivity results in storage.
+- [ ] Step 3 real probing: through-tunnel egress and per-service probing.
+- [ ] Step 4 UI: settings page + homepage cards (cards show status and quick
+  toggles only; details live in settings).
+- [ ] After all features, a user-perspective review pass; Windows version later
+  (Android first).
+
+## Where the new code lives
+
+- Smart routing logic: `lib/smart_anchor/` (models, scoring engine, country lock,
+  service connectivity, sticky monitor, subscription merger, config injector,
+  API key pool, diagnostics)
+- Wiring point: `getProfile` in `lib/providers/actions/setup.dart`,
+  state in `lib/providers/smart_anchor.dart`
+- Unit tests: `test/smart_anchor/`
+
+---
+
 <div align="center">
 
 <img src="assets/images/icon.png" alt="FlClash" width="88">
