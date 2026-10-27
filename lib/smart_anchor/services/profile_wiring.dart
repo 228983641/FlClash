@@ -1,5 +1,6 @@
 import '../models/node_metadata.dart';
 import '../models/service_anchor.dart';
+import '../models/service_group.dart';
 import '../models/service_toggle_config.dart';
 import 'config_injector.dart';
 import 'scoring_engine.dart';
@@ -26,6 +27,7 @@ class SmartAnchorInput {
     this.accessByService = const {},
     this.aggregationSources = const [],
     this.aggregationMode = AggregationGroupMode.primaryOnly,
+    this.sharedLockGroupIds = const [],
   });
 
   final List<ServiceToggleConfig> services;
@@ -34,6 +36,7 @@ class SmartAnchorInput {
   final Map<String, Map<String, ServiceAccessResult>> accessByService;
   final List<AggregationSourceInput> aggregationSources;
   final AggregationGroupMode aggregationMode;
+  final List<String> sharedLockGroupIds;
 
   bool get hasWork {
     return services.any((service) => service.isEnabled) ||
@@ -47,6 +50,7 @@ class SmartAnchorInput {
     Map<String, Map<String, ServiceAccessResult>>? accessByService,
     List<AggregationSourceInput>? aggregationSources,
     AggregationGroupMode? aggregationMode,
+    List<String>? sharedLockGroupIds,
   }) {
     return SmartAnchorInput(
       services: services ?? this.services,
@@ -55,6 +59,7 @@ class SmartAnchorInput {
       accessByService: accessByService ?? this.accessByService,
       aggregationSources: aggregationSources ?? this.aggregationSources,
       aggregationMode: aggregationMode ?? this.aggregationMode,
+      sharedLockGroupIds: sharedLockGroupIds ?? this.sharedLockGroupIds,
     );
   }
 }
@@ -75,12 +80,39 @@ Map<String, dynamic> buildSmartConfig(
     return config;
   }
   final proxyNames = _proxyNames(config);
+  final tested = <NodeMetadataCache>[];
+  for (final name in proxyNames) {
+    final metadata = input.metadataByProxy[name];
+    if (metadata != null) {
+      tested.add(metadata);
+    }
+  }
+  final groupElected = <String, ServiceAnchor?>{};
   final rankedByService = <String, List<String>>{};
   for (final service in enabled) {
+    ServiceAnchor? sharedAnchor;
+    final group = groupForService(service.serviceId);
+    if (group != null && input.sharedLockGroupIds.contains(group.id)) {
+      for (final member in group.serviceIds) {
+        if (input.anchors[member] != null) {
+          sharedAnchor = input.anchors[member];
+          break;
+        }
+      }
+      sharedAnchor ??= groupElected.putIfAbsent(group.id, () {
+        final first = input.services.firstWhere(
+          (candidate) => candidate.serviceId == group.serviceIds.first,
+          orElse: () => service,
+        );
+        final access = input.accessByService[first.serviceId] ?? const {};
+        return _electAnchor(tested, first.lockedCountries, access);
+      });
+    }
     rankedByService[service.serviceId] = _rankForService(
       service,
       proxyNames,
       input,
+      sharedAnchor: sharedAnchor,
     );
   }
   return SmartConfigInjector.injectSmartRouting(
@@ -162,8 +194,9 @@ List<String> _ruleStrings(Map<String, dynamic> config) {
 List<String> _rankForService(
   ServiceToggleConfig service,
   List<String> proxyNames,
-  SmartAnchorInput input,
-) {
+  SmartAnchorInput input, {
+  ServiceAnchor? sharedAnchor,
+}) {
   final tested = <NodeMetadataCache>[];
   final untested = <String>[];
   for (final name in proxyNames) {
@@ -176,7 +209,7 @@ List<String> _rankForService(
   }
   final access = input.accessByService[service.serviceId] ?? const {};
   final lock = service.lockedCountries;
-  var anchor = input.anchors[service.serviceId];
+  var anchor = sharedAnchor ?? input.anchors[service.serviceId];
   anchor ??= _electAnchor(tested, lock, access);
   if (anchor == null) {
     return [...tested.map((node) => node.proxyName), ...untested];

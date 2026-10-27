@@ -6,6 +6,7 @@ class ServiceToggleConfig {
     required this.targetCountry,
     required this.matchRules,
     required this.dnsDomains,
+    this.targetCountries = const [],
   });
 
   final String serviceId;
@@ -14,13 +15,29 @@ class ServiceToggleConfig {
   final String targetCountry;
   final List<String> matchRules;
   final List<String> dnsDomains;
+  final List<String> targetCountries;
 
   List<String> get lockedCountries {
+    if (targetCountries.isNotEmpty) {
+      final seen = <String>{};
+      final result = <String>[];
+      for (final country in targetCountries) {
+        final code = country.trim().toUpperCase();
+        if (code.isNotEmpty && seen.add(code)) {
+          result.add(code);
+        }
+      }
+      return result;
+    }
     final code = targetCountry.trim().toUpperCase();
     return code.isEmpty ? const [] : [code];
   }
 
-  ServiceToggleConfig copyWith({bool? isEnabled, String? targetCountry}) {
+  ServiceToggleConfig copyWith({
+    bool? isEnabled,
+    String? targetCountry,
+    List<String>? targetCountries,
+  }) {
     return ServiceToggleConfig(
       serviceId: serviceId,
       displayName: displayName,
@@ -28,6 +45,7 @@ class ServiceToggleConfig {
       targetCountry: targetCountry ?? this.targetCountry,
       matchRules: matchRules,
       dnsDomains: dnsDomains,
+      targetCountries: targetCountries ?? this.targetCountries,
     );
   }
 
@@ -38,20 +56,24 @@ class ServiceToggleConfig {
     'targetCountry': targetCountry,
     'matchRules': matchRules,
     'dnsDomains': dnsDomains,
+    'targetCountries': targetCountries,
   };
 
   factory ServiceToggleConfig.fromJson(Map<String, dynamic> json) {
     final countries = json['targetCountries'];
-    final firstCountry = countries is List && countries.isNotEmpty
-        ? countries.first.toString()
-        : null;
+    final countryList = countries is List
+        ? [for (final country in countries) country.toString()]
+        : const <String>[];
     return ServiceToggleConfig(
       serviceId: json['serviceId'] as String,
       displayName: json['displayName'] as String,
       isEnabled: json['isEnabled'] as bool,
-      targetCountry: firstCountry ?? (json['targetCountry'] as String? ?? ''),
+      targetCountry: countryList.isNotEmpty
+          ? countryList.first
+          : (json['targetCountry'] as String? ?? ''),
       matchRules: List<String>.from(json['matchRules'] as List),
       dnsDomains: List<String>.from(json['dnsDomains'] as List),
+      targetCountries: countryList,
     );
   }
 }
@@ -122,8 +144,8 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
     displayName: 'Google 综合服务',
     isEnabled: false,
     targetCountry: 'US',
-    matchRules: ['GEOSITE,google', 'GEOSITE,youtube'],
-    dnsDomains: ['google.com', 'youtube.com'],
+    matchRules: ['GEOSITE,google'],
+    dnsDomains: ['google.com'],
   ),
   ServiceToggleConfig(
     serviceId: 'youtube',

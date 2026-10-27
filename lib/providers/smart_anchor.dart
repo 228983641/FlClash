@@ -4,6 +4,7 @@ import 'package:fl_clash/common/request.dart';
 import 'package:fl_clash/common/service_probe.dart';
 import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/smart_anchor/services/api_pool.dart';
+import 'package:fl_clash/smart_anchor/models/service_group.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
 import 'package:fl_clash/smart_anchor/services/persistence.dart';
 import 'package:fl_clash/smart_anchor/services/probing.dart';
@@ -27,6 +28,7 @@ class SmartAnchor extends _$SmartAnchor {
         for (final service in defaultServiceToggles)
           service.copyWith(isEnabled: false),
       ],
+      sharedLockGroupIds: const ['google-group'],
     );
   }
 
@@ -45,6 +47,7 @@ class SmartAnchor extends _$SmartAnchor {
       anchors: snapshot.anchors,
       metadataByProxy: snapshot.metadataByProxy,
       accessByService: snapshot.accessByService,
+      sharedLockGroupIds: snapshot.sharedLockGroupIds,
     );
   }
 
@@ -53,20 +56,63 @@ class SmartAnchor extends _$SmartAnchor {
     bool? isEnabled,
     String? targetCountry,
   }) {
+    if (isEnabled != null) {
+      final byId = {
+        for (final service in defaultServiceToggles) service.serviceId: service,
+        for (final service in state.services) service.serviceId: service,
+      };
+      final current = byId[serviceId];
+      if (current == null) {
+        return;
+      }
+      byId[serviceId] = current.copyWith(isEnabled: isEnabled);
+      update(
+        state.copyWith(
+          services: [
+            for (final service in defaultServiceToggles)
+              byId[service.serviceId]!,
+          ],
+        ),
+      );
+    }
+    if (targetCountry != null) {
+      setLockCountries(
+        serviceId,
+        targetCountry.isEmpty ? const [] : [targetCountry],
+      );
+    }
+  }
+
+  void setLockCountries(String serviceId, List<String> countries) {
+    final normalized = <String>[];
+    for (final country in countries) {
+      final code = country.trim().toUpperCase();
+      if (code.isNotEmpty && !normalized.contains(code)) {
+        normalized.add(code);
+      }
+    }
     final byId = {
       for (final service in defaultServiceToggles) service.serviceId: service,
       for (final service in state.services) service.serviceId: service,
     };
-    final current = byId[serviceId];
-    if (current == null) {
-      return;
+    final group = groupForService(serviceId);
+    final targets = group != null && state.sharedLockGroupIds.contains(group.id)
+        ? group.serviceIds
+        : [serviceId];
+    var changed = false;
+    for (final id in targets) {
+      final member = byId[id];
+      if (member == null) {
+        continue;
+      }
+      if (member.lockedCountries.join(',') != normalized.join(',')) {
+        changed = true;
+      }
+      byId[id] = member.copyWith(
+        targetCountries: normalized,
+        targetCountry: normalized.isEmpty ? '' : normalized.first,
+      );
     }
-    final countryChanged =
-        targetCountry != null && targetCountry != current.targetCountry;
-    byId[serviceId] = current.copyWith(
-      isEnabled: isEnabled,
-      targetCountry: targetCountry,
-    );
     update(
       state.copyWith(
         services: [
@@ -74,9 +120,39 @@ class SmartAnchor extends _$SmartAnchor {
         ],
       ),
     );
-    if (countryChanged) {
-      clearAnchor(serviceId);
+    if (changed) {
+      for (final id in targets) {
+        clearAnchor(id);
+      }
     }
+  }
+
+  void setSharedLockGroup(String groupId, bool enabled) {
+    final ids = [
+      for (final id in state.sharedLockGroupIds)
+        if (id != groupId) id,
+    ];
+    if (enabled) {
+      ids.add(groupId);
+    }
+    update(state.copyWith(sharedLockGroupIds: ids));
+    if (!enabled) {
+      return;
+    }
+    ServiceGroup? group;
+    for (final candidate in defaultServiceGroups) {
+      if (candidate.id == groupId) {
+        group = candidate;
+      }
+    }
+    if (group == null || group.serviceIds.isEmpty) {
+      return;
+    }
+    final first = state.services.firstWhere(
+      (service) => service.serviceId == group!.serviceIds.first,
+      orElse: () => defaultServiceToggles.first,
+    );
+    setLockCountries(first.serviceId, first.lockedCountries);
   }
 
   void setAggregationMode(AggregationGroupMode mode) {

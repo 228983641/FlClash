@@ -72,16 +72,19 @@ class SmartAnchorSnapshot {
     this.anchors = const {},
     this.metadataByProxy = const {},
     this.accessByService = const {},
+    this.sharedLockGroupIds = const [],
   });
 
   final List<ServiceToggleConfig> services;
   final Map<String, ServiceAnchor> anchors;
   final Map<String, NodeMetadataCache> metadataByProxy;
   final Map<String, Map<String, ServiceAccessResult>> accessByService;
+  final List<String> sharedLockGroupIds;
 
   Map<String, dynamic> toJson() {
     return {
       'services': [for (final service in services) service.toJson()],
+      'sharedLockGroupIds': sharedLockGroupIds,
       'anchors': {
         for (final entry in anchors.entries) entry.key: entry.value.toJson(),
       },
@@ -147,11 +150,15 @@ class SmartAnchorSnapshot {
         access[entry.key.toString()] = inner;
       }
     }
+    final shared = json['sharedLockGroupIds'];
     return SmartAnchorSnapshot(
       services: services,
       anchors: anchors,
       metadataByProxy: metadata,
       accessByService: access,
+      sharedLockGroupIds: shared is List
+          ? [for (final id in shared) id.toString()]
+          : const [],
     );
   }
 
@@ -161,6 +168,7 @@ class SmartAnchorSnapshot {
       anchors: anchors,
       metadataByProxy: metadataByProxy,
       accessByService: accessByService,
+      sharedLockGroupIds: sharedLockGroupIds,
     );
   }
 }
@@ -182,6 +190,8 @@ class SmartAnchorStore {
       'access:$serviceId:$proxyName';
 
   static const servicesKey = 'config:services';
+
+  static const sharedGroupsKey = 'config:sharedGroups';
 
   Future<SmartAnchorSnapshot?> load() async {
     final all = await records.readAll();
@@ -205,6 +215,18 @@ class SmartAnchorStore {
     final anchors = <String, ServiceAnchor>{};
     final metadata = <String, NodeMetadataCache>{};
     final access = <String, Map<String, ServiceAccessResult>>{};
+    final sharedRaw = all[sharedGroupsKey];
+    final sharedIds = <String>[];
+    if (sharedRaw == null) {
+      sharedIds.add('google-group');
+    } else {
+      final decoded = json.decode(sharedRaw);
+      if (decoded is List) {
+        for (final id in decoded) {
+          sharedIds.add(id.toString());
+        }
+      }
+    }
     for (final entry in all.entries) {
       final key = entry.key;
       final decoded = json.decode(entry.value);
@@ -239,6 +261,7 @@ class SmartAnchorStore {
       anchors: anchors,
       metadataByProxy: metadata,
       accessByService: access,
+      sharedLockGroupIds: sharedIds,
     );
   }
 
@@ -247,6 +270,7 @@ class SmartAnchorStore {
     fresh[servicesKey] = json.encode([
       for (final service in input.services) service.toJson(),
     ]);
+    fresh[sharedGroupsKey] = json.encode(input.sharedLockGroupIds);
     for (final entry in input.anchors.entries) {
       fresh[anchorKey(entry.key)] = json.encode(entry.value.toJson());
     }

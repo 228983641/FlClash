@@ -2,6 +2,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/providers/smart_anchor.dart';
+import 'package:fl_clash/smart_anchor/models/service_group.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
 import 'package:fl_clash/smart_anchor/services/cloudflare_trace.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
@@ -12,18 +13,11 @@ import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-const _lockCountries = [
-  '',
-  'US',
-  'SG',
-  'JP',
-  'HK',
-  'KR',
-  'TW',
-  'DE',
-  'GB',
-  'NL',
-];
+const _lockCountries = ['US', 'SG', 'JP', 'HK', 'KR', 'TW', 'DE', 'GB', 'NL'];
+
+String _lockSummary(List<String> lockedCountries, String noneLabel) {
+  return lockedCountries.isEmpty ? noneLabel : lockedCountries.join(', ');
+}
 
 List<ServiceToggleConfig> effectiveSmartServices(SmartAnchorInput input) {
   final byId = {
@@ -57,13 +51,13 @@ class SmartAnchorSettingsView extends ConsumerWidget {
           generateSection(
             title: appLocalizations.smartAnchorServices,
             items: [
-              for (final service in services) ...[
+              for (final service in services)
                 DecorationListItem(
                   title: Text(service.displayName),
                   subtitle: Text(
                     service.isEnabled
                         ? '${appLocalizations.countryLock}: '
-                              '${service.targetCountry.isEmpty ? appLocalizations.countryLockNone : service.targetCountry}'
+                              '${_lockSummary(service.lockedCountries, appLocalizations.countryLockNone)}'
                         : appLocalizations.turnOff,
                   ),
                   trailing: CommonSwitch(
@@ -78,23 +72,80 @@ class SmartAnchorSettingsView extends ConsumerWidget {
                     },
                   ),
                 ),
-                ListItem<String>.options(
-                  title: Text(
-                    '${service.displayName} ${appLocalizations.countryLock}',
+            ],
+          ),
+          generateSection(
+            title: appLocalizations.countryLock,
+            items: [
+              for (final group in defaultServiceGroups) ...[
+                if (group.serviceIds.length > 1)
+                  DecorationListItem(
+                    title: Text(
+                      '${group.displayName} ${appLocalizations.smartAnchorSharedLock}',
+                    ),
+                    subtitle: Text(
+                      group.serviceIds
+                          .map(
+                            (id) => services
+                                .firstWhere(
+                                  (service) => service.serviceId == id,
+                                )
+                                .displayName,
+                          )
+                          .join(', '),
+                    ),
+                    trailing: CommonSwitch(
+                      value: input.sharedLockGroupIds.contains(group.id),
+                      onChanged: (value) {
+                        ref
+                            .read(smartAnchorProvider.notifier)
+                            .setSharedLockGroup(group.id, value);
+                        ref
+                            .read(setupActionProvider.notifier)
+                            .applyProfileDebounce(silence: true);
+                      },
+                    ),
                   ),
-                  options: _lockCountries,
-                  textBuilder: (code) =>
-                      code.isEmpty ? appLocalizations.countryLockNone : code,
-                  value: service.targetCountry,
-                  onChanged: (code) {
-                    ref
-                        .read(smartAnchorProvider.notifier)
-                        .updateService(service.serviceId, targetCountry: code);
-                    ref
-                        .read(setupActionProvider.notifier)
-                        .applyProfileDebounce(silence: true);
-                  },
-                ),
+                if (group.serviceIds.length == 1 ||
+                    input.sharedLockGroupIds.contains(group.id))
+                  ListItem.open(
+                    title: Text(
+                      '${group.displayName} ${appLocalizations.countryLock}',
+                    ),
+                    subtitle: Text(
+                      _lockSummary(
+                        services
+                            .firstWhere(
+                              (service) =>
+                                  service.serviceId == group.serviceIds.first,
+                            )
+                            .lockedCountries,
+                        appLocalizations.countryLockNone,
+                      ),
+                    ),
+                    widget: SmartAnchorCountryPickerView(
+                      serviceId: group.serviceIds.first,
+                    ),
+                  ),
+                if (group.serviceIds.length > 1 &&
+                    !input.sharedLockGroupIds.contains(group.id))
+                  for (final memberId in group.serviceIds)
+                    ListItem.open(
+                      title: Text(
+                        '${services.firstWhere((service) => service.serviceId == memberId).displayName} ${appLocalizations.countryLock}',
+                      ),
+                      subtitle: Text(
+                        _lockSummary(
+                          services
+                              .firstWhere(
+                                (service) => service.serviceId == memberId,
+                              )
+                              .lockedCountries,
+                          appLocalizations.countryLockNone,
+                        ),
+                      ),
+                      widget: SmartAnchorCountryPickerView(serviceId: memberId),
+                    ),
               ],
             ],
             footer: appLocalizations.smartAnchorLockDesc,
@@ -226,6 +277,75 @@ class SmartAnchorSettingsView extends ConsumerWidget {
                       .displayName,
                 ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SmartAnchorCountryPickerView extends ConsumerWidget {
+  const SmartAnchorCountryPickerView({super.key, required this.serviceId});
+
+  final String serviceId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final appLocalizations = context.appLocalizations;
+    final input = ref.watch(smartAnchorProvider);
+    final services = effectiveSmartServices(input);
+    final service = services.firstWhere(
+      (candidate) => candidate.serviceId == serviceId,
+    );
+    final selected = service.lockedCountries;
+    void apply(List<String> next) {
+      ref.read(smartAnchorProvider.notifier).setLockCountries(serviceId, next);
+      ref
+          .read(setupActionProvider.notifier)
+          .applyProfileDebounce(silence: true);
+    }
+
+    return CommonScaffold(
+      title: '${service.displayName} ${appLocalizations.countryLock}',
+      body: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
+          top: context.contentTopPadding,
+          bottom: 20 + context.bottomInset,
+        ),
+        children: [
+          generateSection(
+            title: appLocalizations.countryLock,
+            items: [
+              DecorationListItem(
+                title: Text(appLocalizations.countryLockNone),
+                trailing: CommonSwitch(
+                  value: selected.isEmpty,
+                  onChanged: (value) {
+                    if (value) {
+                      apply(const []);
+                    }
+                  },
+                ),
+              ),
+              for (final code in _lockCountries)
+                DecorationListItem(
+                  title: Text(code),
+                  trailing: CommonSwitch(
+                    value: selected.contains(code),
+                    onChanged: (value) {
+                      final next = [
+                        for (final country in selected)
+                          if (country != code) country,
+                      ];
+                      if (value) {
+                        next.add(code);
+                      }
+                      apply(next);
+                    },
+                  ),
+                ),
+            ],
+            footer: appLocalizations.smartAnchorLockDesc,
           ),
         ],
       ),

@@ -8177,10 +8177,10 @@ class AppLocalizations {
     );
   }
 
-  /// `No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; changing the lock country clears the old anchor.`
+  /// `No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; several countries allow nodes within those countries, with risk in between. Changing the locked countries clears the old anchor.`
   String get smartAnchorLockDesc {
     return Intl.message(
-      'No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; changing the lock country clears the old anchor.',
+      'No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; several countries allow nodes within those countries, with risk in between. Changing the locked countries clears the old anchor.',
       name: 'smartAnchorLockDesc',
       desc: '',
       args: [],
@@ -8192,6 +8192,26 @@ class AppLocalizations {
     return Intl.message(
       'Both modes add a unified group with all merged nodes. DNS always comes from the primary subscription only.',
       name: 'smartAnchorAggregationDesc',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Share lock and anchor within the same company`
+  String get smartAnchorSharedLock {
+    return Intl.message(
+      'Share lock and anchor within the same company',
+      name: 'smartAnchorSharedLock',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Services from the same company share one set of locked countries and one anchor, so the login country and city stay consistent. Turn it off and each service can be set separately.`
+  String get smartAnchorSharedLockDesc {
+    return Intl.message(
+      'Services from the same company share one set of locked countries and one anchor, so the login country and city stay consistent. Turn it off and each service can be set separately.',
+      name: 'smartAnchorSharedLockDesc',
       desc: '',
       args: [],
     );

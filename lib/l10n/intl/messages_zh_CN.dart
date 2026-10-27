@@ -1367,11 +1367,15 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorDesc": MessageLookupByLibrary.simpleMessage("业务锁国、锚点记忆与纯净度排序。"),
     "smartAnchorDiagnostics": MessageLookupByLibrary.simpleMessage("诊断"),
     "smartAnchorLockDesc": MessageLookupByLibrary.simpleMessage(
-      "不限表示不按国家过滤，风控风险最高。单国锁固定登录国家，风险最低；改锁国会清空旧锚点。",
+      "不限表示不按国家过滤，风控风险最高。单国锁固定登录国家，风险最低；多国锁允许在几个国家内选节点，风险居中；改锁国会清空旧锚点。",
     ),
     "smartAnchorProbeNow": MessageLookupByLibrary.simpleMessage("立即探测"),
     "smartAnchorResetAnchor": MessageLookupByLibrary.simpleMessage("重置锚点"),
     "smartAnchorServices": MessageLookupByLibrary.simpleMessage("业务"),
+    "smartAnchorSharedLock": MessageLookupByLibrary.simpleMessage("同公司共用锁国与锚点"),
+    "smartAnchorSharedLockDesc": MessageLookupByLibrary.simpleMessage(
+      "同公司不同业务共用同一组锁国国家与同一个锚点，登录国家与城市保持一致；关闭后各业务可分别设置。",
+    ),
     "sniffProtocols": MessageLookupByLibrary.simpleMessage("协议"),
     "sniffer": MessageLookupByLibrary.simpleMessage("域名嗅探"),
     "snifferStatusDesc": MessageLookupByLibrary.simpleMessage(

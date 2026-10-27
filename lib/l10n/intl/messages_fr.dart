@@ -1900,13 +1900,19 @@ class MessageLookup extends MessageLookupByLibrary {
       "Diagnostics",
     ),
     "smartAnchorLockDesc": MessageLookupByLibrary.simpleMessage(
-      "No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; changing the lock country clears the old anchor.",
+      "No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; several countries allow nodes within those countries, with risk in between. Changing the locked countries clears the old anchor.",
     ),
     "smartAnchorProbeNow": MessageLookupByLibrary.simpleMessage("Probe now"),
     "smartAnchorResetAnchor": MessageLookupByLibrary.simpleMessage(
       "Reset anchor",
     ),
     "smartAnchorServices": MessageLookupByLibrary.simpleMessage("Services"),
+    "smartAnchorSharedLock": MessageLookupByLibrary.simpleMessage(
+      "Share lock and anchor within the same company",
+    ),
+    "smartAnchorSharedLockDesc": MessageLookupByLibrary.simpleMessage(
+      "Services from the same company share one set of locked countries and one anchor, so the login country and city stay consistent. Turn it off and each service can be set separately.",
+    ),
     "sniffProtocols": MessageLookupByLibrary.simpleMessage("Protocoles"),
     "sniffer": MessageLookupByLibrary.simpleMessage("Sniffer"),
     "snifferStatusDesc": MessageLookupByLibrary.simpleMessage(

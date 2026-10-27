@@ -977,6 +977,8 @@
   "aggregationMode": "Aggregation mode",
   "aggregationPrimaryOnly": "Primary only",
   "aggregationMergeAll": "Merge all",
-  "smartAnchorLockDesc": "No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; changing the lock country clears the old anchor.",
-  "smartAnchorAggregationDesc": "Both modes add a unified group with all merged nodes. DNS always comes from the primary subscription only."
+  "smartAnchorLockDesc": "No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; several countries allow nodes within those countries, with risk in between. Changing the locked countries clears the old anchor.",
+  "smartAnchorAggregationDesc": "Both modes add a unified group with all merged nodes. DNS always comes from the primary subscription only.",
+  "smartAnchorSharedLock": "Share lock and anchor within the same company",
+  "smartAnchorSharedLockDesc": "Services from the same company share one set of locked countries and one anchor, so the login country and city stay consistent. Turn it off and each service can be set separately."
 }
