@@ -190,6 +190,7 @@ class ProxiesAction extends _$ProxiesAction {
   bool _smartAnchorMonitorRunning = false;
   final Map<String, String> _lastObservedCurrent = {};
   final Map<String, String> _pendingAutoSwitch = {};
+  final Map<String, String> _pendingAutoReason = {};
   final Map<String, (String, int)> _anchorStableSince = {};
 
   Map<String, int> _flattenDelays(DelayMap delayMap) {
@@ -239,8 +240,9 @@ class ProxiesAction extends _$ProxiesAction {
       final currentMeta = smart.metadataByProxy[currentName];
       if (_lastObservedCurrent[service.serviceId] != currentName &&
           currentMeta != null) {
+        final pendingReason = _pendingAutoReason[service.serviceId];
         final note = _pendingAutoSwitch[service.serviceId] == currentName
-            ? 'auto'
+            ? 'auto:${pendingReason ?? 'unknown'}'
             : _lastObservedCurrent[service.serviceId] == null
             ? 'start'
             : 'manual';
@@ -261,22 +263,27 @@ class ProxiesAction extends _$ProxiesAction {
         _lastObservedCurrent[service.serviceId] = currentName;
       }
       _pendingAutoSwitch.remove(service.serviceId);
+      _pendingAutoReason.remove(service.serviceId);
       final ranked = rankedProxiesForService(
         smart,
         service,
         names,
         delays: delays,
       );
+      final currentReason =
+          smart.accessByService[service.serviceId]?[currentName]?.reason;
       final next = _failoverGuard.noteResult(
         serviceId: service.serviceId,
         currentName: currentName,
-        reason: smart.accessByService[service.serviceId]?[currentName]?.reason,
+        reason: currentReason,
         ranked: ranked,
         accessByProxy: smart.accessByService[service.serviceId] ?? const {},
         nowMs: nowMs,
       );
       if (next != null) {
         _pendingAutoSwitch[service.serviceId] = next;
+        _pendingAutoReason[service.serviceId] =
+            currentReason?.name ?? 'unknown';
         changeProxyDebounce(groupName, next);
       }
     }

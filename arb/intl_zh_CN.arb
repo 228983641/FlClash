@@ -990,5 +990,12 @@
   "smartAnchorPathClear": "清除路径",
   "smartAnchorPathAuto": "自动",
   "smartAnchorPathManual": "手动",
-  "smartAnchorPathStart": "开始"
+  "smartAnchorPathStart": "开始",
+  "smartAnchorPathExport": "导出图片",
+  "smartAnchorSetAnchor": "设当前节点为锚点",
+  "smartAnchorPathTapHint": "轻点一条记录可将其节点设为锚点。",
+  "smartAnchorPathAnchor": "锚点",
+  "smartAnchorReasonRegionBlocked": "地区封锁",
+  "smartAnchorReasonNetworkFailed": "网络失败",
+  "smartAnchorPathFromAnchor": "距锚点"
 }

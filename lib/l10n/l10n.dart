@@ -8316,6 +8316,76 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Export image`
+  String get smartAnchorPathExport {
+    return Intl.message(
+      'Export image',
+      name: 'smartAnchorPathExport',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Set current node as anchor`
+  String get smartAnchorSetAnchor {
+    return Intl.message(
+      'Set current node as anchor',
+      name: 'smartAnchorSetAnchor',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Tap a record to set that node as anchor.`
+  String get smartAnchorPathTapHint {
+    return Intl.message(
+      'Tap a record to set that node as anchor.',
+      name: 'smartAnchorPathTapHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Anchor`
+  String get smartAnchorPathAnchor {
+    return Intl.message(
+      'Anchor',
+      name: 'smartAnchorPathAnchor',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Region blocked`
+  String get smartAnchorReasonRegionBlocked {
+    return Intl.message(
+      'Region blocked',
+      name: 'smartAnchorReasonRegionBlocked',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Network failed`
+  String get smartAnchorReasonNetworkFailed {
+    return Intl.message(
+      'Network failed',
+      name: 'smartAnchorReasonNetworkFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `From anchor`
+  String get smartAnchorPathFromAnchor {
+    return Intl.message(
+      'From anchor',
+      name: 'smartAnchorPathFromAnchor',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

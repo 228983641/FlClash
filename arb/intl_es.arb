@@ -990,5 +990,12 @@
   "smartAnchorPathClear": "Clear path",
   "smartAnchorPathAuto": "Auto",
   "smartAnchorPathManual": "Manual",
-  "smartAnchorPathStart": "Start"
+  "smartAnchorPathStart": "Start",
+  "smartAnchorPathExport": "Export image",
+  "smartAnchorSetAnchor": "Set current node as anchor",
+  "smartAnchorPathTapHint": "Tap a record to set that node as anchor.",
+  "smartAnchorPathAnchor": "Anchor",
+  "smartAnchorReasonRegionBlocked": "Region blocked",
+  "smartAnchorReasonNetworkFailed": "Network failed",
+  "smartAnchorPathFromAnchor": "From anchor"
 }

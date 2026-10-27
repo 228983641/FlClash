@@ -1912,6 +1912,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; several countries allow nodes within those countries, with risk in between. Changing the locked countries clears the old anchor.",
     ),
     "smartAnchorPath": MessageLookupByLibrary.simpleMessage("Node path"),
+    "smartAnchorPathAnchor": MessageLookupByLibrary.simpleMessage("Anchor"),
     "smartAnchorPathAuto": MessageLookupByLibrary.simpleMessage("Auto"),
     "smartAnchorPathClear": MessageLookupByLibrary.simpleMessage("Clear path"),
     "smartAnchorPathDesc": MessageLookupByLibrary.simpleMessage(
@@ -1920,13 +1921,31 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorPathEmpty": MessageLookupByLibrary.simpleMessage(
       "No path recorded yet. Use a service for a while and its node moves will show up here.",
     ),
+    "smartAnchorPathExport": MessageLookupByLibrary.simpleMessage(
+      "Export image",
+    ),
+    "smartAnchorPathFromAnchor": MessageLookupByLibrary.simpleMessage(
+      "From anchor",
+    ),
     "smartAnchorPathManual": MessageLookupByLibrary.simpleMessage("Manual"),
     "smartAnchorPathStart": MessageLookupByLibrary.simpleMessage("Start"),
+    "smartAnchorPathTapHint": MessageLookupByLibrary.simpleMessage(
+      "Tap a record to set that node as anchor.",
+    ),
     "smartAnchorProbeNow": MessageLookupByLibrary.simpleMessage("Probe now"),
+    "smartAnchorReasonNetworkFailed": MessageLookupByLibrary.simpleMessage(
+      "Network failed",
+    ),
+    "smartAnchorReasonRegionBlocked": MessageLookupByLibrary.simpleMessage(
+      "Region blocked",
+    ),
     "smartAnchorResetAnchor": MessageLookupByLibrary.simpleMessage(
       "Reset anchor",
     ),
     "smartAnchorServices": MessageLookupByLibrary.simpleMessage("Services"),
+    "smartAnchorSetAnchor": MessageLookupByLibrary.simpleMessage(
+      "Set current node as anchor",
+    ),
     "smartAnchorSharedLock": MessageLookupByLibrary.simpleMessage(
       "Share lock and anchor within the same company",
     ),

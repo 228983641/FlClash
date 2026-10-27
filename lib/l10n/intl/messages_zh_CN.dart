@@ -1375,6 +1375,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "不限表示不按国家过滤，风控风险最高。单国锁固定登录国家，风险最低；多国锁允许在几个国家内选节点，风险居中；改锁国会清空旧锚点。",
     ),
     "smartAnchorPath": MessageLookupByLibrary.simpleMessage("节点位置路径"),
+    "smartAnchorPathAnchor": MessageLookupByLibrary.simpleMessage("锚点"),
     "smartAnchorPathAuto": MessageLookupByLibrary.simpleMessage("自动"),
     "smartAnchorPathClear": MessageLookupByLibrary.simpleMessage("清除路径"),
     "smartAnchorPathDesc": MessageLookupByLibrary.simpleMessage(
@@ -1383,11 +1384,23 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorPathEmpty": MessageLookupByLibrary.simpleMessage(
       "暂无路径记录，使用一段时间后，节点位置变化会画在这里。",
     ),
+    "smartAnchorPathExport": MessageLookupByLibrary.simpleMessage("导出图片"),
+    "smartAnchorPathFromAnchor": MessageLookupByLibrary.simpleMessage("距锚点"),
     "smartAnchorPathManual": MessageLookupByLibrary.simpleMessage("手动"),
     "smartAnchorPathStart": MessageLookupByLibrary.simpleMessage("开始"),
+    "smartAnchorPathTapHint": MessageLookupByLibrary.simpleMessage(
+      "轻点一条记录可将其节点设为锚点。",
+    ),
     "smartAnchorProbeNow": MessageLookupByLibrary.simpleMessage("立即探测"),
+    "smartAnchorReasonNetworkFailed": MessageLookupByLibrary.simpleMessage(
+      "网络失败",
+    ),
+    "smartAnchorReasonRegionBlocked": MessageLookupByLibrary.simpleMessage(
+      "地区封锁",
+    ),
     "smartAnchorResetAnchor": MessageLookupByLibrary.simpleMessage("重置锚点"),
     "smartAnchorServices": MessageLookupByLibrary.simpleMessage("业务"),
+    "smartAnchorSetAnchor": MessageLookupByLibrary.simpleMessage("设当前节点为锚点"),
     "smartAnchorSharedLock": MessageLookupByLibrary.simpleMessage("同公司共用锁国与锚点"),
     "smartAnchorSharedLockDesc": MessageLookupByLibrary.simpleMessage(
       "同公司不同业务共用同一组锁国国家与同一个锚点，登录国家与城市保持一致；关闭后各业务可分别设置。",

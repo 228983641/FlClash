@@ -1,11 +1,16 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:fl_clash/common/common.dart';
+import 'package:flutter/rendering.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/providers/smart_anchor.dart';
 import 'package:fl_clash/smart_anchor/models/anchor_path.dart';
+import 'package:fl_clash/smart_anchor/models/node_metadata.dart';
+import 'package:fl_clash/smart_anchor/models/service_anchor.dart';
 import 'package:fl_clash/smart_anchor/models/service_group.dart';
+import 'package:fl_clash/smart_anchor/services/scoring_engine.dart';
 import 'package:fl_clash/smart_anchor/services/subscription_merger.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/views/smart_anchor.dart';
@@ -80,11 +85,13 @@ class _RawMemberPath {
     required this.color,
     required this.points,
     required this.anchor,
+    required this.anchorPlace,
   });
 
   final Color color;
   final List<AnchorPathPoint> points;
   final ({double lat, double lon})? anchor;
+  final String? anchorPlace;
 }
 
 class _PathPainter extends CustomPainter {
@@ -92,14 +99,88 @@ class _PathPainter extends CustomPainter {
     required this.members,
     required this.gridColor,
     required this.anchorColor,
+    required this.bracketColor,
+    required this.backgroundColor,
+    required this.anchorTitle,
+    required this.labelStyle,
+    required this.labelStyleBold,
   });
 
   final List<_RawMemberPath> members;
   final Color gridColor;
   final Color anchorColor;
+  final Color bracketColor;
+  final Color backgroundColor;
+  final String anchorTitle;
+  final TextStyle labelStyle;
+  final TextStyle labelStyleBold;
+
+  double _niceStep(double span) {
+    const steps = [5.0, 10.0, 15.0, 30.0, 45.0, 60.0, 90.0];
+    for (final step in steps) {
+      if (span / 4 <= step) {
+        return step;
+      }
+    }
+    return 90.0;
+  }
+
+  String _lonLabel(double lon) {
+    final value = lon.abs();
+    final text = value == value.roundToDouble()
+        ? value.toInt().toString()
+        : value.toStringAsFixed(1);
+    return lon < 0 ? '$text°W' : '$text°E';
+  }
+
+  String _latLabel(double lat) {
+    final value = lat.abs();
+    final text = value == value.roundToDouble()
+        ? value.toInt().toString()
+        : value.toStringAsFixed(1);
+    return lat < 0 ? '$text°S' : '$text°N';
+  }
+
+  void _drawLabel(
+    Canvas canvas,
+    String text,
+    Offset offset, {
+    bool bold = false,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: bold ? labelStyleBold : labelStyle,
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    canvas.drawRect(
+      offset & painter.size,
+      Paint()..color = backgroundColor.withValues(alpha: 0.7),
+    );
+    painter.paint(canvas, offset);
+  }
+
+  void _drawDashedLine(Canvas canvas, Offset from, Offset to, Paint paint) {
+    const dash = 6.0;
+    const gap = 4.0;
+    final total = (to - from).distance;
+    if (total == 0) {
+      return;
+    }
+    var drawn = 0.0;
+    while (drawn < total) {
+      final start = from + (to - from) * (drawn / total);
+      final endLength = math.min(drawn + dash, total);
+      final end = from + (to - from) * (endLength / total);
+      canvas.drawLine(start, end, paint);
+      drawn += dash + gap;
+    }
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Offset.zero & size, Paint()..color = backgroundColor);
     final lats = <double>[];
     final lons = <double>[];
     for (final member in members) {
@@ -143,21 +224,52 @@ class _PathPainter extends CustomPainter {
     final gridPaint = Paint()
       ..color = gridColor
       ..strokeWidth = 1;
-    for (var i = 1; i < 4; i++) {
-      final x = size.width * i / 4;
+    final lonStep = _niceStep(maxLon - minLon);
+    var lon = (minLon / lonStep).ceil() * lonStep;
+    while (lon <= maxLon) {
+      final x = project(minLat, lon).dx;
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
+      _drawLabel(canvas, _lonLabel(lon), Offset(x + 2, size.height - 12));
+      lon += lonStep;
     }
-    for (var i = 1; i < 3; i++) {
-      final y = size.height * i / 3;
+    final latStep = _niceStep(maxLat - minLat);
+    var lat = (minLat / latStep).ceil() * latStep;
+    while (lat <= maxLat) {
+      final y = project(lat, minLon).dy;
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+      _drawLabel(canvas, _latLabel(lat), Offset(2, y + 2));
+      lat += latStep;
     }
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()
-        ..color = gridColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
+    final bracketPaint = Paint()
+      ..color = bracketColor
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    const bracketLen = 14.0;
+    const inset = 5.0;
+    final corners = [
+      (const Offset(inset, inset), const Offset(1, 1)),
+      (Offset(size.width - inset, inset), const Offset(-1, 1)),
+      (Offset(inset, size.height - inset), const Offset(1, -1)),
+      (Offset(size.width - inset, size.height - inset), const Offset(-1, -1)),
+    ];
+    for (final (origin, direction) in corners) {
+      final path = Path()
+        ..moveTo(origin.dx + direction.dx * bracketLen, origin.dy)
+        ..lineTo(origin.dx, origin.dy)
+        ..lineTo(origin.dx, origin.dy + direction.dy * bracketLen);
+      canvas.drawPath(path, bracketPaint);
+    }
+    final compassX = size.width - 20;
+    const compassY = 20.0;
+    canvas.drawPath(
+      Path()
+        ..moveTo(compassX, compassY - 7)
+        ..lineTo(compassX - 5, compassY + 5)
+        ..lineTo(compassX + 5, compassY + 5)
+        ..close(),
+      Paint()..color = bracketColor,
     );
+    _drawLabel(canvas, 'N', Offset(compassX - 3, compassY + 7), bold: true);
     for (final member in members) {
       if (member.points.length > 1) {
         final path = Path();
@@ -181,10 +293,30 @@ class _PathPainter extends CustomPainter {
             ..strokeJoin = StrokeJoin.round,
         );
       }
+      if (member.anchor != null && member.points.isNotEmpty) {
+        final anchorOffset = project(member.anchor!.lat, member.anchor!.lon);
+        final last = member.points.last;
+        final lastOffset = project(last.latitude, last.longitude);
+        _drawDashedLine(
+          canvas,
+          anchorOffset,
+          lastOffset,
+          Paint()
+            ..color = anchorColor.withValues(alpha: 0.55)
+            ..strokeWidth = 1.5,
+        );
+      }
       for (var i = 0; i < member.points.length; i++) {
         final point = member.points[i];
         final offset = project(point.latitude, point.longitude);
         final isLast = i == member.points.length - 1;
+        if (isLast) {
+          canvas.drawCircle(
+            offset,
+            13,
+            Paint()..color = member.color.withValues(alpha: 0.18),
+          );
+        }
         canvas.drawCircle(
           offset,
           isLast ? 6 : 3.5,
@@ -199,25 +331,46 @@ class _PathPainter extends CustomPainter {
               ..style = PaintingStyle.stroke
               ..strokeWidth = 1.5,
           );
+          canvas.drawCircle(offset, 2, Paint()..color = backgroundColor);
+          final labelX = offset.dx > size.width - 70
+              ? offset.dx - 62
+              : offset.dx + 10;
+          _drawLabel(
+            canvas,
+            point.placeLabel,
+            Offset(labelX, offset.dy - 16),
+            bold: true,
+          );
         }
       }
       if (member.anchor != null) {
         final offset = project(member.anchor!.lat, member.anchor!.lon);
+        canvas.drawCircle(
+          offset,
+          15,
+          Paint()..color = anchorColor.withValues(alpha: 0.18),
+        );
         final diamond = Path()
-          ..moveTo(offset.dx, offset.dy - 7)
-          ..lineTo(offset.dx + 7, offset.dy)
-          ..lineTo(offset.dx, offset.dy + 7)
-          ..lineTo(offset.dx - 7, offset.dy)
+          ..moveTo(offset.dx, offset.dy - 8)
+          ..lineTo(offset.dx + 8, offset.dy)
+          ..lineTo(offset.dx, offset.dy + 8)
+          ..lineTo(offset.dx - 8, offset.dy)
           ..close();
         canvas.drawPath(diamond, Paint()..color = anchorColor);
+        canvas.drawCircle(offset, 2.5, Paint()..color = backgroundColor);
+        final label = member.anchorPlace == null
+            ? anchorTitle
+            : '$anchorTitle · ${member.anchorPlace}';
+        final labelX = offset.dx > size.width - 90
+            ? offset.dx - 84
+            : offset.dx + 10;
+        _drawLabel(canvas, label, Offset(labelX, offset.dy - 16), bold: true);
       }
     }
   }
 
   @override
-  bool shouldRepaint(_PathPainter oldDelegate) {
-    return oldDelegate.members != members;
-  }
+  bool shouldRepaint(_PathPainter oldDelegate) => true;
 }
 
 class SmartAnchorPathCard extends ConsumerStatefulWidget {
@@ -228,8 +381,55 @@ class SmartAnchorPathCard extends ConsumerStatefulWidget {
       _SmartAnchorPathCardState();
 }
 
+String _formatKm(double km) {
+  if (km >= 100) {
+    return '${km.round()} km';
+  }
+  return '${km.toStringAsFixed(1)} km';
+}
+
 class _SmartAnchorPathCardState extends ConsumerState<SmartAnchorPathCard> {
   String? _selectedId;
+  final _diagramKey = GlobalKey();
+
+  Future<void> _exportDiagram() async {
+    final boundary =
+        _diagramKey.currentContext?.findRenderObject()
+            as RenderRepaintBoundary?;
+    if (boundary == null) {
+      return;
+    }
+    final image = await boundary.toImage(pixelRatio: 3);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    final png = bytes?.buffer.asUint8List();
+    if (png == null) {
+      return;
+    }
+    await Picker().saveFile('smart-anchor-path.png', png);
+  }
+
+  void _setAnchor(String serviceId, NodeMetadataCache meta, String proxyName) {
+    ref
+        .read(smartAnchorProvider.notifier)
+        .setAnchor(
+          serviceId,
+          ServiceAnchor(
+            serviceTag: serviceId,
+            countryCode: meta.countryCode,
+            lastProxyName: proxyName,
+            egressIp: meta.egressIp,
+            subnet24: meta.egressIp.contains('.')
+                ? meta.egressIp.split('.').take(3).join('.')
+                : '',
+            asn: meta.asn,
+            isp: '',
+            latitude: meta.latitude,
+            longitude: meta.longitude,
+            city: '',
+            confirmedAt: DateTime.now().millisecondsSinceEpoch,
+          ),
+        );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -274,6 +474,11 @@ class _SmartAnchorPathCardState extends ConsumerState<SmartAnchorPathCard> {
                     (anchor.latitude == 0 && anchor.longitude == 0)
                 ? null
                 : (lat: anchor.latitude, lon: anchor.longitude),
+            anchorPlace: anchor == null
+                ? null
+                : anchor.city.isEmpty
+                ? anchor.countryCode
+                : anchor.city,
           ),
         );
       }
@@ -285,6 +490,22 @@ class _SmartAnchorPathCardState extends ConsumerState<SmartAnchorPathCard> {
     ]..sort((a, b) => b.recordedAt.compareTo(a.recordedAt));
     String? backToAnchorGroup;
     String? backToAnchorProxy;
+    String? setAnchorServiceId;
+    NodeMetadataCache? setAnchorMeta;
+    String? setAnchorProxy;
+    if (selected != null) {
+      for (final memberId in selected.members) {
+        final group = groups.getGroup('🎯 Smart-${memberId.toUpperCase()}');
+        final current = group?.now;
+        final meta = current == null ? null : input.metadataByProxy[current];
+        if (current != null && meta != null) {
+          setAnchorServiceId = memberId;
+          setAnchorMeta = meta;
+          setAnchorProxy = current;
+          break;
+        }
+      }
+    }
     if (selected != null) {
       for (final memberId in selected.members) {
         final anchor = input.anchors[memberId];
@@ -342,14 +563,28 @@ class _SmartAnchorPathCardState extends ConsumerState<SmartAnchorPathCard> {
               style: AppTextStyle.footnote.of(context),
             )
           else ...[
-            SizedBox(
-              height: 170,
-              width: double.infinity,
-              child: CustomPaint(
-                painter: _PathPainter(
-                  members: members,
-                  gridColor: context.colorScheme.outlineVariant,
-                  anchorColor: context.colorScheme.onSurfaceVariant,
+            RepaintBoundary(
+              key: _diagramKey,
+              child: SizedBox(
+                height: 180,
+                width: double.infinity,
+                child: CustomPaint(
+                  painter: _PathPainter(
+                    members: members,
+                    gridColor: context.colorScheme.outlineVariant,
+                    anchorColor: context.colorScheme.tertiary,
+                    bracketColor: context.colorScheme.primary,
+                    backgroundColor: context.colorScheme.surfaceContainerLow,
+                    anchorTitle: appLocalizations.smartAnchorPathAnchor,
+                    labelStyle: AppTextStyle.footnote.of(context).copyWith(
+                      color: context.colorScheme.onSurfaceVariant,
+                    ),
+                    labelStyleBold: AppTextStyle.footnote
+                        .of(context, emphasized: true)
+                        .copyWith(
+                          color: context.colorScheme.onSurfaceVariant,
+                        ),
+                  ),
                 ),
               ),
             ),
@@ -379,7 +614,8 @@ class _SmartAnchorPathCardState extends ConsumerState<SmartAnchorPathCard> {
                     members[i].points.isEmpty
                         ? '—'
                         : '${members[i].points.last.placeLabel} '
-                              '${_hhmm(members[i].points.last.recordedAt)}',
+                              '${_hhmm(members[i].points.last.recordedAt)}'
+                              '${members[i].anchor == null ? '' : ' · ${appLocalizations.smartAnchorPathFromAnchor} ${_formatKm(ScoringEngine.haversineKm(members[i].anchor!.lat, members[i].anchor!.lon, members[i].points.last.latitude, members[i].points.last.longitude))}'}',
                     style: AppTextStyle.footnote.of(context),
                   ),
                 ],
@@ -387,21 +623,69 @@ class _SmartAnchorPathCardState extends ConsumerState<SmartAnchorPathCard> {
               const SizedBox(height: 4),
             ],
             for (final point in recent.take(5))
-              Text(
-                '${_hhmm(point.recordedAt)} ${point.placeLabel} '
-                '${point.proxyName} · ${switch (point.note) {
-                  'auto' => appLocalizations.smartAnchorPathAuto,
-                  'manual' => appLocalizations.smartAnchorPathManual,
-                  _ => appLocalizations.smartAnchorPathStart,
-                }}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyle.footnote.of(context),
+              Builder(
+                builder: (context) {
+                  String noteLabel;
+                  if (point.note.startsWith('auto:')) {
+                    final reason = point.note.substring(5);
+                    final reasonLabel = reason == 'regionBlocked'
+                        ? appLocalizations.smartAnchorReasonRegionBlocked
+                        : reason == 'networkFailed'
+                        ? appLocalizations.smartAnchorReasonNetworkFailed
+                        : '';
+                    noteLabel = reasonLabel.isEmpty
+                        ? appLocalizations.smartAnchorPathAuto
+                        : '${appLocalizations.smartAnchorPathAuto}（$reasonLabel）';
+                  } else if (point.note == 'manual') {
+                    noteLabel = appLocalizations.smartAnchorPathManual;
+                  } else {
+                    noteLabel = appLocalizations.smartAnchorPathStart;
+                  }
+                  String moveLabel = '';
+                  for (final member in members) {
+                    final index = member.points.indexOf(point);
+                    if (index < 0) {
+                      continue;
+                    }
+                    if (index > 0) {
+                      final prev = member.points[index - 1];
+                      moveLabel =
+                          ' · +${_formatKm(ScoringEngine.haversineKm(prev.latitude, prev.longitude, point.latitude, point.longitude))}';
+                    } else if (member.anchor != null) {
+                      moveLabel =
+                          ' · +${_formatKm(ScoringEngine.haversineKm(member.anchor!.lat, member.anchor!.lon, point.latitude, point.longitude))}';
+                    }
+                    break;
+                  }
+                  final meta = input.metadataByProxy[point.proxyName];
+                  return InkWell(
+                    onTap: meta == null
+                        ? null
+                        : () => _setAnchor(
+                            point.serviceId,
+                            meta,
+                            point.proxyName,
+                          ),
+                    child: Text(
+                      '${_hhmm(point.recordedAt)} ${point.placeLabel} '
+                      '${point.proxyName} · $noteLabel$moveLabel',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyle.footnote.of(context),
+                    ),
+                  );
+                },
               ),
+            Text(
+              appLocalizations.smartAnchorPathTapHint,
+              style: AppTextStyle.footnote.of(context),
+            ),
           ],
-          if (backToAnchorGroup != null || selected != null) ...[
+          if (selected != null) ...[
             const SizedBox(height: 8),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
               children: [
                 if (backToAnchorGroup != null)
                   FilledButton.tonal(
@@ -415,12 +699,21 @@ class _SmartAnchorPathCardState extends ConsumerState<SmartAnchorPathCard> {
                     },
                     child: Text(appLocalizations.smartAnchorBackToAnchor),
                   ),
-                const SizedBox(width: 8),
+                if (setAnchorServiceId != null)
+                  FilledButton.tonal(
+                    onPressed: () => _setAnchor(
+                      setAnchorServiceId!,
+                      setAnchorMeta!,
+                      setAnchorProxy!,
+                    ),
+                    child: Text(appLocalizations.smartAnchorSetAnchor),
+                  ),
+                FilledButton.tonal(
+                  onPressed: _exportDiagram,
+                  child: Text(appLocalizations.smartAnchorPathExport),
+                ),
                 TextButton(
                   onPressed: () {
-                    if (selected == null) {
-                      return;
-                    }
                     for (final memberId in selected.members) {
                       ref
                           .read(smartAnchorProvider.notifier)
