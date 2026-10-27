@@ -172,6 +172,15 @@ class ServiceOutageGuard {
   final int threshold;
   final int windowMs;
   final List<int> _serviceDownAt = [];
+  bool _officialOutage = false;
+
+  void noteOfficialOutage() {
+    _officialOutage = true;
+  }
+
+  bool get officialOutage => _officialOutage;
+
+  bool get shouldNotBlameNodes => suspectedOutage || _officialOutage;
 
   void recordFailure(ServiceAccessReason reason, int nowMs) {
     if (reason != ServiceAccessReason.serviceDown) {
@@ -185,5 +194,6 @@ class ServiceOutageGuard {
 
   void reset() {
     _serviceDownAt.clear();
+    _officialOutage = false;
   }
 }

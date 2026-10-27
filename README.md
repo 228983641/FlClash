@@ -130,6 +130,7 @@
 - [x] Step 3 real probing: through-tunnel egress and per-service probing.
 - [x] Step 4 UI: settings page + homepage cards (cards show status and quick
   toggles only; details live in settings).
+- [x] ip.net.coffee merge: Cloudflare edge info (colo/WARP/protocol) and official service status (Claude/OpenAI/Cloudflare) in diagnostics; DNS/WebRTC leaks stay device-level diagnostics, global Ping stays latency display only.
 - [ ] After all features, a user-perspective review pass; Windows version later
   (Android first).
 

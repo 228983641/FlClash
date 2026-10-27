@@ -2,8 +2,10 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/providers/smart_anchor.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
+import 'package:fl_clash/smart_anchor/services/cloudflare_trace.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:fl_clash/smart_anchor/services/scoring_engine.dart';
+import 'package:fl_clash/smart_anchor/services/service_status.dart';
 import 'package:fl_clash/smart_anchor/services/subscription_merger.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
@@ -154,10 +156,137 @@ class SmartAnchorSettingsView extends ConsumerWidget {
                       child: Text(appLocalizations.smartAnchorResetAnchor),
                     ),
                   ),
+              const _CloudflareEdgeRow(),
+              for (final entry in officialStatusEndpoints.entries)
+                _OfficialStatusRow(
+                  serviceId: entry.key,
+                  endpoint: entry.value,
+                  displayName: services
+                      .firstWhere(
+                        (service) => service.serviceId == entry.key,
+                        orElse: () => defaultServiceToggles.first,
+                      )
+                      .displayName,
+                ),
             ],
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CloudflareEdgeRow extends StatefulWidget {
+  const _CloudflareEdgeRow();
+
+  @override
+  State<_CloudflareEdgeRow> createState() => _CloudflareEdgeRowState();
+}
+
+class _CloudflareEdgeRowState extends State<_CloudflareEdgeRow> {
+  CloudflareEdgeInfo? _info;
+  var _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final response = await request.dio.get<String>(
+        'https://www.cloudflare.com/cdn-cgi/trace',
+      );
+      final info = response.data == null
+          ? null
+          : parseCloudflareTrace(response.data!);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _info = info;
+        _failed = info == null;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _failed = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final appLocalizations = context.appLocalizations;
+    final info = _info;
+    return DecorationListItem(
+      title: const Text('Cloudflare'),
+      subtitle: Text(
+        info == null
+            ? _failed
+                  ? appLocalizations.serviceFailed
+                  : appLocalizations.loading
+            : '${info.colo} · ${info.countryCode} · '
+                  '${info.warpOn ? 'WARP on' : 'WARP off'} · ${info.httpProtocol}',
+      ),
+    );
+  }
+}
+
+class _OfficialStatusRow extends StatefulWidget {
+  const _OfficialStatusRow({
+    required this.serviceId,
+    required this.endpoint,
+    required this.displayName,
+  });
+
+  final String serviceId;
+  final String endpoint;
+  final String displayName;
+
+  @override
+  State<_OfficialStatusRow> createState() => _OfficialStatusRowState();
+}
+
+class _OfficialStatusRowState extends State<_OfficialStatusRow> {
+  OfficialServiceStatus? _status;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final response = await request.dio.get<Map<String, dynamic>>(
+        widget.endpoint,
+      );
+      if (!mounted || response.data == null) {
+        return;
+      }
+      setState(() => _status = parseStatuspageStatus(response.data!));
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _status = OfficialServiceStatus.unknown);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final appLocalizations = context.appLocalizations;
+    final status = _status;
+    return DecorationListItem(
+      title: Text(widget.displayName),
+      subtitle: Text(switch (status) {
+        null => appLocalizations.loading,
+        OfficialServiceStatus.operational => appLocalizations.serviceAvailable,
+        OfficialServiceStatus.outage => appLocalizations.serviceUnavailable,
+        _ => appLocalizations.unknown,
+      }),
     );
   }
 }
