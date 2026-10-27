@@ -152,6 +152,28 @@ class ProxiesAction extends _$ProxiesAction {
         logLevel: coreFailureLogLevel(e),
       );
     }
+    final smart = ref.read(smartAnchorProvider);
+    if (smart.services.any((service) => service.isEnabled)) {
+      final groups = ref.read(groupsProvider);
+      final groupNames = {for (final group in groups) group.name};
+      final names = <String>{};
+      var current = '';
+      for (final group in groups) {
+        if (group.name.startsWith('🎯 Smart-') && group.now != null) {
+          current = group.now!;
+        }
+        for (final proxy in group.all) {
+          if (!groupNames.contains(proxy.name)) {
+            names.add(proxy.name);
+          }
+        }
+      }
+      unawaited(
+        ref
+            .read(smartAnchorProvider.notifier)
+            .probeNodes(proxyNames: names.toList(), currentProxyName: current),
+      );
+    }
   }
 
   void updateCurrentGroupName(String groupName) {

@@ -126,7 +126,7 @@
 - [x] Step 1 wiring: ranking, locking, aggregation and injection logic wired
   into profile generation, behind the default-off switch; custom
   (non-subscription) profiles are not wired yet.
-- [ ] Step 2 persistence: anchors, node data and connectivity results in storage.
+- [x] Step 2 persistence: anchors, node data and connectivity results in storage.
 - [ ] Step 3 real probing: through-tunnel egress and per-service probing.
 - [ ] Step 4 UI: settings page + homepage cards (cards show status and quick
   toggles only; details live in settings).
