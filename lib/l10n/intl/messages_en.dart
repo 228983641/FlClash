@@ -1833,7 +1833,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Where each service group\'s nodes have moved, drawn as a schematic path.",
     ),
     "smartAnchorPathEmpty": MessageLookupByLibrary.simpleMessage(
-      "No path recorded yet. Use a service for a while and its node moves will show up here.",
+      "No path recorded yet. Enable a service in Smart Anchor settings and start the core; node moves will show up here and the Globe button will become available.",
     ),
     "smartAnchorPathExport": MessageLookupByLibrary.simpleMessage(
       "Export image",

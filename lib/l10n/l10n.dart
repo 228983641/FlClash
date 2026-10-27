@@ -8258,10 +8258,10 @@ class AppLocalizations {
     );
   }
 
-  /// `No path recorded yet. Use a service for a while and its node moves will show up here.`
+  /// `No path recorded yet. Enable a service in Smart Anchor settings and start the core; node moves will show up here and the Globe button will become available.`
   String get smartAnchorPathEmpty {
     return Intl.message(
-      'No path recorded yet. Use a service for a while and its node moves will show up here.',
+      'No path recorded yet. Enable a service in Smart Anchor settings and start the core; node moves will show up here and the Globe button will become available.',
       name: 'smartAnchorPathEmpty',
       desc: '',
       args: [],

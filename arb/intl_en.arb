@@ -985,7 +985,7 @@
   "smartAnchorAutoFailoverDesc": "When the node in use fails 2 consecutive probes, automatically switch to the next ranked node and never switch back. When off, a failing node is never switched away automatically.",
   "smartAnchorPath": "Node path",
   "smartAnchorPathDesc": "Where each service group's nodes have moved, drawn as a schematic path.",
-  "smartAnchorPathEmpty": "No path recorded yet. Use a service for a while and its node moves will show up here.",
+  "smartAnchorPathEmpty": "No path recorded yet. Enable a service in Smart Anchor settings and start the core; node moves will show up here and the Globe button will become available.",
   "smartAnchorBackToAnchor": "Back to anchor",
   "smartAnchorPathClear": "Clear path",
   "smartAnchorPathAuto": "Auto",

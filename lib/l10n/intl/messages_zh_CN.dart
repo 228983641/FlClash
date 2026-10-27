@@ -1427,7 +1427,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "各服务组的节点位置变化示意图。",
     ),
     "smartAnchorPathEmpty": MessageLookupByLibrary.simpleMessage(
-      "暂无路径记录，使用一段时间后，节点位置变化会画在这里。",
+      "暂无路径记录。请在智能分流设置中开启业务并启动核心，节点位置变化后会画在这里，地球按钮随之可用。",
     ),
     "smartAnchorPathExport": MessageLookupByLibrary.simpleMessage("导出图片"),
     "smartAnchorPathFromAnchor": MessageLookupByLibrary.simpleMessage("距锚点"),

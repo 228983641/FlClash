@@ -985,7 +985,7 @@
   "smartAnchorAutoFailoverDesc": "在用节点连续 2 次探测失败时自动切到下一顺位，且不回切；关闭后故障节点不会自动切换。",
   "smartAnchorPath": "节点位置路径",
   "smartAnchorPathDesc": "各服务组的节点位置变化示意图。",
-  "smartAnchorPathEmpty": "暂无路径记录，使用一段时间后，节点位置变化会画在这里。",
+  "smartAnchorPathEmpty": "暂无路径记录。请在智能分流设置中开启业务并启动核心，节点位置变化后会画在这里，地球按钮随之可用。",
   "smartAnchorBackToAnchor": "回到锚点",
   "smartAnchorPathClear": "清除路径",
   "smartAnchorPathAuto": "自动",
