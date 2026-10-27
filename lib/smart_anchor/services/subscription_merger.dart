@@ -41,12 +41,14 @@ class MergedSubscription {
   bool get empty => proxies.isEmpty;
 }
 
+const unifiedAggregationGroupName = '🔗 聚合全部节点';
+
 class SubscriptionMerger {
   static MergedSubscription merge(
     List<SubscriptionSourceResult> sources, {
     AggregationGroupMode mode = AggregationGroupMode.primaryOnly,
     String? primarySourceId,
-    String unifiedGroupName = '🔗 聚合全部节点',
+    String unifiedGroupName = unifiedAggregationGroupName,
   }) {
     final merged = <Map<String, dynamic>>[];
     final proxyNameByKey = <String, String>{};

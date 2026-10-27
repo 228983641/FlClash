@@ -97,8 +97,11 @@ Map<String, dynamic> buildSmartConfig(
     return rawConfig;
   }
   var config = Map<String, dynamic>.from(rawConfig);
+  var effectiveInput = input;
   if (input.aggregationSources.isNotEmpty) {
     config = _applyAggregation(config, input);
+    effectiveInput = _remapInputForMergedConfig(input, _proxyNames(config));
+    _orderUnifiedGroup(config, effectiveInput);
   }
   final enabled = input.services.where((service) => service.isEnabled);
   if (enabled.isEmpty) {
@@ -108,14 +111,14 @@ Map<String, dynamic> buildSmartConfig(
   final rankedByService = <String, List<String>>{};
   for (final service in enabled) {
     rankedByService[service.serviceId] = rankedProxiesForService(
-      input,
+      effectiveInput,
       service,
       proxyNames,
     );
   }
   return SmartConfigInjector.injectSmartRouting(
     rawConfig: config,
-    serviceConfigs: input.services,
+    serviceConfigs: effectiveInput.services,
     rankedProxiesByService: rankedByService,
   );
 }
@@ -150,6 +153,49 @@ Map<String, dynamic> _applyAggregation(
   result['proxy-groups'] = merged.proxyGroups;
   result['rules'] = merged.rules;
   return result;
+}
+
+// The unified aggregation group is the feature's own list, so its member
+// order follows the engine's quality ranking: probed nodes by purity
+// descending, unprobed nodes after in pool order. The group has no service
+// anchor, so distance and subnet bonuses do not apply here, and delays are
+// not known yet at profile build time. Subscription groups keep their own
+// order, and per-service smart groups keep their full engine ranking.
+void _orderUnifiedGroup(Map<String, dynamic> config, SmartAnchorInput input) {
+  final groups = config['proxy-groups'];
+  if (groups is! List) {
+    return;
+  }
+  for (final group in groups) {
+    if (group is! Map) {
+      continue;
+    }
+    final name = group['name']?.toString() ?? '';
+    if (name != unifiedAggregationGroupName &&
+        !name.startsWith('$unifiedAggregationGroupName (')) {
+      continue;
+    }
+    final members = group['proxies'];
+    if (members is! List) {
+      continue;
+    }
+    final tested = <String>[];
+    final untested = <String>[];
+    for (final member in members) {
+      final proxyName = member.toString();
+      if (input.metadataByProxy.containsKey(proxyName)) {
+        tested.add(proxyName);
+      } else {
+        untested.add(proxyName);
+      }
+    }
+    tested.sort(
+      (a, b) => input.metadataByProxy[b]!.purityScore.compareTo(
+        input.metadataByProxy[a]!.purityScore,
+      ),
+    );
+    group['proxies'] = [...tested, ...untested];
+  }
 }
 
 List<String> _proxyNames(Map<String, dynamic> config) {
@@ -189,12 +235,88 @@ List<String> _ruleStrings(Map<String, dynamic> config) {
   return [for (final rule in rules) rule.toString()];
 }
 
+// Aggregation renames every node to "[<sourceLabel>] <original>", but
+// metadata and access records are keyed by the name the node had when
+// probed. Translate those maps to the merged names (exact matches win, so
+// records probed after aggregation keep working) so ranking, access
+// filtering and unified ordering see the same names as the merged config.
+// Without this, every aggregated node looks untested and the engine ranking
+// silently degrades to pool order.
+SmartAnchorInput _remapInputForMergedConfig(
+  SmartAnchorInput input,
+  List<String> proxyNames,
+) {
+  final metadataByProxy = <String, NodeMetadataCache>{};
+  for (final name in proxyNames) {
+    final meta =
+        input.metadataByProxy[name] ??
+        input.metadataByProxy[_strippedProxyName(name)];
+    if (meta == null) {
+      continue;
+    }
+    metadataByProxy[name] = NodeMetadataCache(
+      proxyName: name,
+      entryServer: meta.entryServer,
+      egressIp: meta.egressIp,
+      countryCode: meta.countryCode,
+      latitude: meta.latitude,
+      longitude: meta.longitude,
+      asn: meta.asn,
+      ipType: meta.ipType,
+      fraudScore: meta.fraudScore,
+      purityScore: meta.purityScore,
+      wafPass: meta.wafPass,
+      updatedAt: meta.updatedAt,
+      ttlHours: meta.ttlHours,
+      sourceCount: meta.sourceCount,
+      countryDisputed: meta.countryDisputed,
+    );
+  }
+  final accessByService = <String, Map<String, ServiceAccessResult>>{};
+  for (final entry in input.accessByService.entries) {
+    final remapped = <String, ServiceAccessResult>{};
+    for (final name in proxyNames) {
+      final access = entry.value[name] ?? entry.value[_strippedProxyName(name)];
+      if (access == null) {
+        continue;
+      }
+      remapped[name] = ServiceAccessResult(
+        serviceId: access.serviceId,
+        proxyName: name,
+        egressIp: access.egressIp,
+        reason: access.reason,
+        checkedAt: access.checkedAt,
+        ttlHours: access.ttlHours,
+      );
+    }
+    if (remapped.isNotEmpty) {
+      accessByService[entry.key] = remapped;
+    }
+  }
+  return input.copyWith(
+    metadataByProxy: metadataByProxy,
+    accessByService: accessByService,
+  );
+}
+
+String _strippedProxyName(String name) {
+  if (!name.startsWith('[')) {
+    return name;
+  }
+  final close = name.indexOf('] ');
+  if (close < 0) {
+    return name;
+  }
+  return name.substring(close + 2);
+}
+
 List<String> rankedProxiesForService(
   SmartAnchorInput input,
   ServiceToggleConfig service,
   List<String> proxyNames, {
   Map<String, int> delays = const {},
 }) {
+  input = _remapInputForMergedConfig(input, proxyNames);
   final tested = <NodeMetadataCache>[];
   for (final name in proxyNames) {
     final metadata = input.metadataByProxy[name];

@@ -132,4 +132,91 @@ void main() {
     final groups = result['proxy-groups'] as List;
     expect(groups.first['name'], '🔗 聚合全部节点');
   });
+
+  test('unified aggregation group orders nodes by engine purity', () {
+    final result = buildSmartConfig(
+      baseConfig(),
+      SmartAnchorInput(
+        services: [claude.copyWith(isEnabled: false)],
+        metadataByProxy: {
+          'US-far': meta('US-far', 40.7128, -74.0060, 70),
+          'US-near': meta('US-near', 34.0522, -118.2437, 90),
+          'B-01': meta('B-01', 34.0522, -118.2437, 80),
+        },
+        aggregationSources: [
+          const AggregationSourceInput(
+            sourceId: 'extra',
+            sourceLabel: 'B',
+            config: {
+              'proxies': [
+                {'name': 'B-01', 'type': 'vless', 'server': 'e.example'},
+              ],
+              'proxy-groups': [],
+              'rules': [],
+            },
+          ),
+        ],
+      ),
+    );
+    final groups = result['proxy-groups'] as List;
+    final unified = groups.firstWhere((group) => group['name'] == '🔗 聚合全部节点');
+    expect(unified['proxies'], [
+      '[主订阅] US-near',
+      '[B] B-01',
+      '[主订阅] US-far',
+      '[主订阅] US-blocked',
+      '[主订阅] US-unknown',
+    ]);
+  });
+
+  test('smart ranking survives aggregation renames', () {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final result = buildSmartConfig(
+      baseConfig(),
+      SmartAnchorInput(
+        services: [claude],
+        anchors: {'claude': anchor},
+        metadataByProxy: {
+          'US-near': meta('US-near', 34.0522, -118.2437, 90),
+          'US-far': meta('US-far', 40.7128, -74.0060, 90),
+          'US-blocked': meta('US-blocked', 34.0522, -118.2437, 95),
+          'B-01': meta('B-01', 34.0522, -118.2437, 80),
+        },
+        accessByService: {
+          'claude': {
+            'US-blocked': ServiceAccessResult(
+              serviceId: 'claude',
+              proxyName: 'US-blocked',
+              egressIp: '1.2.3.4',
+              reason: ServiceAccessReason.regionBlocked,
+              checkedAt: now,
+            ),
+          },
+        },
+        aggregationSources: [
+          const AggregationSourceInput(
+            sourceId: 'extra',
+            sourceLabel: 'B',
+            config: {
+              'proxies': [
+                {'name': 'B-01', 'type': 'vless', 'server': 'e.example'},
+              ],
+              'proxy-groups': [],
+              'rules': [],
+            },
+          ),
+        ],
+      ),
+    );
+    final groups = result['proxy-groups'] as List;
+    final smart = groups.firstWhere(
+      (group) => group['name'] == '🎯 Smart-CLAUDE',
+    );
+    expect(smart['proxies'], [
+      '[主订阅] US-near',
+      '[B] B-01',
+      '[主订阅] US-far',
+      '[主订阅] US-unknown',
+    ]);
+  });
 }
