@@ -127,8 +127,8 @@
   into profile generation, behind the default-off switch; custom
   (non-subscription) profiles are not wired yet.
 - [x] Step 2 persistence: anchors, node data and connectivity results in storage.
-- [ ] Step 3 real probing: through-tunnel egress and per-service probing.
-- [ ] Step 4 UI: settings page + homepage cards (cards show status and quick
+- [x] Step 3 real probing: through-tunnel egress and per-service probing.
+- [x] Step 4 UI: settings page + homepage cards (cards show status and quick
   toggles only; details live in settings).
 - [ ] After all features, a user-perspective review pass; Windows version later
   (Android first).
