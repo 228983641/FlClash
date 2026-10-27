@@ -41,7 +41,7 @@ final class SmartAnchorProvider
   }
 }
 
-String _$smartAnchorHash() => r'c2bfb346d0cfbf8a273aecf968456e08b57f16f3';
+String _$smartAnchorHash() => r'c3bc27fc02e1ab2a6acfa4943b6844ae60ca3c7e';
 
 abstract class _$SmartAnchor extends $Notifier<SmartAnchorInput> {
   SmartAnchorInput build();

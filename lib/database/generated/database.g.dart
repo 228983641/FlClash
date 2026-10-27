@@ -4597,6 +4597,274 @@ class IpQualitiesCompanion extends UpdateCompanion<IpQualityRecord> {
   }
 }
 
+class $SmartAnchorRecordsTable extends SmartAnchorRecords
+    with TableInfo<$SmartAnchorRecordsTable, SmartAnchorRecord> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SmartAnchorRecordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _keyMeta = const VerificationMeta('key');
+  @override
+  late final GeneratedColumn<String> key = GeneratedColumn<String>(
+    'key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [key, payload, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'smart_anchor_records';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SmartAnchorRecord> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('key')) {
+      context.handle(
+        _keyMeta,
+        key.isAcceptableOrUnknown(data['key']!, _keyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_keyMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {key};
+  @override
+  SmartAnchorRecord map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SmartAnchorRecord(
+      key: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}key'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $SmartAnchorRecordsTable createAlias(String alias) {
+    return $SmartAnchorRecordsTable(attachedDatabase, alias);
+  }
+}
+
+class SmartAnchorRecord extends DataClass
+    implements Insertable<SmartAnchorRecord> {
+  final String key;
+  final String payload;
+  final DateTime updatedAt;
+  const SmartAnchorRecord({
+    required this.key,
+    required this.payload,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['key'] = Variable<String>(key);
+    map['payload'] = Variable<String>(payload);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  SmartAnchorRecordsCompanion toCompanion(bool nullToAbsent) {
+    return SmartAnchorRecordsCompanion(
+      key: Value(key),
+      payload: Value(payload),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory SmartAnchorRecord.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SmartAnchorRecord(
+      key: serializer.fromJson<String>(json['key']),
+      payload: serializer.fromJson<String>(json['payload']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'key': serializer.toJson<String>(key),
+      'payload': serializer.toJson<String>(payload),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  SmartAnchorRecord copyWith({
+    String? key,
+    String? payload,
+    DateTime? updatedAt,
+  }) => SmartAnchorRecord(
+    key: key ?? this.key,
+    payload: payload ?? this.payload,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  SmartAnchorRecord copyWithCompanion(SmartAnchorRecordsCompanion data) {
+    return SmartAnchorRecord(
+      key: data.key.present ? data.key.value : this.key,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SmartAnchorRecord(')
+          ..write('key: $key, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(key, payload, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SmartAnchorRecord &&
+          other.key == this.key &&
+          other.payload == this.payload &&
+          other.updatedAt == this.updatedAt);
+}
+
+class SmartAnchorRecordsCompanion extends UpdateCompanion<SmartAnchorRecord> {
+  final Value<String> key;
+  final Value<String> payload;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const SmartAnchorRecordsCompanion({
+    this.key = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SmartAnchorRecordsCompanion.insert({
+    required String key,
+    required String payload,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : key = Value(key),
+       payload = Value(payload),
+       updatedAt = Value(updatedAt);
+  static Insertable<SmartAnchorRecord> custom({
+    Expression<String>? key,
+    Expression<String>? payload,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (key != null) 'key': key,
+      if (payload != null) 'payload': payload,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SmartAnchorRecordsCompanion copyWith({
+    Value<String>? key,
+    Value<String>? payload,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return SmartAnchorRecordsCompanion(
+      key: key ?? this.key,
+      payload: payload ?? this.payload,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (key.present) {
+      map['key'] = Variable<String>(key.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SmartAnchorRecordsCompanion(')
+          ..write('key: $key, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$Database extends GeneratedDatabase {
   _$Database(QueryExecutor e) : super(e);
   $DatabaseManager get managers => $DatabaseManager(this);
@@ -4611,6 +4879,8 @@ abstract class _$Database extends GeneratedDatabase {
   late final $CustomProxiesTable customProxies = $CustomProxiesTable(this);
   late final $ProxyDialersTable proxyDialers = $ProxyDialersTable(this);
   late final $IpQualitiesTable ipQualities = $IpQualitiesTable(this);
+  late final $SmartAnchorRecordsTable smartAnchorRecords =
+      $SmartAnchorRecordsTable(this);
   late final Index idxRuleTarget = Index(
     'idx_rule_target',
     'CREATE INDEX idx_rule_target ON rules (rule_target)',
@@ -4643,6 +4913,7 @@ abstract class _$Database extends GeneratedDatabase {
     this as Database,
   );
   late final IpQualitiesDao ipQualitiesDao = IpQualitiesDao(this as Database);
+  late final SmartAnchorDao smartAnchorDao = SmartAnchorDao(this as Database);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4659,6 +4930,7 @@ abstract class _$Database extends GeneratedDatabase {
     customProxies,
     proxyDialers,
     ipQualities,
+    smartAnchorRecords,
     idxRuleTarget,
     idxRulesProfileOrder,
     idxProxyGroupsProfileOrder,
@@ -8434,6 +8706,188 @@ typedef $$IpQualitiesTableProcessedTableManager =
       IpQualityRecord,
       PrefetchHooks Function()
     >;
+typedef $$SmartAnchorRecordsTableCreateCompanionBuilder =
+    SmartAnchorRecordsCompanion Function({
+      required String key,
+      required String payload,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$SmartAnchorRecordsTableUpdateCompanionBuilder =
+    SmartAnchorRecordsCompanion Function({
+      Value<String> key,
+      Value<String> payload,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$SmartAnchorRecordsTableFilterComposer
+    extends Composer<_$Database, $SmartAnchorRecordsTable> {
+  $$SmartAnchorRecordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SmartAnchorRecordsTableOrderingComposer
+    extends Composer<_$Database, $SmartAnchorRecordsTable> {
+  $$SmartAnchorRecordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SmartAnchorRecordsTableAnnotationComposer
+    extends Composer<_$Database, $SmartAnchorRecordsTable> {
+  $$SmartAnchorRecordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get key =>
+      $composableBuilder(column: $table.key, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$SmartAnchorRecordsTableTableManager
+    extends
+        RootTableManager<
+          _$Database,
+          $SmartAnchorRecordsTable,
+          SmartAnchorRecord,
+          $$SmartAnchorRecordsTableFilterComposer,
+          $$SmartAnchorRecordsTableOrderingComposer,
+          $$SmartAnchorRecordsTableAnnotationComposer,
+          $$SmartAnchorRecordsTableCreateCompanionBuilder,
+          $$SmartAnchorRecordsTableUpdateCompanionBuilder,
+          (
+            SmartAnchorRecord,
+            BaseReferences<
+              _$Database,
+              $SmartAnchorRecordsTable,
+              SmartAnchorRecord
+            >,
+          ),
+          SmartAnchorRecord,
+          PrefetchHooks Function()
+        > {
+  $$SmartAnchorRecordsTableTableManager(
+    _$Database db,
+    $SmartAnchorRecordsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SmartAnchorRecordsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SmartAnchorRecordsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SmartAnchorRecordsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> key = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SmartAnchorRecordsCompanion(
+                key: key,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String key,
+                required String payload,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => SmartAnchorRecordsCompanion.insert(
+                key: key,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$SmartAnchorRecordsTable, SmartAnchorRecord>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$Database,
+                    $SmartAnchorRecordsTable,
+                    SmartAnchorRecord
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SmartAnchorRecordsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$Database,
+      $SmartAnchorRecordsTable,
+      SmartAnchorRecord,
+      $$SmartAnchorRecordsTableFilterComposer,
+      $$SmartAnchorRecordsTableOrderingComposer,
+      $$SmartAnchorRecordsTableAnnotationComposer,
+      $$SmartAnchorRecordsTableCreateCompanionBuilder,
+      $$SmartAnchorRecordsTableUpdateCompanionBuilder,
+      (
+        SmartAnchorRecord,
+        BaseReferences<_$Database, $SmartAnchorRecordsTable, SmartAnchorRecord>,
+      ),
+      SmartAnchorRecord,
+      PrefetchHooks Function()
+    >;
 
 class $DatabaseManager {
   final _$Database _db;
@@ -8460,6 +8914,8 @@ class $DatabaseManager {
       $$ProxyDialersTableTableManager(_db, _db.proxyDialers);
   $$IpQualitiesTableTableManager get ipQualities =>
       $$IpQualitiesTableTableManager(_db, _db.ipQualities);
+  $$SmartAnchorRecordsTableTableManager get smartAnchorRecords =>
+      $$SmartAnchorRecordsTableTableManager(_db, _db.smartAnchorRecords);
 }
 
 mixin _$ProfilesDaoMixin on DatabaseAccessor<Database> {
@@ -8598,4 +9054,20 @@ class IpQualitiesDaoManager {
   IpQualitiesDaoManager(this._db);
   $$IpQualitiesTableTableManager get ipQualities =>
       $$IpQualitiesTableTableManager(_db.attachedDatabase, _db.ipQualities);
+}
+
+mixin _$SmartAnchorDaoMixin on DatabaseAccessor<Database> {
+  $SmartAnchorRecordsTable get smartAnchorRecords =>
+      attachedDatabase.smartAnchorRecords;
+  SmartAnchorDaoManager get managers => SmartAnchorDaoManager(this);
+}
+
+class SmartAnchorDaoManager {
+  final _$SmartAnchorDaoMixin _db;
+  SmartAnchorDaoManager(this._db);
+  $$SmartAnchorRecordsTableTableManager get smartAnchorRecords =>
+      $$SmartAnchorRecordsTableTableManager(
+        _db.attachedDatabase,
+        _db.smartAnchorRecords,
+      );
 }

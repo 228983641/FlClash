@@ -49,6 +49,7 @@ class SetupAction extends _$SetupAction {
 
   @override
   void build() {
+    unawaited(ref.read(smartAnchorProvider.notifier).restore());
     ref.onDispose(_stopRuntimeTicker);
     ref.listen(appVisibleProvider, (_, _) => _syncRuntimeTicker());
     ref.listen(

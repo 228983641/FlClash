@@ -21,6 +21,7 @@ part 'ip_qualities.dart';
 part 'profiles.dart';
 part 'rules.dart';
 part 'scripts.dart';
+part 'smart_anchor.dart';
 
 @DriftDatabase(
   tables: [
@@ -35,6 +36,7 @@ part 'scripts.dart';
     CustomProxies,
     ProxyDialers,
     IpQualities,
+    SmartAnchorRecords,
   ],
   daos: [
     ProfilesDao,
@@ -47,13 +49,14 @@ part 'scripts.dart';
     CustomProxiesDao,
     ProxyDialersDao,
     IpQualitiesDao,
+    SmartAnchorDao,
   ],
 )
 class Database extends _$Database {
   Database([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 21;
+  int get schemaVersion => 22;
 
   static LazyDatabase _openConnection() {
     return LazyDatabase(() async {
@@ -116,6 +119,9 @@ class Database extends _$Database {
         }
         if (from < 21) {
           await _createTableIfMissing(m, ipQualities);
+        }
+        if (from < 22) {
+          await _createTableIfMissing(m, smartAnchorRecords);
         }
       }),
       beforeOpen: (_) => customStatement('PRAGMA foreign_keys = ON'),
