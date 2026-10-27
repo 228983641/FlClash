@@ -641,13 +641,7 @@ class _ProbeNowRowState extends ConsumerState<_ProbeNowRow> {
     return DecorationListItem(
       title: Text(appLocalizations.smartAnchorProbeNow),
       subtitle: _probing ? Text(appLocalizations.smartAnchorProbing) : null,
-      trailing: _probing
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : null,
+      trailing: _probing ? const CommonCircleLoading(size: 20) : null,
       onPressed: _probing
           ? null
           : () async {
