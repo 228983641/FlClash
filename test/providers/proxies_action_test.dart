@@ -13,7 +13,9 @@ import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/providers/database.dart';
+import 'package:fl_clash/providers/smart_anchor.dart';
 import 'package:fl_clash/providers/state.dart';
+import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +25,11 @@ import 'package:riverpod/riverpod.dart';
 import '../helpers/test_profiles.dart';
 
 class MockCoreHandlerInterface extends Mock implements CoreHandlerInterface {}
+
+class _DisabledSmartAnchor extends SmartAnchor {
+  @override
+  SmartAnchorInput build() => const SmartAnchorInput();
+}
 
 const _testUrl = 'http://delay.test';
 
@@ -76,6 +83,7 @@ void main() {
         coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
         profilesProvider.overrideWith(() => TestProfiles([?profile])),
         currentProfileIdProvider.overrideWithBuild((_, _) => profile?.id),
+        smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
       ],
     );
     addTearDown(container.dispose);

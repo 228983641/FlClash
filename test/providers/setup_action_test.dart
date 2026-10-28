@@ -14,7 +14,9 @@ import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/providers/database.dart';
+import 'package:fl_clash/providers/smart_anchor.dart';
 import 'package:fl_clash/providers/state.dart';
+import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
@@ -30,6 +32,11 @@ import '../helpers/preferences.dart';
 import '../helpers/test_profiles.dart';
 
 class _MockCoreHandlerInterface extends Mock implements CoreHandlerInterface {}
+
+class _DisabledSmartAnchor extends SmartAnchor {
+  @override
+  SmartAnchorInput build() => const SmartAnchorInput();
+}
 
 // checkAndUpdateAndCopy checks the file system before it refreshes, so its
 // failure tests need appPath to resolve to a real, writable directory.
@@ -1462,6 +1469,7 @@ void main() {
                 nullProfileSetupState.copyWith(profileId: profileId),
           ),
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
+          smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
           setupActionProvider.overrideWith(SetupAction.new),
         ],
       );
@@ -1526,6 +1534,7 @@ void main() {
             ),
           ),
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
+          smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
           setupActionProvider.overrideWith(SetupAction.new),
         ],
       );
