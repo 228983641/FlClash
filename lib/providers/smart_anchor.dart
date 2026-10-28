@@ -350,8 +350,12 @@ class SmartAnchor extends _$SmartAnchor {
     }
     var updated = 0;
     final core = ref.read(coreHandlerProvider);
+    final geoCache = GeoIpCache();
+    for (final entry in state.metadataByProxy.values) {
+      geoCache.put(entry);
+    }
     final geoService = GeoIpService(
-      cache: GeoIpCache(),
+      cache: geoCache,
       fetcher: _dioGeoFetcher,
       keyPools: const {},
     );
@@ -367,25 +371,52 @@ class SmartAnchor extends _$SmartAnchor {
       current: currentProxyName,
     );
     final serviceIds = [for (final service in enabled) service.serviceId];
-    for (final name in targets) {
-      final outcome = await prober.probeNode(
-        proxyName: name,
-        entryServer: entryServers[name] ?? '',
-        serviceIds: serviceIds,
-        nowMs: DateTime.now().millisecondsSinceEpoch,
+    final metadata = Map.of(state.metadataByProxy);
+    final access = <String, Map<String, ServiceAccessResult>>{
+      for (final entry in state.accessByService.entries)
+        entry.key: Map.of(entry.value),
+    };
+    var changed = false;
+    const probeConcurrency = 4;
+    for (var i = 0; i < targets.length; i += probeConcurrency) {
+      final end = i + probeConcurrency < targets.length
+          ? i + probeConcurrency
+          : targets.length;
+      final chunk = targets.sublist(i, end);
+      final outcomes = await Future.wait(
+        chunk.map((name) async {
+          try {
+            return MapEntry(
+              name,
+              await prober.probeNode(
+                proxyName: name,
+                entryServer: entryServers[name] ?? '',
+                serviceIds: serviceIds,
+                nowMs: DateTime.now().millisecondsSinceEpoch,
+              ),
+            );
+          } catch (_) {
+            return null;
+          }
+        }),
       );
-      final metadata = Map.of(state.metadataByProxy);
-      if (outcome.metadata != null) {
-        metadata[name] = outcome.metadata!;
-        updated++;
+      for (final outcome in outcomes) {
+        if (outcome == null) {
+          continue;
+        }
+        final result = outcome.value;
+        if (result.metadata != null) {
+          metadata[outcome.key] = result.metadata!;
+          updated++;
+          changed = true;
+        }
+        for (final entry in result.accessByService.entries) {
+          (access[entry.key] ??= {})[outcome.key] = entry.value;
+          changed = true;
+        }
       }
-      final access = <String, Map<String, ServiceAccessResult>>{};
-      for (final entry in state.accessByService.entries) {
-        access[entry.key] = Map.of(entry.value);
-      }
-      for (final entry in outcome.accessByService.entries) {
-        (access[entry.key] ??= {})[name] = entry.value;
-      }
+    }
+    if (changed) {
       update(
         state.copyWith(metadataByProxy: metadata, accessByService: access),
       );

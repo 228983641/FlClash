@@ -1,5 +1,6 @@
 import 'package:fl_clash/common/boot_guard.dart';
 import 'package:fl_clash/common/boot_record.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _RecordStore {
@@ -107,6 +108,33 @@ void main() {
 
     expect(decision.recovery, BootRecovery.skipAutoSetup);
     expect(store.record?.handledExitAt, 4000);
+  });
+
+  test('a crash while running is logged on the next launch', () async {
+    final store = _RecordStore()
+      ..record = const BootRecord(
+        stage: BootStage.running,
+        profileId: 7,
+        startedAt: 1000,
+      );
+    final guard = _guard(
+      store,
+      exitInfo: const AppExitInfo(reason: AppExitReason.crash, timestamp: 4000),
+    );
+    final lines = <String>[];
+    final previousPrint = debugPrint;
+    debugPrint = (String? message, {int? wrapWidth}) {
+      if (message != null) {
+        lines.add(message);
+      }
+    };
+    try {
+      final decision = await guard.evaluate(profileId: 7);
+      expect(decision.recovery, BootRecovery.none);
+      expect(lines.any((line) => line.contains('Last exit: crash')), isTrue);
+    } finally {
+      debugPrint = previousPrint;
+    }
   });
 
   test('a completed launch resets the failure count', () async {

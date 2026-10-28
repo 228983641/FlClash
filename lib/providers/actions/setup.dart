@@ -519,7 +519,13 @@ class SetupAction extends _$SetupAction {
         .read(smartAnchorProvider.notifier)
         .refreshAggregationSources();
     if (!isCustom && smartAnchorInput.hasWork) {
-      rawConfig = buildSmartConfig(rawConfig, smartAnchorInput);
+      final counts = configCountsOf(rawConfig);
+      rawConfig = await PerfTrace.time(
+        'build-smart-config',
+        () async => buildSmartConfig(rawConfig, smartAnchorInput),
+        detail:
+            'proxies=${counts.proxies} groups=${counts.groups} rules=${counts.rules}',
+      );
     }
     final directory = await appPath.profilesPath;
     final injected = await _resolveInjectedProviders(
@@ -527,30 +533,34 @@ class SetupAction extends _$SetupAction {
       proxyGroups: proxyGroups,
       rules: rules,
     );
-    final res = await makeRealProfileTask(
-      MakeRealProfileState(
-        rules: rules,
-        proxyGroups: proxyGroups,
-        injectedProxyProviders: injected.proxies,
-        injectedRuleProviders: injected.rules,
-        profilesPath: directory,
-        profileId: profileId,
-        rawConfig: rawConfig,
-        realPatchConfig: patchConfig,
-        overrides: setupState.overrides,
-        bypassPrivateRoute: networkSetting.bypassPrivateRoute,
-        keepEmptyDnsOverrides: setupState.profileType != ProfileType.custom,
-        appendSystemDns: appendSystemDns,
-        addedRules: setupState.addedRules,
-        defaultUA: defaultUA,
-        authentication: networkSetting.authentication.credentials,
-        matchTarget:
-            profileBase == null ||
-                setupState.matchTarget?.trim().isNotEmpty == true
-            ? setupState.matchTarget
-            : lastMatchTarget(profileBase.base.matchRules),
-        safeMode: ref.read(safeModeProvider),
+    final res = await PerfTrace.time(
+      'build-real-profile',
+      () => makeRealProfileTask(
+        MakeRealProfileState(
+          rules: rules,
+          proxyGroups: proxyGroups,
+          injectedProxyProviders: injected.proxies,
+          injectedRuleProviders: injected.rules,
+          profilesPath: directory,
+          profileId: profileId,
+          rawConfig: rawConfig,
+          realPatchConfig: patchConfig,
+          overrides: setupState.overrides,
+          bypassPrivateRoute: networkSetting.bypassPrivateRoute,
+          keepEmptyDnsOverrides: setupState.profileType != ProfileType.custom,
+          appendSystemDns: appendSystemDns,
+          addedRules: setupState.addedRules,
+          defaultUA: defaultUA,
+          authentication: networkSetting.authentication.credentials,
+          matchTarget:
+              profileBase == null ||
+                  setupState.matchTarget?.trim().isNotEmpty == true
+              ? setupState.matchTarget
+              : lastMatchTarget(profileBase.base.matchRules),
+          safeMode: ref.read(safeModeProvider),
+        ),
       ),
+      detail: 'profile=$profileId',
     );
     if (profileBase == null) {
       return (yaml: res.yaml, md5: res.md5, counts: res.counts, base: null);

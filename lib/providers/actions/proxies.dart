@@ -105,7 +105,11 @@ class ProxiesAction extends _$ProxiesAction {
     debouncer.call(FunctionTag.updateGroups, updateGroups, duration: duration);
   }
 
-  void changeProxyDebounce(String groupName, String proxyName) {
+  void changeProxyDebounce(
+    String groupName,
+    String proxyName, {
+    String trigger = 'tap',
+  }) {
     _pendingSelectedRollback.putIfAbsent(
       groupName,
       () => _currentSelectedName(groupName),
@@ -117,7 +121,11 @@ class ProxiesAction extends _$ProxiesAction {
       String groupName,
       String proxyName,
     ) async {
-      await changeProxy(groupName: groupName, proxyName: proxyName);
+      await changeProxy(
+        groupName: groupName,
+        proxyName: proxyName,
+        trigger: trigger,
+      );
       updateGroupsDebounce();
     }, args: [groupName, proxyName]);
   }
@@ -320,7 +328,7 @@ class ProxiesAction extends _$ProxiesAction {
         _pendingAutoSwitch[service.serviceId] = next;
         _pendingAutoReason[service.serviceId] =
             currentReason?.name ?? 'unknown';
-        changeProxyDebounce(groupName, next);
+        changeProxyDebounce(groupName, next, trigger: 'auto-failover');
       }
     }
   }
@@ -434,6 +442,7 @@ class ProxiesAction extends _$ProxiesAction {
   Future<void> changeProxy({
     required String groupName,
     required String proxyName,
+    String trigger = 'tap',
   }) async {
     final profilesAction = ref.read(profilesActionProvider.notifier);
     final rollbackName =
@@ -442,8 +451,12 @@ class ProxiesAction extends _$ProxiesAction {
     profilesAction.updateCurrentSelectedMap(groupName, proxyName);
     final ChangeProxyResult result;
     try {
-      result = await _core.changeProxy(
-        ChangeProxyParams(groupName: groupName, proxyName: proxyName),
+      result = await PerfTrace.time(
+        'switch-proxy-core',
+        () => _core.changeProxy(
+          ChangeProxyParams(groupName: groupName, proxyName: proxyName),
+        ),
+        detail: '$trigger $groupName -> $proxyName',
       );
       if (result.message.isNotEmpty) {
         throw MessageException(result.message);
@@ -465,9 +478,17 @@ class ProxiesAction extends _$ProxiesAction {
     }
     try {
       if (ref.read(appSettingProvider).closeConnections) {
-        await _core.closeConnections();
+        await PerfTrace.time(
+          'switch-proxy-reset',
+          () => _core.closeConnections(),
+          detail: '$trigger $groupName -> $proxyName',
+        );
       } else {
-        await _core.resetConnections();
+        await PerfTrace.time(
+          'switch-proxy-reset',
+          () => _core.resetConnections(),
+          detail: '$trigger $groupName -> $proxyName',
+        );
       }
     } catch (error) {
       commonPrint.log(

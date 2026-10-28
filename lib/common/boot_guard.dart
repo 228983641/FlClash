@@ -44,6 +44,16 @@ class BootGuard {
         logLevel: LogLevel.warning,
       );
     }
+    if (!decision.isDegraded &&
+        record != null &&
+        exitInfo != null &&
+        exitInfo.timestamp > record.handledExitAt &&
+        exitInfo.timestamp >= record.startedAt) {
+      commonPrint.log(
+        'Last exit: ${exitInfo.reason.name}',
+        logLevel: LogLevel.warning,
+      );
+    }
     await _writeRecord(
       BootRecord(
         stage: BootStage.starting,
