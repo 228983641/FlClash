@@ -264,7 +264,7 @@ void main() {
       expect(chain['dialer-proxy'], '[A] HK-01');
     });
 
-    test('dialer-proxy keeps an unresolvable reference untouched', () {
+    test('unresolvable dialer-proxy drops the node', () {
       const chained = SubscriptionSourceResult(
         sourceId: 'a',
         sourceLabel: 'A',
@@ -277,13 +277,115 @@ void main() {
             'port': 443,
             'dialer-proxy': 'MISSING',
           },
+          {'name': 'HK-01', 'type': 'vmess', 'server': '2.2.2.2', 'port': 443},
         ],
       );
       final merged = SubscriptionMerger.merge([chained]);
-      final chain = merged.proxies.firstWhere(
-        (proxy) => proxy['name'] == '[A] TW-01',
+      expect(merged.proxies.map((proxy) => proxy['name']), ['[A] HK-01']);
+      final unified = merged.proxyGroups.first;
+      expect(unified['proxies'], ['[A] HK-01']);
+    });
+
+    test('duplicate renamed names get unique suffixes', () {
+      const first = SubscriptionSourceResult(
+        sourceId: 'a',
+        sourceLabel: 'A',
+        ok: true,
+        proxies: [
+          {'name': 'X', 'type': 'vmess', 'server': '1.1.1.1', 'port': 443},
+        ],
+        proxyGroups: [
+          {
+            'name': 'GA',
+            'type': 'select',
+            'proxies': ['X'],
+          },
+        ],
       );
-      expect(chain['dialer-proxy'], 'MISSING');
+      const second = SubscriptionSourceResult(
+        sourceId: 'b',
+        sourceLabel: 'A',
+        ok: true,
+        proxies: [
+          {'name': 'X', 'type': 'vmess', 'server': '2.2.2.2', 'port': 443},
+        ],
+        proxyGroups: [
+          {
+            'name': 'GB',
+            'type': 'select',
+            'proxies': ['X'],
+          },
+        ],
+      );
+      final merged = SubscriptionMerger.merge([
+        first,
+        second,
+      ], mode: AggregationGroupMode.mergeAll);
+      expect(merged.proxies.map((proxy) => proxy['name']), [
+        '[A] X',
+        '[A] X (2)',
+      ]);
+      final ga = merged.proxyGroups.firstWhere(
+        (group) => group['name'] == 'GA',
+      );
+      final gb = merged.proxyGroups.firstWhere(
+        (group) => group['name'] == 'GB',
+      );
+      expect(ga['proxies'], ['[A] X']);
+      expect(gb['proxies'], ['[A] X (2)']);
+    });
+
+    test('prune drops dangling members, groups and rules', () {
+      const primary = SubscriptionSourceResult(
+        sourceId: 'a',
+        sourceLabel: 'A',
+        ok: true,
+        proxies: [
+          {'name': 'GOOD', 'type': 'vmess', 'server': '1.1.1.1', 'port': 443},
+        ],
+        proxyGroups: [
+          {
+            'name': 'G',
+            'type': 'select',
+            'proxies': ['GOOD', 'GHOST'],
+          },
+          {
+            'name': 'EMPTY',
+            'type': 'select',
+            'proxies': ['GHOST'],
+          },
+        ],
+        rules: [
+          'DOMAIN,example.com,G',
+          'DOMAIN,other.com,GHOST',
+          'RULE-SET,missing,DIRECT',
+          'RULE-SET,lan,DIRECT',
+          'MATCH,DIRECT',
+        ],
+        ruleProviders: {
+          'lan': {
+            'type': 'http',
+            'behavior': 'classical',
+            'url': 'https://a.example/lan.yaml',
+            'path': './lan.yaml',
+            'interval': 86400,
+          },
+        },
+      );
+      final merged = SubscriptionMerger.merge([
+        primary,
+      ], mode: AggregationGroupMode.mergeAll);
+      final g = merged.proxyGroups.firstWhere((group) => group['name'] == 'G');
+      expect(g['proxies'], ['[A] GOOD']);
+      expect(
+        merged.proxyGroups.map((group) => group['name']),
+        isNot(contains('EMPTY')),
+      );
+      expect(merged.rules, [
+        'DOMAIN,example.com,G',
+        'RULE-SET,lan,DIRECT',
+        'MATCH,DIRECT',
+      ]);
     });
 
     test('dialer-proxy follows a renamed group target in mergeAll', () {
@@ -316,6 +418,95 @@ void main() {
         (proxy) => proxy['name'] == '[B] B-01',
       );
       expect(chain['dialer-proxy'], '[B] 自动');
+    });
+
+    SubscriptionSourceResult providerPrimary() {
+      return const SubscriptionSourceResult(
+        sourceId: 'a',
+        sourceLabel: 'A',
+        ok: true,
+        proxies: [],
+        rules: ['RULE-SET,lan,DIRECT'],
+        ruleProviders: {
+          'lan': {
+            'type': 'http',
+            'behavior': 'classical',
+            'url': 'https://a.example/lan.yaml',
+            'path': './lan.yaml',
+            'interval': 86400,
+          },
+          'shared': {
+            'type': 'http',
+            'behavior': 'domain',
+            'url': 'https://a.example/shared.yaml',
+            'path': './shared.yaml',
+            'interval': 86400,
+          },
+        },
+        proxyProviders: {
+          'nodes': {
+            'type': 'http',
+            'url': 'https://a.example/nodes.yaml',
+            'path': './nodes.yaml',
+            'interval': 3600,
+          },
+        },
+      );
+    }
+
+    SubscriptionSourceResult providerOther() {
+      return const SubscriptionSourceResult(
+        sourceId: 'b',
+        sourceLabel: 'B',
+        ok: true,
+        proxies: [],
+        rules: ['RULE-SET,lancidr,DIRECT'],
+        ruleProviders: {
+          'lancidr': {
+            'type': 'http',
+            'behavior': 'ipcidr',
+            'url': 'https://b.example/lancidr.yaml',
+            'path': './lancidr.yaml',
+            'interval': 86400,
+          },
+          'shared': {
+            'type': 'http',
+            'behavior': 'domain',
+            'url': 'https://b.example/shared.yaml',
+            'path': './shared.yaml',
+            'interval': 86400,
+          },
+        },
+      );
+    }
+
+    test('mergeAll merges providers from every source', () {
+      final merged = SubscriptionMerger.merge([
+        providerPrimary(),
+        providerOther(),
+      ], mode: AggregationGroupMode.mergeAll);
+      expect(merged.ruleProviders.keys, containsAll(['lan', 'lancidr']));
+      expect(merged.rules, contains('RULE-SET,lancidr,DIRECT'));
+      expect(merged.proxyProviders.keys, contains('nodes'));
+    });
+
+    test('same-name provider keeps the first definition', () {
+      final merged = SubscriptionMerger.merge([
+        providerPrimary(),
+        providerOther(),
+      ], mode: AggregationGroupMode.mergeAll);
+      final shared = merged.ruleProviders['shared'] as Map;
+      expect(shared['url'], 'https://a.example/shared.yaml');
+    });
+
+    test('primaryOnly keeps only primary providers', () {
+      final merged = SubscriptionMerger.merge([
+        providerPrimary(),
+        providerOther(),
+      ]);
+      expect(merged.ruleProviders.keys, contains('lan'));
+      expect(merged.ruleProviders.keys, isNot(contains('lancidr')));
+      expect(merged.rules, isNot(contains('RULE-SET,lancidr,DIRECT')));
     });
   });
 

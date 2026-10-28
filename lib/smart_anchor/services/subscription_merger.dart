@@ -8,6 +8,8 @@ class SubscriptionSourceResult {
     required this.proxies,
     this.proxyGroups = const [],
     this.rules = const [],
+    this.ruleProviders = const {},
+    this.proxyProviders = const {},
     this.error,
   });
 
@@ -17,6 +19,8 @@ class SubscriptionSourceResult {
   final List<Map<String, dynamic>> proxies;
   final List<Map<String, dynamic>> proxyGroups;
   final List<String> rules;
+  final Map<String, dynamic> ruleProviders;
+  final Map<String, dynamic> proxyProviders;
   final String? error;
 }
 
@@ -26,6 +30,8 @@ class MergedSubscription {
     required this.sources,
     required this.proxyGroups,
     required this.rules,
+    required this.ruleProviders,
+    required this.proxyProviders,
     required this.mode,
     required this.unifiedGroupName,
   });
@@ -34,6 +40,8 @@ class MergedSubscription {
   final List<SubscriptionSourceResult> sources;
   final List<Map<String, dynamic>> proxyGroups;
   final List<String> rules;
+  final Map<String, dynamic> ruleProviders;
+  final Map<String, dynamic> proxyProviders;
   final AggregationGroupMode mode;
   final String unifiedGroupName;
 
@@ -52,6 +60,7 @@ class SubscriptionMerger {
   }) {
     final merged = <Map<String, dynamic>>[];
     final mergedSourceIds = <String>[];
+    final mergedOriginalNames = <String>[];
     final proxyNameByKey = <String, String>{};
     final proxyNameByDedup = <String, String>{};
     for (final source in sources) {
@@ -70,6 +79,21 @@ class SubscriptionMerger {
         copy['name'] = renamed;
         merged.add(copy);
         mergedSourceIds.add(source.sourceId);
+        mergedOriginalNames.add(originalName);
+      }
+    }
+    final seenNames = <String>{};
+    for (var i = 0; i < merged.length; i++) {
+      var name = merged[i]['name']?.toString() ?? '';
+      if (!seenNames.add(name)) {
+        var suffix = 2;
+        while (!seenNames.add('$name ($suffix)')) {
+          suffix++;
+        }
+        name = '$name ($suffix)';
+        merged[i]['name'] = name;
+        proxyNameByKey['${mergedSourceIds[i]}\x00${mergedOriginalNames[i]}'] =
+            name;
       }
     }
     final primary = sources.isEmpty
@@ -207,6 +231,26 @@ class SubscriptionMerger {
     final ruleSources = mode == AggregationGroupMode.primaryOnly
         ? (primary == null ? const <SubscriptionSourceResult>[] : [primary])
         : sources;
+    final mergedRuleProviders = <String, dynamic>{};
+    final mergedProxyProviders = <String, dynamic>{};
+    for (final source in ruleSources) {
+      for (final entry in source.ruleProviders.entries) {
+        mergedRuleProviders.putIfAbsent(
+          entry.key,
+          () => entry.value is Map
+              ? Map<String, dynamic>.from(entry.value as Map)
+              : entry.value,
+        );
+      }
+      for (final entry in source.proxyProviders.entries) {
+        mergedProxyProviders.putIfAbsent(
+          entry.key,
+          () => entry.value is Map
+              ? Map<String, dynamic>.from(entry.value as Map)
+              : entry.value,
+        );
+      }
+    }
     for (final source in ruleSources) {
       for (final rule in source.rules) {
         var text = rule;
@@ -226,11 +270,72 @@ class SubscriptionMerger {
         }
       }
     }
+    Set<String> currentNames() {
+      return {
+        'DIRECT',
+        'REJECT',
+        'REJECT-DROP',
+        'GLOBAL',
+        for (final proxy in merged) proxy['name']?.toString() ?? '',
+        for (final group in mergedGroups) group['name']?.toString() ?? '',
+      };
+    }
+
+    var changed = true;
+    while (changed) {
+      changed = false;
+      var names = currentNames();
+      final proxyCount = merged.length;
+      merged.removeWhere((proxy) {
+        final dialer = proxy['dialer-proxy'];
+        return dialer is String && dialer.isNotEmpty && !names.contains(dialer);
+      });
+      changed |= merged.length != proxyCount;
+      names = currentNames();
+      final groupCount = mergedGroups.length;
+      mergedGroups.removeWhere((group) {
+        final members = group['proxies'];
+        if (members is List) {
+          members.removeWhere((member) => !names.contains(member.toString()));
+        }
+        final use = group['use'];
+        if (use is List) {
+          group['use'] = [
+            for (final entry in use)
+              if (mergedProxyProviders.containsKey(entry.toString())) entry,
+          ];
+        }
+        final remainingMembers = (group['proxies'] as List?) ?? const [];
+        final remainingUse = (group['use'] as List?) ?? const [];
+        return remainingMembers.isEmpty && remainingUse.isEmpty;
+      });
+      changed |= mergedGroups.length != groupCount;
+      names = currentNames();
+      final ruleCount = mergedRules.length;
+      mergedRules.removeWhere((rule) {
+        var text = rule;
+        if (text.endsWith(',no-resolve')) {
+          text = text.substring(0, text.length - ',no-resolve'.length);
+        }
+        final parts = text.split(',');
+        if (parts.isNotEmpty && parts.first == 'RULE-SET') {
+          if (parts.length < 3 || !mergedRuleProviders.containsKey(parts[1])) {
+            return true;
+          }
+        }
+        final idx = text.lastIndexOf(',');
+        final target = idx < 0 ? text : text.substring(idx + 1);
+        return !names.contains(target);
+      });
+      changed |= mergedRules.length != ruleCount;
+    }
     return MergedSubscription(
       proxies: merged,
       sources: sources,
       proxyGroups: mergedGroups,
       rules: mergedRules,
+      ruleProviders: mergedRuleProviders,
+      proxyProviders: mergedProxyProviders,
       mode: mode,
       unifiedGroupName: unifiedName,
     );

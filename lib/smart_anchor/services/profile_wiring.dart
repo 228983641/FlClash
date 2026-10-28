@@ -154,6 +154,8 @@ Map<String, dynamic> _applyAggregation(
     proxies: _proxyMaps(config),
     proxyGroups: _groupMaps(config),
     rules: _ruleStrings(config),
+    ruleProviders: _providerMap(config, 'rule-providers'),
+    proxyProviders: _providerMap(config, 'proxy-providers'),
   );
   final sources = [
     primary,
@@ -165,6 +167,8 @@ Map<String, dynamic> _applyAggregation(
         proxies: _proxyMaps(source.config),
         proxyGroups: _groupMaps(source.config),
         rules: _ruleStrings(source.config),
+        ruleProviders: _providerMap(source.config, 'rule-providers'),
+        proxyProviders: _providerMap(source.config, 'proxy-providers'),
       ),
   ];
   final merged = SubscriptionMerger.merge(sources, mode: input.aggregationMode);
@@ -172,6 +176,8 @@ Map<String, dynamic> _applyAggregation(
   result['proxies'] = merged.proxies;
   result['proxy-groups'] = merged.proxyGroups;
   result['rules'] = merged.rules;
+  result['rule-providers'] = merged.ruleProviders;
+  result['proxy-providers'] = merged.proxyProviders;
   return result;
 }
 
@@ -253,6 +259,19 @@ List<String> _ruleStrings(Map<String, dynamic> config) {
     return const [];
   }
   return [for (final rule in rules) rule.toString()];
+}
+
+Map<String, dynamic> _providerMap(Map<String, dynamic> config, String key) {
+  final providers = config[key];
+  if (providers is! Map) {
+    return const {};
+  }
+  return {
+    for (final entry in providers.entries)
+      entry.key.toString(): entry.value is Map
+          ? Map<String, dynamic>.from(entry.value as Map)
+          : entry.value,
+  };
 }
 
 // Aggregation renames every node to "[<sourceLabel>] <original>", but
