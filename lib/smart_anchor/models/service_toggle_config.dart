@@ -131,7 +131,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
     serviceId: 'claude',
     displayName: 'Claude (克劳德)',
     officialName: 'Claude',
-    isEnabled: false,
+    isEnabled: true,
     targetCountry: 'US',
     matchRules: [
       'GEOSITE,anthropic',
@@ -144,7 +144,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
     serviceId: 'openai',
     displayName: 'ChatGPT (OpenAI)',
     officialName: 'ChatGPT',
-    isEnabled: false,
+    isEnabled: true,
     targetCountry: 'US',
     matchRules: [
       'GEOSITE,openai',
@@ -157,7 +157,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
     serviceId: 'gemini',
     displayName: 'Google Gemini',
     officialName: 'Gemini',
-    isEnabled: false,
+    isEnabled: true,
     targetCountry: 'US',
     matchRules: [
       'GEOSITE,google-gemini',
@@ -170,7 +170,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
     serviceId: 'cloudflare',
     displayName: 'Cloudflare 护盾站点',
     officialName: 'Cloudflare',
-    isEnabled: false,
+    isEnabled: true,
     targetCountry: 'US',
     matchRules: [
       'GEOSITE,cloudflare',
@@ -183,7 +183,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
     serviceId: 'netflix',
     displayName: 'Netflix (奈飞)',
     officialName: 'Netflix',
-    isEnabled: false,
+    isEnabled: true,
     targetCountry: 'SG',
     matchRules: [
       'GEOSITE,netflix',
@@ -196,15 +196,15 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
     serviceId: 'google',
     displayName: 'Google 综合服务',
     officialName: 'Google',
-    isEnabled: false,
-    targetCountry: 'US',
+    isEnabled: true,
+    targetCountry: '',
     matchRules: ['GEOSITE,google'],
     dnsDomains: ['google.com'],
   ),
   ServiceToggleConfig(
     serviceId: 'youtube',
     displayName: 'YouTube',
-    isEnabled: false,
+    isEnabled: true,
     targetCountry: '',
     matchRules: ['GEOSITE,youtube'],
     dnsDomains: ['youtube.com', 'youtu.be'],
@@ -213,7 +213,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
     serviceId: 'x',
     displayName: 'X (Twitter)',
     officialName: 'X',
-    isEnabled: false,
+    isEnabled: true,
     targetCountry: '',
     matchRules: ['GEOSITE,twitter'],
     dnsDomains: ['x.com', 'twitter.com'],
@@ -221,7 +221,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
   ServiceToggleConfig(
     serviceId: 'copilot',
     displayName: 'Microsoft Copilot',
-    isEnabled: false,
+    isEnabled: true,
     targetCountry: 'US',
     matchRules: ['DOMAIN-SUFFIX,copilot.microsoft.com'],
     dnsDomains: ['copilot.microsoft.com'],
@@ -229,7 +229,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
   ServiceToggleConfig(
     serviceId: 'meta-ai',
     displayName: 'Meta AI',
-    isEnabled: false,
+    isEnabled: true,
     targetCountry: 'US',
     matchRules: ['DOMAIN-SUFFIX,meta.ai'],
     dnsDomains: ['meta.ai'],
@@ -238,7 +238,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
     serviceId: 'grok',
     displayName: 'Grok (xAI)',
     officialName: 'Grok',
-    isEnabled: false,
+    isEnabled: true,
     targetCountry: 'US',
     matchRules: ['DOMAIN-SUFFIX,grok.com', 'DOMAIN-SUFFIX,x.ai'],
     dnsDomains: ['grok.com', 'x.ai'],
@@ -246,7 +246,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
   ServiceToggleConfig(
     serviceId: 'perplexity',
     displayName: 'Perplexity',
-    isEnabled: false,
+    isEnabled: true,
     targetCountry: 'US',
     matchRules: ['DOMAIN-SUFFIX,perplexity.ai', 'DOMAIN-SUFFIX,perplexity.com'],
     dnsDomains: ['perplexity.ai', 'perplexity.com'],
@@ -254,7 +254,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
   ServiceToggleConfig(
     serviceId: 'mistral',
     displayName: 'Mistral Le Chat',
-    isEnabled: false,
+    isEnabled: true,
     targetCountry: 'US',
     matchRules: ['DOMAIN-SUFFIX,chat.mistral.ai', 'DOMAIN-SUFFIX,mistral.ai'],
     dnsDomains: ['chat.mistral.ai', 'mistral.ai'],
@@ -262,7 +262,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
   ServiceToggleConfig(
     serviceId: 'poe',
     displayName: 'Poe',
-    isEnabled: false,
+    isEnabled: true,
     targetCountry: 'US',
     matchRules: ['DOMAIN-SUFFIX,poe.com'],
     dnsDomains: ['poe.com'],
@@ -270,7 +270,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
   ServiceToggleConfig(
     serviceId: 'disney',
     displayName: 'Disney+',
-    isEnabled: false,
+    isEnabled: true,
     targetCountry: 'US',
     matchRules: [
       'DOMAIN-SUFFIX,disneyplus.com',
@@ -281,7 +281,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
   ServiceToggleConfig(
     serviceId: 'appletv',
     displayName: 'Apple TV+',
-    isEnabled: false,
+    isEnabled: true,
     targetCountry: 'US',
     matchRules: ['DOMAIN-SUFFIX,tv.apple.com'],
     dnsDomains: ['tv.apple.com'],
@@ -290,7 +290,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
     serviceId: 'muse',
     displayName: 'Muse (Meta)',
     officialName: 'Muse',
-    isEnabled: false,
+    isEnabled: true,
     targetCountry: 'US',
     matchRules: ['DOMAIN-SUFFIX,muse.ai'],
     dnsDomains: ['muse.ai'],

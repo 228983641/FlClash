@@ -16,19 +16,20 @@
 
 # Smart Anchor (new features in this fork, in detail)
 
-## Default state: everything off, stock behaviour unchanged
+## Default state: preset services on, original rules one toggle away
 
-- Every new feature is off by default: no rule, group or DNS entry is injected,
-  and traffic follows the original subscription exactly as before.
-- Only a service explicitly enabled in settings takes the smart path below;
-  disabling it restores the original rules at once, with its anchor frozen and
-  kept for re-enabling.
+- Every preset service is enabled by default: its Smart group, rules and DNS
+  entries are injected. Services with regional restrictions start locked to
+  their preset country; services without regional restrictions (Google,
+  YouTube, X) start unlocked.
+- Disabling a service in settings restores the original rules at once, with
+  its anchor frozen and kept for re-enabling.
 
 ## 1. Per-service country lock: each service locks its own country
 
-- Claude, ChatGPT, Gemini and Cloudflare default to a US lock and enabled;
-  Netflix defaults to a Singapore lock but disabled; Google, YouTube and X
-  default to disabled with no lock.
+- Claude, ChatGPT, Gemini and Cloudflare default to a US lock; Netflix
+  defaults to a Singapore lock; Google, YouTube and X default to no lock.
+  All preset services are enabled by default.
 - The lock country is chosen by the user in advance and does **not** have to
   equal the anchor country. Three modes: no lock (0 countries — no country
   filtering, login location may jump across countries, highest risk-control
@@ -133,7 +134,7 @@
 - [x] Service groups and multi-country lock: groups are formed by restriction profile, not by company alone — Google and YouTube share one group (neither refuses regions), while Gemini stands alone (it refuses some regions), so a restricted service never drags an open service into its lock; locked countries are a list per service group, synced across members while sharing is on.
 - [x] ip.net.coffee merge: Cloudflare edge info (colo/WARP/protocol) and official service status (Claude/OpenAI/Cloudflare) in diagnostics; DNS/WebRTC leaks stay device-level diagnostics, global Ping stays latency display only.
 - [x] Auto-failover switch and anti-bounce guard: auto-switching can be turned off; when on, a 30-second loop probes the node in use for each enabled service, and a switch needs two consecutive failures of that node, never targets a region-blocked node, never follows a ranking change alone, a manual switch resets the failure count, and at most three switches happen per service in ten minutes before failover freezes in place. Lock or no lock, the rule is the same: a locked service only switches within its locked countries, an unlocked service switches by purity, anchor distance and delay.
-- [x] More presets and user-editable services: Copilot, Meta AI, Muse, Grok, Perplexity, Mistral, Poe, Disney+ and Apple TV+ presets, all off by default (Chinese AI services are intentionally not preset; they can be added as custom services); any preset or custom service can be edited from the services list (name, match rules, DNS domains, lock countries), and custom services can be added or deleted like scripts and subscriptions are edited.
+- [x] More presets and user-editable services: Copilot, Meta AI, Muse, Grok, Perplexity, Mistral, Poe, Disney+ and Apple TV+ presets, all enabled by default and locked to the US (Chinese AI services are intentionally not preset; they can be added as custom services); any preset or custom service can be edited from the services list (name, match rules, DNS domains, lock countries), and custom services can be added or deleted like scripts and subscriptions are edited.
 - [x] Node path diagram on the homepage: a dashboard card draws each service group's node moves as a schematic path (one line per member, anchor marked as a diamond, latest node ringed), switchable by service group, with a recent-moves list noting whether each move was automatic, manual or the first sighting, a back-to-anchor button and a clear-path button. A node that stays in use for ten minutes becomes the service's anchor, so the anchor finally updates on its own instead of only being restored. The diagram is styled like a HUD: latitude/longitude graticule with degree labels, corner brackets, a compass, a glowing anchor diamond, a dashed anchor-to-current line, and distance figures (anchor to current node, and each move's displacement); automatic moves name their cause (region blocked or network failed); the diagram exports to a PNG image, and any node — current or from a record — can be set as the anchor by hand.
 - [ ] After all features, a user-perspective review pass; Windows version later
   (Android first).

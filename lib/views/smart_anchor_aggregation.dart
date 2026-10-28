@@ -14,56 +14,54 @@ String _profileHost(String url) {
   return host.isEmpty ? url : host;
 }
 
-/// Subscription aggregation, managed where the profiles live: one switch
-/// turns it on, and then every other profile gets a checkbox. The current
-/// profile stays the primary one; checked profiles only contribute nodes.
-class SmartAnchorAggregationCard extends ConsumerWidget {
-  const SmartAnchorAggregationCard({super.key});
-
-  Future<void> _toggleSource(
-    WidgetRef ref,
-    AppLocalizations appLocalizations,
-    Profile profile,
-    bool enable,
-  ) async {
-    final label = profile.label.isEmpty
-        ? _profileHost(profile.url)
-        : profile.label;
-    final notifier = ref.read(smartAnchorProvider.notifier);
-    if (!enable) {
+Future<void> toggleAggregationSource(
+  WidgetRef ref,
+  AppLocalizations appLocalizations,
+  Profile profile,
+  bool enable,
+) async {
+  final label = profile.label.isEmpty
+      ? _profileHost(profile.url)
+      : profile.label;
+  final notifier = ref.read(smartAnchorProvider.notifier);
+  if (!enable) {
+    notifier.setAggregationSource(
+      sourceId: 'profile:${profile.id}',
+      sourceLabel: label,
+      config: const {},
+      enabled: false,
+    );
+  } else {
+    try {
+      final config = await ref.read(coreHandlerProvider).getConfig(profile.id);
       notifier.setAggregationSource(
         sourceId: 'profile:${profile.id}',
         sourceLabel: label,
-        config: const {},
-        enabled: false,
+        config: config,
+        enabled: true,
       );
-    } else {
-      try {
-        final config = await ref
-            .read(coreHandlerProvider)
-            .getConfig(profile.id);
-        notifier.setAggregationSource(
-          sourceId: 'profile:${profile.id}',
-          sourceLabel: label,
-          config: config,
-          enabled: true,
-        );
-      } catch (_) {
-        dialogs.showNotifier(
-          appLocalizations.smartAnchorAggregationLoadFailed,
-          level: MessageLevel.error,
-        );
-        return;
-      }
+    } catch (_) {
+      dialogs.showNotifier(
+        appLocalizations.smartAnchorAggregationLoadFailed,
+        level: MessageLevel.error,
+      );
+      return;
     }
-    ref.read(setupActionProvider.notifier).applyProfileDebounce(silence: true);
   }
+  ref.read(setupActionProvider.notifier).applyProfileDebounce(silence: true);
+}
+
+/// Subscription aggregation, managed where the profiles live: one switch
+/// turns it on, and the profiles in the list below each get a checkbox.
+/// The current profile stays the primary one; checked profiles only
+/// contribute nodes.
+class SmartAnchorAggregationCard extends ConsumerWidget {
+  const SmartAnchorAggregationCard({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appLocalizations = context.appLocalizations;
     final input = ref.watch(smartAnchorProvider);
-    final profiles = ref.watch(profilesProvider);
     final current = ref.watch(currentProfileProvider);
     final enabled = input.aggregationEnabled;
     return Padding(
@@ -134,26 +132,6 @@ class SmartAnchorAggregationCard extends ConsumerWidget {
                 style: AppTextStyle.body.of(context),
               ),
             ),
-          if (enabled)
-            for (final profile in profiles)
-              if (profile.id != current?.id &&
-                  profile.type != ProfileType.custom)
-                CheckboxListTile(
-                  title: Text(
-                    profile.label.isEmpty
-                        ? _profileHost(profile.url)
-                        : profile.label,
-                  ),
-                  value: input.aggregationSources.any(
-                    (source) => source.sourceId == 'profile:${profile.id}',
-                  ),
-                  onChanged: (value) {
-                    if (value == null) {
-                      return;
-                    }
-                    _toggleSource(ref, appLocalizations, profile, value);
-                  },
-                ),
           if (enabled)
             ListItem<AggregationGroupMode>.options(
               title: Text(appLocalizations.aggregationMode),

@@ -4,6 +4,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/providers/smart_anchor.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/views/profiles/custom/custom.dart';
@@ -258,6 +259,7 @@ class _ProfilesGridState extends ConsumerState<_ProfilesGrid> {
               key: ValueKey(profile.id),
               profile: profile,
               groupValue: widget.currentProfileId,
+              showAggregationCheckbox: widget.showAggregation,
               onChanged: (profileId) {
                 ref.read(currentProfileIdProvider.notifier).value = profileId;
               },
@@ -296,12 +298,14 @@ class _ProfilesGridState extends ConsumerState<_ProfilesGrid> {
 class ProfileItem extends ConsumerWidget {
   final Profile profile;
   final int? groupValue;
+  final bool showAggregationCheckbox;
   final void Function(int? value) onChanged;
 
   const ProfileItem({
     super.key,
     required this.profile,
     required this.groupValue,
+    this.showAggregationCheckbox = false,
     required this.onChanged,
   });
 
@@ -528,6 +532,15 @@ class ProfileItem extends ConsumerWidget {
     final isUpdating = ref.watch(isUpdatingProvider(profile.updatingKey));
     final subscriptionInfo = _subscriptionInfo;
     final isSelected = profile.id == groupValue;
+    final smartInput = ref.watch(smartAnchorProvider);
+    final showAggregationCheckbox =
+        this.showAggregationCheckbox &&
+        smartInput.aggregationEnabled &&
+        !isSelected &&
+        profile.type != ProfileType.custom;
+    final isAggregationSource = smartInput.aggregationSources.any(
+      (source) => source.sourceId == 'profile:${profile.id}',
+    );
     return ContextMenuRegion(
       menuItems: isUpdating ? null : _menuItems(context, ref),
       child: CommonCard(
@@ -545,6 +558,21 @@ class ProfileItem extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             spacing: 8,
             children: [
+              if (showAggregationCheckbox)
+                Checkbox(
+                  value: isAggregationSource,
+                  onChanged: (value) {
+                    if (value == null) {
+                      return;
+                    }
+                    toggleAggregationSource(
+                      ref,
+                      context.appLocalizations,
+                      profile,
+                      value,
+                    );
+                  },
+                ),
               if (profile.type == ProfileType.custom)
                 _GroupsCountChip(profileId: profile.id)
               else

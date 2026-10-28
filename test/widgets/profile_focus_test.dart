@@ -2,6 +2,9 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/providers/smart_anchor.dart';
+import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
+import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/profiles/profiles.dart';
 import 'package:fl_clash/widgets/widgets.dart';
@@ -372,4 +375,69 @@ void main() {
       expect(find.text(selected.label), findsNothing);
     });
   });
+
+  group('aggregation checkboxes in the profile list', () {
+    testWidgets('checked sources show on their own rows, primary has none', (
+      tester,
+    ) async {
+      final profiles = [
+        urlProfile('url 1'),
+        Profile.normal(label: 'file 1'),
+        urlProfile('url 2'),
+      ];
+      final sourceId = 'profile:${profiles[2].id}';
+      await pumpProfiles(
+        tester,
+        profiles: profiles,
+        overrides: [
+          smartAnchorProvider.overrideWith(
+            () => _AggregationOnSmartAnchor(sourceId),
+          ),
+        ],
+      );
+
+      final checkboxes = find
+          .byType(Checkbox)
+          .evaluate()
+          .map((element) => element.widget as Checkbox)
+          .toList();
+      expect(checkboxes, hasLength(2));
+      expect(checkboxes[0].value, isFalse);
+      expect(checkboxes[1].value, isTrue);
+      expect(find.byType(CheckboxListTile), findsNothing);
+    });
+
+    testWidgets('aggregation off hides the list checkboxes', (tester) async {
+      await pumpProfiles(
+        tester,
+        profiles: [
+          urlProfile('url 1'),
+          Profile.normal(label: 'file 1'),
+          urlProfile('url 2'),
+        ],
+      );
+      expect(find.byType(Checkbox), findsNothing);
+    });
+  });
+}
+
+class _AggregationOnSmartAnchor extends SmartAnchor {
+  _AggregationOnSmartAnchor(this.sourceId);
+
+  final String sourceId;
+
+  @override
+  SmartAnchorInput build() {
+    return SmartAnchorInput(
+      services: [...defaultServiceToggles],
+      aggregationEnabled: true,
+      aggregationSources: [
+        AggregationSourceInput(
+          sourceId: sourceId,
+          sourceLabel: 'url 2',
+          config: const {},
+        ),
+      ],
+    );
+  }
 }

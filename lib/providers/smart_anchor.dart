@@ -26,12 +26,9 @@ class SmartAnchor extends _$SmartAnchor {
 
   @override
   SmartAnchorInput build() {
-    return SmartAnchorInput(
-      services: [
-        for (final service in defaultServiceToggles)
-          service.copyWith(isEnabled: false),
-      ],
-      sharedLockGroupIds: const ['google-group'],
+    return const SmartAnchorInput(
+      services: [...defaultServiceToggles],
+      sharedLockGroupIds: ['google-group'],
     );
   }
 
