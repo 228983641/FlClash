@@ -15,6 +15,7 @@ import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/providers/database.dart';
 import 'package:fl_clash/providers/smart_anchor.dart';
 import 'package:fl_clash/providers/state.dart';
+import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:flutter/widgets.dart';
@@ -29,6 +30,12 @@ class MockCoreHandlerInterface extends Mock implements CoreHandlerInterface {}
 class _DisabledSmartAnchor extends SmartAnchor {
   @override
   SmartAnchorInput build() => const SmartAnchorInput();
+}
+
+class _EnabledSmartAnchor extends SmartAnchor {
+  @override
+  SmartAnchorInput build() =>
+      SmartAnchorInput(services: [defaultServiceToggles.first]);
 }
 
 const _testUrl = 'http://delay.test';
@@ -77,13 +84,16 @@ void main() {
 
   setUp(() => reset(core));
 
-  ProviderContainer buildContainer({Profile? profile}) {
+  ProviderContainer buildContainer({
+    Profile? profile,
+    SmartAnchor Function() smartAnchor = _DisabledSmartAnchor.new,
+  }) {
     final container = ProviderContainer(
       overrides: [
         coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
         profilesProvider.overrideWith(() => TestProfiles([?profile])),
         currentProfileIdProvider.overrideWithBuild((_, _) => profile?.id),
-        smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
+        smartAnchorProvider.overrideWith(smartAnchor),
       ],
     );
     addTearDown(container.dispose);
@@ -128,6 +138,109 @@ void main() {
       expect(groups.map((group) => group.name), ['Proxy']);
       expect(groups.single.all.map((proxy) => proxy.name), ['HK-01']);
     });
+
+    test(
+      'runs a delay test first when smart is enabled and no delays exist',
+      () async {
+        when(core.getProxies).thenAnswer(
+          (_) async => ProxiesData(
+            all: const ['Proxy', 'Direct'],
+            proxies: Map<String, dynamic>.from({
+              'Proxy': Map<String, dynamic>.from({
+                'name': 'Proxy',
+                'type': 'Selector',
+                'now': 'HK-01',
+                'all': ['HK-01'],
+              }),
+              'Direct': Map<String, dynamic>.from({
+                'name': 'Direct',
+                'type': 'Direct',
+              }),
+              'HK-01': Map<String, dynamic>.from({
+                'name': 'HK-01',
+                'type': 'ss',
+              }),
+            }),
+          ),
+        );
+        when(() => core.asyncTestDelay(any(), 'HK-01', any())).thenAnswer(
+          (_) async => const Delay(name: 'HK-01', url: _testUrl, value: 128),
+        );
+        final container = _delayContainer(
+          () => buildContainer(smartAnchor: _EnabledSmartAnchor.new),
+        );
+
+        await actionOf(container).updateGroups();
+        final delays = container
+            .read(delayDataSourceProvider)
+            .values
+            .expand((byProxy) => byProxy.entries);
+        expect(
+          delays.any((entry) => entry.key == 'HK-01' && entry.value == 128),
+          isTrue,
+        );
+
+        await actionOf(container).updateGroups();
+        verify(() => core.asyncTestDelay(any(), 'HK-01', any())).called(1);
+      },
+    );
+
+    test(
+      'only tests nodes missing delays when some delays already exist',
+      () async {
+        when(core.getProxies).thenAnswer(
+          (_) async => ProxiesData(
+            all: const ['Proxy', 'Direct'],
+            proxies: Map<String, dynamic>.from({
+              'Proxy': Map<String, dynamic>.from({
+                'name': 'Proxy',
+                'type': 'Selector',
+                'now': 'HK-01',
+                'all': ['HK-01', 'HK-02'],
+              }),
+              'Direct': Map<String, dynamic>.from({
+                'name': 'Direct',
+                'type': 'Direct',
+              }),
+              'HK-01': Map<String, dynamic>.from({
+                'name': 'HK-01',
+                'type': 'ss',
+              }),
+              'HK-02': Map<String, dynamic>.from({
+                'name': 'HK-02',
+                'type': 'ss',
+              }),
+            }),
+          ),
+        );
+        when(() => core.asyncTestDelay(any(), any(), any())).thenAnswer(
+          (inv) async => Delay(
+            name: inv.positionalArguments[1] as String,
+            url: _testUrl,
+            value: 200,
+          ),
+        );
+        final container = _delayContainer(
+          () => buildContainer(smartAnchor: _EnabledSmartAnchor.new),
+        );
+        container
+            .read(delayDataSourceProvider.notifier)
+            .setDelay(const Delay(name: 'HK-01', url: _testUrl, value: 42));
+
+        await actionOf(container).updateGroups();
+
+        verify(() => core.asyncTestDelay(any(), 'HK-02', any())).called(1);
+        verifyNever(() => core.asyncTestDelay(any(), 'HK-01', any()));
+        final delays = container
+            .read(delayDataSourceProvider)
+            .values
+            .expand((byProxy) => byProxy.entries);
+        expect(
+          delays.any((entry) => entry.key == 'HK-02' && entry.value == 200),
+          isTrue,
+        );
+      },
+    );
 
     test(
       'publishes the groups once a retry succeeds after core throws',

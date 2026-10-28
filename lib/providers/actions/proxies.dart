@@ -14,6 +14,24 @@ class _DelayTestTarget {
 
 typedef _DelayTestBatch = ({List<Proxy> proxies, String? testUrl});
 
+Map<String, int> flattenDelays(DelayMap delayMap) {
+  final delays = <String, int>{};
+  for (final byProxy in delayMap.values) {
+    for (final entry in byProxy.entries) {
+      final value = entry.value;
+      if (value == null) {
+        continue;
+      }
+      final existing = delays[entry.key];
+      if (existing == null ||
+          (value >= 0 && (existing < 0 || value < existing))) {
+        delays[entry.key] = value;
+      }
+    }
+  }
+  return delays;
+}
+
 class _DelayTestJob {
   _DelayTestJob(Iterable<String> keys, this.timeout) : held = keys.toSet();
 
@@ -190,16 +208,64 @@ class ProxiesAction extends _$ProxiesAction {
           }
         }
       }
-      unawaited(
-        ref
-            .read(smartAnchorProvider.notifier)
-            .probeNodes(proxyNames: names.toList(), currentProxyName: current)
-            .then((_) => smartAnchorFailoverCheck()),
+      await _smartAnchorProbeAfterDelayTest(
+        groups: groups,
+        names: names.toList(),
+        current: current,
       );
     }
   }
 
   final FailoverGuard _failoverGuard = FailoverGuard();
+  bool _smartAnchorAutoDelayTesting = false;
+
+  Future<void> _smartAnchorProbeAfterDelayTest({
+    required List<Group> groups,
+    required List<String> names,
+    required String current,
+  }) async {
+    if (_smartAnchorAutoDelayTesting) {
+      return;
+    }
+    _smartAnchorAutoDelayTesting = true;
+    try {
+      var delays = flattenDelays(ref.read(delayDataSourceProvider));
+      final hadNoDelays = delays.isEmpty;
+      if (hadNoDelays) {
+        await delayTestGroups(groups);
+        delays = flattenDelays(ref.read(delayDataSourceProvider));
+      } else {
+        final proxyByName = <String, Proxy>{};
+        for (final group in groups) {
+          for (final proxy in group.all) {
+            proxyByName.putIfAbsent(proxy.name, () => proxy);
+          }
+        }
+        final missing = <Proxy>[];
+        for (final name in names) {
+          final proxy = proxyByName[name];
+          if (proxy != null && !delays.containsKey(name)) {
+            missing.add(proxy);
+          }
+        }
+        if (missing.isNotEmpty) {
+          await delayTest(missing);
+          delays = flattenDelays(ref.read(delayDataSourceProvider));
+        }
+      }
+      await ref
+          .read(smartAnchorProvider.notifier)
+          .probeNodes(
+            proxyNames: names,
+            currentProxyName: current,
+            delays: delays,
+            force: hadNoDelays,
+          );
+      smartAnchorFailoverCheck();
+    } finally {
+      _smartAnchorAutoDelayTesting = false;
+    }
+  }
 
   Timer? _smartAnchorMonitorTimer;
   bool _smartAnchorMonitorRunning = false;
@@ -207,24 +273,6 @@ class ProxiesAction extends _$ProxiesAction {
   final Map<String, String> _pendingAutoSwitch = {};
   final Map<String, String> _pendingAutoReason = {};
   final Map<String, (String, int)> _anchorStableSince = {};
-
-  Map<String, int> _flattenDelays(DelayMap delayMap) {
-    final delays = <String, int>{};
-    for (final byProxy in delayMap.values) {
-      for (final entry in byProxy.entries) {
-        final value = entry.value;
-        if (value == null) {
-          continue;
-        }
-        final existing = delays[entry.key];
-        if (existing == null ||
-            (value >= 0 && (existing < 0 || value < existing))) {
-          delays[entry.key] = value;
-        }
-      }
-    }
-    return delays;
-  }
 
   void _observePathPoints(
     SmartAnchorInput smart,
@@ -285,7 +333,7 @@ class ProxiesAction extends _$ProxiesAction {
         }
       }
     }
-    final delays = _flattenDelays(ref.read(delayDataSourceProvider));
+    final delays = flattenDelays(ref.read(delayDataSourceProvider));
     for (final service in smart.services.where(
       (service) => service.isEnabled,
     )) {
