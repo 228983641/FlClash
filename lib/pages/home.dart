@@ -240,6 +240,7 @@ class _HomePageViewState extends ConsumerState<_HomePageView> {
 
   List<int>? _order;
   int _slide = 0;
+  bool _animating = false;
 
   @override
   void initState() {
@@ -298,6 +299,15 @@ class _HomePageViewState extends ConsumerState<_HomePageView> {
       _pageController.jumpToPage(current);
     }
     if (!isMobile || ignoreAnimateTo) {
+      _animating = false;
+      _pageController.jumpToPage(index);
+      return;
+    }
+    if (_animating) {
+      if (_order != null) {
+        setState(() => _order = null);
+      }
+      _animating = false;
       _pageController.jumpToPage(index);
       return;
     }
@@ -312,11 +322,18 @@ class _HomePageViewState extends ConsumerState<_HomePageView> {
       _pageController.jumpToPage(adjacent);
     }
     final fade = tabAnimation == TabAnimation.fade;
-    await _pageController.animateToPage(
-      index,
-      duration: fade ? fadeTabDuration : kTabScrollDuration,
-      curve: fade ? fadeTabCurve : Curves.easeOut,
-    );
+    _animating = true;
+    try {
+      await _pageController.animateToPage(
+        index,
+        duration: fade ? fadeTabDuration : kTabScrollDuration,
+        curve: fade ? fadeTabCurve : Curves.easeOut,
+      );
+    } finally {
+      if (mounted && slide == _slide) {
+        _animating = false;
+      }
+    }
     if (mounted && slide == _slide && _order != null) {
       setState(() => _order = null);
     }

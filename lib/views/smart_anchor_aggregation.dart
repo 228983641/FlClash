@@ -69,64 +69,32 @@ class SmartAnchorAggregationCard extends ConsumerWidget {
       child: generateSection(
         title: appLocalizations.subscriptionAggregation,
         items: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final switchWidget = CommonSwitch(
-                  value: enabled,
-                  onChanged: (value) {
-                    ref
-                        .read(smartAnchorProvider.notifier)
-                        .setAggregationEnabled(value);
-                    ref
-                        .read(setupActionProvider.notifier)
-                        .applyProfileDebounce(silence: true);
-                  },
-                );
-                final titleWidget = Text(
-                  appLocalizations.subscriptionAggregation,
-                  style: AppTextStyle.body.of(context),
-                );
-                final subtitleWidget = Text(
-                  appLocalizations.smartAnchorAggregationDesc,
-                  style: AppTextStyle.footnote
-                      .of(context)
-                      .copyWith(color: context.colorScheme.onSurfaceVariant),
-                );
-                if (constraints.maxWidth < 300) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      titleWidget,
-                      const SizedBox(height: 8),
-                      switchWidget,
-                      const SizedBox(height: 4),
-                      subtitleWidget,
-                    ],
-                  );
-                }
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(child: titleWidget),
-                        const SizedBox(width: 12),
-                        switchWidget,
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    subtitleWidget,
-                  ],
-                );
+          DecorationListItem(
+            title: Text(
+              appLocalizations.subscriptionAggregation,
+              style: AppTextStyle.body.of(context),
+            ),
+            subtitle: Text(
+              appLocalizations.smartAnchorAggregationDesc,
+              style: AppTextStyle.footnote
+                  .of(context)
+                  .copyWith(color: context.colorScheme.onSurfaceVariant),
+            ),
+            trailing: CommonSwitch(
+              value: enabled,
+              onChanged: (value) {
+                ref
+                    .read(smartAnchorProvider.notifier)
+                    .setAggregationEnabled(value);
+                ref
+                    .read(setupActionProvider.notifier)
+                    .applyProfileDebounce(silence: true);
               },
             ),
           ),
           if (enabled && current != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Text(
+            DecorationListItem(
+              title: Text(
                 '${appLocalizations.smartAnchorPrimarySubscription}: '
                 '${current.label.isEmpty ? _profileHost(current.url) : current.label}',
                 style: AppTextStyle.body.of(context),

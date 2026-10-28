@@ -199,7 +199,7 @@ class _ProfilesGridState extends ConsumerState<_ProfilesGrid> {
   EdgeInsets get _padding => EdgeInsets.only(
     left: _horizontalPadding,
     right: _horizontalPadding,
-    top: context.contentTopPadding,
+    top: widget.showAggregation ? widget.spacing : context.contentTopPadding,
     bottom: 16 + context.bottomInset,
   );
 

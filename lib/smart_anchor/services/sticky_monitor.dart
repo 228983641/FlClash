@@ -41,6 +41,9 @@ class FailoverGuard {
       if (name == currentName) {
         continue;
       }
+      if (name == 'DIRECT' || name == 'REJECT' || name == 'REJECT-DROP') {
+        continue;
+      }
       if (accessByProxy[name]?.reason == ServiceAccessReason.regionBlocked) {
         continue;
       }

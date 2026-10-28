@@ -116,13 +116,38 @@ void main() {
     );
   });
 
+  test('never switches to a built-in target', () {
+    final guard = FailoverGuard();
+    const ranked = ['A', 'REJECT', 'DIRECT', 'REJECT-DROP', 'B'];
+    final access = <String, ServiceAccessResult>{};
+    guard.noteResult(
+      serviceId: 'youtube',
+      currentName: 'A',
+      reason: ServiceAccessReason.networkFailed,
+      ranked: ranked,
+      accessByProxy: access,
+      nowMs: 1000,
+    );
+    expect(
+      guard.noteResult(
+        serviceId: 'youtube',
+        currentName: 'A',
+        reason: ServiceAccessReason.networkFailed,
+        ranked: ranked,
+        accessByProxy: access,
+        nowMs: 2000,
+      ),
+      'B',
+    );
+  });
+
   test('no more than three switches in ten minutes, then frozen', () {
     final guard = FailoverGuard();
     const ranked = ['A', 'B', 'C', 'D', 'E'];
     var current = 'A';
     var switches = 0;
     for (var cycle = 0; cycle < 8; cycle++) {
-      var next;
+      String? next;
       for (var attempt = 0; attempt < 2; attempt++) {
         next = guard.noteResult(
           serviceId: 'youtube',
