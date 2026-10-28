@@ -51,6 +51,7 @@ class SubscriptionMerger {
     String unifiedGroupName = unifiedAggregationGroupName,
   }) {
     final merged = <Map<String, dynamic>>[];
+    final mergedSourceIds = <String>[];
     final proxyNameByKey = <String, String>{};
     final proxyNameByDedup = <String, String>{};
     for (final source in sources) {
@@ -68,6 +69,7 @@ class SubscriptionMerger {
         final copy = Map<String, dynamic>.from(proxy);
         copy['name'] = renamed;
         merged.add(copy);
+        mergedSourceIds.add(source.sourceId);
       }
     }
     final primary = sources.isEmpty
@@ -96,6 +98,18 @@ class SubscriptionMerger {
           typesByFinalName.putIfAbsent(finalName, () => <String>{}).add(type);
           groupRenameByKey['${source.sourceId}\x00$name'] = finalName;
         }
+      }
+    }
+    for (var i = 0; i < merged.length; i++) {
+      final dialer = merged[i]['dialer-proxy'];
+      if (dialer is! String || dialer.isEmpty) {
+        continue;
+      }
+      final remapped =
+          proxyNameByKey['${mergedSourceIds[i]}\x00$dialer'] ??
+          groupRenameByKey['${mergedSourceIds[i]}\x00$dialer'];
+      if (remapped != null && remapped != dialer) {
+        merged[i]['dialer-proxy'] = remapped;
       }
     }
     List<String> remapMembers(

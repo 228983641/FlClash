@@ -240,6 +240,83 @@ void main() {
       );
       expect(merged.rules, contains('GEOSITE,youtube,美国'));
     });
+
+    test('dialer-proxy follows its renamed chain target', () {
+      const chained = SubscriptionSourceResult(
+        sourceId: 'a',
+        sourceLabel: 'A',
+        ok: true,
+        proxies: [
+          {
+            'name': 'TW-01',
+            'type': 'vmess',
+            'server': '1.1.1.1',
+            'port': 443,
+            'dialer-proxy': 'HK-01',
+          },
+          {'name': 'HK-01', 'type': 'vmess', 'server': '2.2.2.2', 'port': 443},
+        ],
+      );
+      final merged = SubscriptionMerger.merge([chained]);
+      final chain = merged.proxies.firstWhere(
+        (proxy) => proxy['name'] == '[A] TW-01',
+      );
+      expect(chain['dialer-proxy'], '[A] HK-01');
+    });
+
+    test('dialer-proxy keeps an unresolvable reference untouched', () {
+      const chained = SubscriptionSourceResult(
+        sourceId: 'a',
+        sourceLabel: 'A',
+        ok: true,
+        proxies: [
+          {
+            'name': 'TW-01',
+            'type': 'vmess',
+            'server': '1.1.1.1',
+            'port': 443,
+            'dialer-proxy': 'MISSING',
+          },
+        ],
+      );
+      final merged = SubscriptionMerger.merge([chained]);
+      final chain = merged.proxies.firstWhere(
+        (proxy) => proxy['name'] == '[A] TW-01',
+      );
+      expect(chain['dialer-proxy'], 'MISSING');
+    });
+
+    test('dialer-proxy follows a renamed group target in mergeAll', () {
+      const chained = SubscriptionSourceResult(
+        sourceId: 'b',
+        sourceLabel: 'B',
+        ok: true,
+        proxies: [
+          {
+            'name': 'B-01',
+            'type': 'vmess',
+            'server': '3.3.3.3',
+            'port': 443,
+            'dialer-proxy': '自动',
+          },
+        ],
+        proxyGroups: [
+          {
+            'name': '自动',
+            'type': 'select',
+            'proxies': ['B-01'],
+          },
+        ],
+      );
+      final merged = SubscriptionMerger.merge([
+        sourceA(),
+        chained,
+      ], mode: AggregationGroupMode.mergeAll);
+      final chain = merged.proxies.firstWhere(
+        (proxy) => proxy['name'] == '[B] B-01',
+      );
+      expect(chain['dialer-proxy'], '[B] 自动');
+    });
   });
 
   group('SmartConfigInjector', () {
