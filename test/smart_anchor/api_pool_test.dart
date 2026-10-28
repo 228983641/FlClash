@@ -94,6 +94,7 @@ void main() {
     var calls = 0;
     final service = GeoIpService(
       cache: cache,
+      sourceOrder: const ['ip-api'],
       keyPools: {
         'ip-api': ApiKeyPool(['k1', 'k2'], cooldownMs: 60000),
       },
@@ -133,7 +134,175 @@ void main() {
       nowMs: now,
     );
     expect(second, first);
-    expect(calls, 4);
+    expect(calls, 2);
+  });
+
+  test('new free source parsers produce geo and asn', () {
+    final ipWhoIs = parseIpWhoIs({
+      'ip': '8.8.8.8',
+      'success': true,
+      'country_code': 'US',
+      'latitude': 37.3393939,
+      'longitude': -121.8949553,
+      'connection': {'asn': 15169, 'org': 'Google LLC'},
+    })!;
+    expect(ipWhoIs.asn, 'AS15169');
+    expect(ipWhoIs.countryCode, 'US');
+    expect(parseIpWhoIs({'success': false, 'country_code': 'US'}), isNull);
+    final freeIpApi = parseFreeIpApi({
+      'ipAddress': '8.8.8.8',
+      'countryCode': 'US',
+      'latitude': 37.422,
+      'longitude': -122.085,
+      'asn': '15169',
+      'isProxy': true,
+    })!;
+    expect(freeIpApi.asn, 'AS15169');
+    expect(freeIpApi.isAbuse, true);
+    expect(parseFreeIpApi({'countryCode': ''}), isNull);
+    final ipApiCo = parseIpApiCo({
+      'ip': '8.8.8.8',
+      'country_code': 'US',
+      'latitude': 37.42301,
+      'longitude': -122.083352,
+      'asn': 'AS15169',
+    })!;
+    expect(ipApiCo.asn, 'AS15169');
+    expect(ipApiCo.countryCode, 'US');
+    expect(parseIpApiCo({'country_code': ''}), isNull);
+    final geoJs = parseGeoJs({
+      'ip': '8.8.8.8',
+      'country_code': 'US',
+      'latitude': '37.751',
+      'longitude': '-97.822',
+      'asn': 15169,
+    })!;
+    expect(geoJs.asn, 'AS15169');
+    expect(geoJs.latitude, 37.751);
+    expect(parseGeoJs({'country_code': ''}), isNull);
+  });
+
+  test('service rotates three sources per lookup', () async {
+    final seen = <List<String>>[];
+    var current = <String>[];
+    final service = GeoIpService(
+      cache: GeoIpCache(),
+      keyPools: const {},
+      fetcher: (ip, key, sourceId) async {
+        current.add(sourceId);
+        return {
+          'status': 'success',
+          'query': ip,
+          'countryCode': 'US',
+          'lat': 34.0,
+          'lon': -118.0,
+          'as': 'AS20057 Example',
+          'hosting': false,
+          'mobile': false,
+          'proxy': false,
+          'ip': ip,
+          'country': 'US',
+          'loc': '34.0,-118.0',
+          'org': 'AS20057 Example',
+          'country_code': 'US',
+          'latitude': 34.0,
+          'longitude': -118.0,
+          'asn': 20057,
+          'success': true,
+          'connection': {'asn': 20057},
+          'ipAddress': ip,
+        };
+      },
+    );
+    final now = DateTime.now().millisecondsSinceEpoch;
+    Future<void> probe(String ip) async {
+      current = [];
+      final result = await service.lookup(
+        ip: ip,
+        proxyName: 'P-$ip',
+        entryServer: 'entry.example',
+        wafPass: true,
+        nowMs: now,
+      );
+      expect(result?.sourceCount, 3);
+      seen.add(current);
+    }
+
+    await probe('1.1.1.1');
+    await probe('2.2.2.2');
+    expect(seen[0], ['ip-api', 'ipinfo', 'ip.sb']);
+    expect(seen[1], ['ipinfo', 'ip.sb', 'ipwho.is']);
+  });
+
+  test('service aggregates six sources by majority country', () async {
+    final service = GeoIpService(
+      cache: GeoIpCache(),
+      sourcesPerLookup: 6,
+      keyPools: const {},
+      fetcher: (ip, key, sourceId) async {
+        return switch (sourceId) {
+          'ip-api' => {
+            'status': 'success',
+            'query': ip,
+            'countryCode': 'US',
+            'lat': 34.0,
+            'lon': -118.0,
+            'as': 'AS20057 Example',
+            'hosting': false,
+            'mobile': false,
+            'proxy': false,
+          },
+          'ipinfo' => {
+            'ip': ip,
+            'country': 'US',
+            'loc': '34.0522,-118.2437',
+            'org': 'AS20057 Example',
+          },
+          'ip.sb' => {
+            'ip': ip,
+            'country_code': 'SG',
+            'latitude': 1.35,
+            'longitude': 103.82,
+            'asn': 9999,
+          },
+          'ipwho.is' => {
+            'ip': ip,
+            'success': true,
+            'country_code': 'SG',
+            'latitude': 1.35,
+            'longitude': 103.82,
+            'connection': {'asn': 9999},
+          },
+          'freeipapi' => {
+            'ipAddress': ip,
+            'countryCode': 'SG',
+            'latitude': 1.35,
+            'longitude': 103.82,
+            'asn': '9999',
+            'isProxy': false,
+          },
+          'geojs' => {
+            'ip': ip,
+            'country_code': 'SG',
+            'latitude': '1.35',
+            'longitude': '103.82',
+            'asn': 9999,
+          },
+          _ => null,
+        };
+      },
+    );
+    final result = await service.lookup(
+      ip: '1.2.3.4',
+      proxyName: 'SG-01',
+      entryServer: 'entry.example',
+      wafPass: true,
+      nowMs: DateTime.now().millisecondsSinceEpoch,
+    );
+    expect(result?.countryCode, 'SG');
+    expect(result?.sourceCount, 6);
+    expect(result?.countryDisputed, true);
+    expect(result?.asn, 'AS9999');
   });
 
   test('service aggregates three sources by majority country', () async {

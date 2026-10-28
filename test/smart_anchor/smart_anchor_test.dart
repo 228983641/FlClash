@@ -241,6 +241,18 @@ void main() {
       expect(merged.rules, contains('GEOSITE,youtube,美国'));
     });
 
+    test('mergeAll dedups rules primary first, order kept', () {
+      final merged = SubscriptionMerger.merge([
+        sourceA(),
+        sourceB(),
+      ], mode: AggregationGroupMode.mergeAll);
+      expect(merged.rules, [
+        'GEOSITE,google,美国',
+        'MATCH,DIRECT',
+        'GEOSITE,youtube,美国',
+      ]);
+    });
+
     test('dialer-proxy follows its renamed chain target', () {
       const chained = SubscriptionSourceResult(
         sourceId: 'a',
