@@ -7,6 +7,7 @@ import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/profiles/profiles.dart';
+import 'package:fl_clash/views/smart_anchor_aggregation.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -109,6 +110,14 @@ void main() {
     final cards = find
         .byType(FilledButton)
         .evaluate()
+        .where(
+          (element) =>
+              element
+                  .findAncestorWidgetOfExactType<
+                    SmartAnchorAggregationCard
+                  >() ==
+              null,
+        )
         .map((element) => element.widget)
         .toList();
 

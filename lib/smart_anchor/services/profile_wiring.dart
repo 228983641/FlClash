@@ -111,8 +111,9 @@ bool serviceHasNoUsableNodes(
 
 Map<String, dynamic> buildSmartConfig(
   Map<String, dynamic> rawConfig,
-  SmartAnchorInput input,
-) {
+  SmartAnchorInput input, {
+  Map<String, int> delays = const {},
+}) {
   if (!input.hasWork) {
     return rawConfig;
   }
@@ -128,19 +129,50 @@ Map<String, dynamic> buildSmartConfig(
     return config;
   }
   final proxyNames = _proxyNames(config);
+  final remappedDelays = <String, int>{};
+  for (final name in proxyNames) {
+    final delay = delays[name] ?? delays[_strippedProxyName(name)];
+    if (delay != null) {
+      remappedDelays[name] = delay;
+    }
+  }
   final rankedByService = <String, List<String>>{};
   for (final service in enabled) {
     rankedByService[service.serviceId] = rankedProxiesForService(
       effectiveInput,
       service,
       proxyNames,
+      delays: remappedDelays,
     );
   }
-  return SmartConfigInjector.injectSmartRouting(
+  final injected = SmartConfigInjector.injectSmartRouting(
     rawConfig: config,
     serviceConfigs: effectiveInput.services,
     rankedProxiesByService: rankedByService,
   );
+  _moveUnifiedGroupFirst(injected);
+  return injected;
+}
+
+void _moveUnifiedGroupFirst(Map<String, dynamic> config) {
+  final groups = config['proxy-groups'];
+  if (groups is! List) {
+    return;
+  }
+  final index = groups.indexWhere(
+    (group) =>
+        group is Map &&
+        (group['name'] == unifiedAggregationGroupName ||
+            (group['name'] is String &&
+                (group['name'] as String).startsWith(
+                  '$unifiedAggregationGroupName (',
+                ))),
+  );
+  if (index <= 0) {
+    return;
+  }
+  final unified = groups.removeAt(index);
+  groups.insert(0, unified);
 }
 
 Map<String, dynamic> _applyAggregation(
@@ -468,7 +500,12 @@ List<String> rankedProxiesForService(
         orElse: () => service,
       );
       final access = input.accessByService[first.serviceId] ?? const {};
-      return _electAnchor(tested, first.lockedCountries, access);
+      return _electAnchor(
+        tested,
+        first.lockedCountries,
+        access,
+        delays: delays,
+      );
     }();
   }
   return _rankForService(
@@ -500,7 +537,7 @@ List<String> _rankForService(
   final access = input.accessByService[service.serviceId] ?? const {};
   final lock = service.lockedCountries;
   var anchor = sharedAnchor ?? input.anchors[service.serviceId];
-  anchor ??= _electAnchor(tested, lock, access);
+  anchor ??= _electAnchor(tested, lock, access, delays: delays);
   if (anchor == null) {
     // No node passes the lock, so no known node may serve this service.
     // Only nodes without metadata stay as the emergency pool.
@@ -519,13 +556,28 @@ List<String> _rankForService(
 ServiceAnchor? _electAnchor(
   List<NodeMetadataCache> tested,
   List<String> lock,
-  Map<String, ServiceAccessResult> access,
-) {
+  Map<String, ServiceAccessResult> access, {
+  Map<String, int> delays = const {},
+}) {
   final eligible = ScoringEngine.filterForService(tested, lock, access);
   if (eligible.isEmpty) {
     return null;
   }
-  eligible.sort((a, b) => b.purityScore.compareTo(a.purityScore));
+  int effectiveDelay(NodeMetadataCache node) {
+    final delay = delays[node.proxyName];
+    if (delay == null || delay < 0) {
+      return 1 << 30;
+    }
+    return delay;
+  }
+
+  eligible.sort((a, b) {
+    final purity = b.purityScore.compareTo(a.purityScore);
+    if (purity != 0) {
+      return purity;
+    }
+    return effectiveDelay(a).compareTo(effectiveDelay(b));
+  });
   final best = eligible.first;
   return ServiceAnchor(
     serviceTag: '',

@@ -241,6 +241,79 @@ GeoIpResult? parseIpInfo(Map<String, dynamic> json) {
   );
 }
 
+GeoIpResult? parseIpWhoIs(Map<String, dynamic> json) {
+  if (json['success'] != true ||
+      json['country_code'] is! String ||
+      (json['country_code'] as String).isEmpty) {
+    return null;
+  }
+  final connection = json['connection'];
+  final asnValue = connection is Map ? connection['asn'] : null;
+  return GeoIpResult(
+    ip: json['ip'] as String? ?? '',
+    countryCode: json['country_code'] as String? ?? '',
+    latitude: (json['latitude'] as num?)?.toDouble() ?? 0,
+    longitude: (json['longitude'] as num?)?.toDouble() ?? 0,
+    asn: asnValue is num ? 'AS${asnValue.toInt()}' : '',
+    ipType: 'isp',
+  );
+}
+
+GeoIpResult? parseFreeIpApi(Map<String, dynamic> json) {
+  if (json['countryCode'] is! String ||
+      (json['countryCode'] as String).isEmpty) {
+    return null;
+  }
+  final asnValue = json['asn'];
+  final asn = asnValue is String && asnValue.isNotEmpty
+      ? (asnValue.startsWith('AS') ? asnValue : 'AS$asnValue')
+      : '';
+  return GeoIpResult(
+    ip: json['ipAddress'] as String? ?? '',
+    countryCode: json['countryCode'] as String? ?? '',
+    latitude: (json['latitude'] as num?)?.toDouble() ?? 0,
+    longitude: (json['longitude'] as num?)?.toDouble() ?? 0,
+    asn: asn,
+    ipType: 'isp',
+    isAbuse: json['isProxy'] == true,
+  );
+}
+
+GeoIpResult? parseIpApiCo(Map<String, dynamic> json) {
+  if (json['country_code'] is! String ||
+      (json['country_code'] as String).isEmpty) {
+    return null;
+  }
+  final asnValue = json['asn'];
+  final asn = asnValue is String && asnValue.isNotEmpty
+      ? (asnValue.startsWith('AS') ? asnValue : 'AS$asnValue')
+      : '';
+  return GeoIpResult(
+    ip: json['ip'] as String? ?? '',
+    countryCode: json['country_code'] as String? ?? '',
+    latitude: (json['latitude'] as num?)?.toDouble() ?? 0,
+    longitude: (json['longitude'] as num?)?.toDouble() ?? 0,
+    asn: asn,
+    ipType: 'isp',
+  );
+}
+
+GeoIpResult? parseGeoJs(Map<String, dynamic> json) {
+  if (json['country_code'] is! String ||
+      (json['country_code'] as String).isEmpty) {
+    return null;
+  }
+  final asnValue = json['asn'];
+  return GeoIpResult(
+    ip: json['ip'] as String? ?? '',
+    countryCode: json['country_code'] as String? ?? '',
+    latitude: double.tryParse(json['latitude']?.toString() ?? '') ?? 0,
+    longitude: double.tryParse(json['longitude']?.toString() ?? '') ?? 0,
+    asn: asnValue is num ? 'AS${asnValue.toInt()}' : '',
+    ipType: 'isp',
+  );
+}
+
 GeoIpResult? parseIpSb(Map<String, dynamic> json) {
   if (json['country_code'] is! String ||
       (json['country_code'] as String).isEmpty ||
@@ -264,13 +337,24 @@ class GeoIpService {
     required this.cache,
     required this.fetcher,
     required this.keyPools,
-    this.sourceOrder = const ['ip-api', 'ipinfo', 'ip.sb'],
+    this.sourceOrder = const [
+      'ip-api',
+      'ipinfo',
+      'ip.sb',
+      'ipwho.is',
+      'freeipapi',
+      'geojs',
+      'ipapi.co',
+    ],
+    this.sourcesPerLookup = 3,
   });
 
   final GeoIpCache cache;
   final GeoIpFetcher fetcher;
   final Map<String, ApiKeyPool> keyPools;
   final List<String> sourceOrder;
+  final int sourcesPerLookup;
+  var _lookupCount = 0;
 
   Future<NodeMetadataCache?> lookup({
     required String ip,
@@ -283,8 +367,17 @@ class GeoIpService {
     if (cached != null) {
       return cached;
     }
+    final perLookup = sourceOrder.isEmpty
+        ? 0
+        : sourcesPerLookup.clamp(1, sourceOrder.length);
+    final start = sourceOrder.isEmpty ? 0 : _lookupCount % sourceOrder.length;
+    _lookupCount++;
+    final selected = [
+      for (var i = 0; i < perLookup; i++)
+        sourceOrder[(start + i) % sourceOrder.length],
+    ];
     final results = <GeoIpResult>[];
-    for (final sourceId in sourceOrder) {
+    for (final sourceId in selected) {
       final result = await _querySource(sourceId, ip, nowMs);
       if (result != null) {
         results.add(result);
@@ -325,6 +418,10 @@ class GeoIpService {
           'ip-api' => parseIpApi(json),
           'ipinfo' => parseIpInfo(json),
           'ip.sb' => parseIpSb(json),
+          'ipwho.is' => parseIpWhoIs(json),
+          'freeipapi' => parseFreeIpApi(json),
+          'geojs' => parseGeoJs(json),
+          'ipapi.co' => parseIpApiCo(json),
           _ => null,
         };
         if (parsed != null) {

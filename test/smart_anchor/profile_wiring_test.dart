@@ -114,6 +114,27 @@ void main() {
     );
   });
 
+  test('config ranking uses delays and elects the fastest anchor on ties', () {
+    final result = buildSmartConfig(
+      {
+        'proxies': [
+          {'name': 'S', 'type': 'vless', 'server': 's.example'},
+          {'name': 'F', 'type': 'vless', 'server': 'f.example'},
+        ],
+        'proxy-groups': [],
+        'rules': [],
+      },
+      SmartAnchorInput(
+        services: [claude],
+        metadataByProxy: {'S': meta('S', 0, 0, 90), 'F': meta('F', 0, 30, 90)},
+      ),
+      delays: {'S': 900, 'F': 100},
+    );
+    final groups = result['proxy-groups'] as List;
+    expect(groups.first['name'], '🎯 Smart-Claude');
+    expect(groups.first['proxies'], ['F', 'S']);
+  });
+
   test('wiring merges an aggregation source before smart injection', () {
     final result = buildSmartConfig(
       baseConfig(),
@@ -139,6 +160,32 @@ void main() {
     expect(proxies.length, 5);
     final groups = result['proxy-groups'] as List;
     expect(groups.first['name'], '🔗 聚合全部节点');
+  });
+
+  test('unified aggregation group stays first when smart groups inject', () {
+    final result = buildSmartConfig(
+      baseConfig(),
+      const SmartAnchorInput(
+        services: [claude],
+        aggregationEnabled: true,
+        aggregationSources: [
+          AggregationSourceInput(
+            sourceId: 'extra',
+            sourceLabel: 'B',
+            config: {
+              'proxies': [
+                {'name': 'B-01', 'type': 'vless', 'server': 'e.example'},
+              ],
+              'proxy-groups': [],
+              'rules': [],
+            },
+          ),
+        ],
+      ),
+    );
+    final groups = result['proxy-groups'] as List;
+    expect(groups.first['name'], '🔗 聚合全部节点');
+    expect(groups[1]['name'], '🎯 Smart-Claude');
   });
 
   test('unified aggregation group orders nodes by engine purity', () {

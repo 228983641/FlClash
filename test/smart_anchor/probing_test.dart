@@ -64,6 +64,60 @@ void main() {
     expect(targets, ['C', 'A', 'B']);
   });
 
+  test('full probe targets keep nodes faster than the median delay', () {
+    final targets = selectFullProbeTargets(
+      proxyNames: ['A', 'B', 'C', 'D'],
+      current: 'C',
+      delays: {'A': 100, 'B': 200, 'C': 300, 'D': 400},
+    );
+    expect(targets, ['C', 'A', 'B']);
+  });
+
+  test('full probe targets ignore outliers the mean would include', () {
+    final targets = selectFullProbeTargets(
+      proxyNames: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'],
+      current: '',
+      delays: {
+        'A': 50,
+        'B': 60,
+        'C': 70,
+        'D': 80,
+        'E': 90,
+        'F': 100,
+        'G': 200,
+        'H': 300,
+        'I': 400,
+        'J': 5000,
+      },
+    );
+    expect(targets, ['A', 'B', 'C', 'D', 'E']);
+  });
+
+  test('full probe targets use the middle value for odd counts', () {
+    final targets = selectFullProbeTargets(
+      proxyNames: ['A', 'B', 'C'],
+      current: '',
+      delays: {'A': 100, 'B': 200, 'C': 300},
+    );
+    expect(targets, ['A', 'B']);
+  });
+
+  test('full probe targets ignore unmeasured and timed out nodes', () {
+    final targets = selectFullProbeTargets(
+      proxyNames: ['A', 'B', 'C'],
+      current: '',
+      delays: {'A': 100, 'B': -1},
+    );
+    expect(targets, ['A']);
+  });
+
+  test('full probe targets are empty without measured delays', () {
+    expect(
+      selectFullProbeTargets(proxyNames: ['A'], current: 'A', delays: {}),
+      isEmpty,
+    );
+  });
+
   test('probeNode combines egress, geo and service checks', () async {
     final prober = SmartAnchorProber(
       egressLookup: (_) async => const IpInfo(ip: '1.2.3.4', countryCode: 'US'),

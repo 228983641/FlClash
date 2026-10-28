@@ -519,12 +519,18 @@ class SetupAction extends _$SetupAction {
         .read(smartAnchorProvider.notifier)
         .refreshAggregationSources();
     if (!isCustom && smartAnchorInput.hasWork) {
-      final counts = configCountsOf(rawConfig);
+      final enabledServices = smartAnchorInput.services.where(
+        (service) => service.isEnabled,
+      );
       rawConfig = await PerfTrace.time(
         'build-smart-config',
-        () async => buildSmartConfig(rawConfig, smartAnchorInput),
+        () async => buildSmartConfig(
+          rawConfig,
+          smartAnchorInput,
+          delays: flattenDelays(ref.read(delayDataSourceProvider)),
+        ),
         detail:
-            'proxies=${counts.proxies} groups=${counts.groups} rules=${counts.rules}',
+            'sources=${smartAnchorInput.aggregationSources.length} services=${enabledServices.length}',
       );
     }
     final directory = await appPath.profilesPath;

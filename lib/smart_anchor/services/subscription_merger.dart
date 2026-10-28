@@ -228,6 +228,7 @@ class SubscriptionMerger {
       });
     }
     final mergedRules = <String>[];
+    final seenRules = <String>{};
     final ruleSources = mode == AggregationGroupMode.primaryOnly
         ? (primary == null ? const <SubscriptionSourceResult>[] : [primary])
         : sources;
@@ -265,7 +266,7 @@ class SubscriptionMerger {
             }
           }
         }
-        if (!mergedRules.contains(text)) {
+        if (seenRules.add(text)) {
           mergedRules.add(text);
         }
       }

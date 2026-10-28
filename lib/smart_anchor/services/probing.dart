@@ -58,6 +58,44 @@ ServiceAccessResult accessResultFromStatus({
   );
 }
 
+List<String> selectFullProbeTargets({
+  required List<String> proxyNames,
+  required String current,
+  required Map<String, int> delays,
+}) {
+  final measured = <String, int>{};
+  for (final name in proxyNames) {
+    final delay = delays[name];
+    if (delay != null && delay > 0) {
+      measured[name] = delay;
+    }
+  }
+  if (measured.isEmpty) {
+    return [];
+  }
+  final sorted = measured.values.toList()..sort();
+  final middle = sorted.length ~/ 2;
+  final median = sorted.length.isOdd
+      ? sorted[middle].toDouble()
+      : (sorted[middle - 1] + sorted[middle]) / 2;
+  final aboveMedian =
+      measured.entries
+          .where((entry) => entry.value <= median)
+          .map((entry) => entry.key)
+          .toList()
+        ..sort((a, b) => measured[a]!.compareTo(measured[b]!));
+  final targets = <String>[];
+  if (current.isNotEmpty && !targets.contains(current)) {
+    targets.add(current);
+  }
+  for (final name in aboveMedian) {
+    if (!targets.contains(name)) {
+      targets.add(name);
+    }
+  }
+  return targets;
+}
+
 List<String> selectProbeTargets({
   required List<String> ranked,
   required String current,

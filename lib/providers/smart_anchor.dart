@@ -332,6 +332,7 @@ class SmartAnchor extends _$SmartAnchor {
     required List<String> proxyNames,
     required String currentProxyName,
     Map<String, String> entryServers = const {},
+    Map<String, int> delays = const {},
     bool force = false,
     bool updateThrottle = true,
   }) async {
@@ -366,10 +367,21 @@ class SmartAnchor extends _$SmartAnchor {
           checkServices(core, proxyName: name, targets: targets),
       geoLookup: geoLookupFromService(geoService, true),
     );
-    final targets = selectProbeTargets(
+    final baseTargets = selectProbeTargets(
       ranked: proxyNames,
       current: currentProxyName,
     );
+    final fullTargets = selectFullProbeTargets(
+      proxyNames: proxyNames,
+      current: currentProxyName,
+      delays: delays,
+    );
+    final targets = <String>[];
+    for (final name in [...fullTargets, ...baseTargets]) {
+      if (!targets.contains(name)) {
+        targets.add(name);
+      }
+    }
     final serviceIds = [for (final service in enabled) service.serviceId];
     final metadata = Map.of(state.metadataByProxy);
     final access = <String, Map<String, ServiceAccessResult>>{
@@ -434,6 +446,10 @@ Future<Map<String, dynamic>?> _dioGeoFetcher(
     'ip-api' => 'http://ip-api.com/json/$ip',
     'ipinfo' => 'https://ipinfo.io/$ip/json',
     'ip.sb' => 'https://api.ip.sb/geoip/$ip',
+    'ipwho.is' => 'https://ipwho.is/$ip',
+    'freeipapi' => 'https://freeipapi.com/api/json/$ip',
+    'geojs' => 'https://get.geojs.io/v1/ip/geo/$ip.json',
+    'ipapi.co' => 'https://ipapi.co/$ip/json/',
     _ => null,
   };
   if (url == null) {
