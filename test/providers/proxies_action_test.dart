@@ -171,6 +171,7 @@ void main() {
         );
 
         await actionOf(container).updateGroups();
+        await actionOf(container).smartAnchorAutoDelayTestForTesting;
         final delays = container
             .read(delayDataSourceProvider)
             .values
@@ -228,6 +229,7 @@ void main() {
             .setDelay(const Delay(name: 'HK-01', url: _testUrl, value: 42));
 
         await actionOf(container).updateGroups();
+        await actionOf(container).smartAnchorAutoDelayTestForTesting;
 
         verify(() => core.asyncTestDelay(any(), 'HK-02', any())).called(1);
         verifyNever(() => core.asyncTestDelay(any(), 'HK-01', any()));

@@ -208,16 +208,27 @@ class ProxiesAction extends _$ProxiesAction {
           }
         }
       }
-      await _smartAnchorProbeAfterDelayTest(
-        groups: groups,
-        names: names.toList(),
-        current: current,
-      );
+      // Must not be awaited: updateGroups runs inside the setup/start path
+      // (applyProfile onUpdated, initCore), and a full auto delay test here
+      // blocks the VPN start until every node has been tested.
+      final pending =
+          _smartAnchorProbeAfterDelayTest(
+            groups: groups,
+            names: names.toList(),
+            current: current,
+          ).catchError((Object e) {
+            commonPrint.log('smart anchor auto delay test failed: $e');
+          });
+      smartAnchorAutoDelayTestForTesting = pending;
+      unawaited(pending);
     }
   }
 
   final FailoverGuard _failoverGuard = FailoverGuard();
   bool _smartAnchorAutoDelayTesting = false;
+
+  @visibleForTesting
+  Future<void>? smartAnchorAutoDelayTestForTesting;
 
   Future<void> _smartAnchorProbeAfterDelayTest({
     required List<Group> groups,
