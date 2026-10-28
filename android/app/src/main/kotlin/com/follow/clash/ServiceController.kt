@@ -36,6 +36,10 @@ object ServiceController {
     internal var runtime: ServiceRuntime? = null
         private set
 
+    @Volatile
+    internal var lastStartError: String? = null
+        private set
+
     private fun clearBinding() {
         binding?.unbind()
         binding = null
@@ -71,6 +75,7 @@ object ServiceController {
     }
 
     suspend fun start(options: VpnOptions): Boolean = lock.withLock {
+        lastStartError = null
         ServiceConfig.updateVpnOptions(options)
         val nextIntent = if (options.enable) {
             VpnService::class.intent
@@ -89,15 +94,20 @@ object ServiceController {
             binding = nextBinding
             nextBinding.bind().onFailure { error ->
                 GlobalState.log("Unable to bind background service: $error")
+                lastStartError = "绑定后台服务失败：$error"
                 release()
                 return@withLock false
             }
         }
 
-        val currentBinding = binding ?: return@withLock false
+        val currentBinding = binding ?: run {
+            lastStartError = "无服务绑定"
+            return@withLock false
+        }
         val result = currentBinding.useService { service -> service.start() }
         if (result.isFailure) {
             GlobalState.log("Unable to start background service: ${result.exceptionOrNull()}")
+            lastStartError = "服务 start 失败：${result.exceptionOrNull()}"
             currentBinding.stopIfConnected()
                 .onFailure { error ->
                     GlobalState.log("Unable to clean up failed background service start: $error")

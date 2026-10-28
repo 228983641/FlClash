@@ -122,6 +122,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
 
     fun requestStart(): Deferred<Boolean> {
         if (isStartedAs(sharedState.vpnOptions)) {
+            host.showToast("诊断：启动请求被判定为已运行，直接返回（vpn=${sharedState.vpnOptions?.enable}）")
             return CompletableDeferred(true)
         }
         val outcome = launchStart(createRequest(running = true))
@@ -220,6 +221,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
             throw error
         } catch (error: Exception) {
             host.log("Unable to process service start request: $error")
+            host.showToast("诊断：启动请求异常：$error")
             false
         }
         return if (started) StartOutcome.STARTED else abandon(request)
@@ -239,19 +241,32 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         if (!isCurrent(request)) {
             return false
         }
-        val options = sharedState.vpnOptions ?: return false
+        val options = sharedState.vpnOptions ?: run {
+            host.showToast("诊断：启动失败，VPN 配置为空")
+            return false
+        }
         if (!prepareVpn(options)) {
             if (host.app() == null && isCurrent(request)) {
                 host.showToast(VPN_PERMISSION_MESSAGE)
             }
+            host.showToast("诊断：VPN 授权未通过")
             return false
         }
         return transitionLock.withLock {
             when {
                 !isCurrent(request) -> false
-                host.runtime?.vpn == options.enable -> true
+                host.runtime?.vpn == options.enable -> {
+                    host.showToast("诊断：已按运行中跳过（服务 vpn=${host.runtime?.vpn}，目标=${options.enable}）")
+                    true
+                }
                 else -> transitioning(RunState.STARTING) {
-                    host.startService(withLocalNetworkFallback(options)) && isCurrent(request)
+                    val ok = host.startService(withLocalNetworkFallback(options)) && isCurrent(request)
+                    if (!ok) {
+                        host.showToast("诊断：后台服务启动失败（${ServiceController.lastStartError ?: "未知"}）")
+                    } else {
+                        host.showToast("诊断：服务启动成功（vpn=${options.enable}）")
+                    }
+                    ok
                 }
             }
         }
