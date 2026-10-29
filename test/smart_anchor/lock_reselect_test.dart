@@ -68,13 +68,42 @@ void main() {
     expect(target, isNull);
   });
 
-  test('selection without metadata stays because its country is unknown', () {
+  test('selection without metadata yields to a known compliant node', () {
     final input = inputWith({'US-1': meta('US-1', 'US', 90)});
     final target = lockReselectTarget(input, usLocked, [
       'US-1',
       'unprobed',
     ], 'unprobed');
+    expect(target, 'US-1');
+  });
+
+  test('selection without metadata stays while no node is known compliant', () {
+    final input = inputWith({'TW-1': meta('TW-1', 'TW', 100)});
+    final target = lockReselectTarget(input, usLocked, [
+      'TW-1',
+      'unprobed',
+      'also-unprobed',
+    ], 'unprobed');
     expect(target, isNull);
+  });
+
+  test('decision reports whether the current selection is untested', () {
+    final input = inputWith({
+      'US-1': meta('US-1', 'US', 90),
+      'TW-1': meta('TW-1', 'TW', 100),
+    });
+    final unknown = lockReselectDecision(input, usLocked, [
+      'US-1',
+      'unprobed',
+    ], 'unprobed');
+    expect(unknown.currentUnknown, isTrue);
+    expect(unknown.target, 'US-1');
+    final known = lockReselectDecision(input, usLocked, [
+      'US-1',
+      'TW-1',
+    ], 'TW-1');
+    expect(known.currentUnknown, isFalse);
+    expect(known.target, 'US-1');
   });
 
   test('known violator falls back to an unprobed node', () {

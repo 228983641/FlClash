@@ -640,6 +640,25 @@ List<String> rankedProxiesForService(
   List<String> proxyNames, {
   Map<String, int> delays = const {},
 }) {
+  return _rankedPartsForService(
+    input,
+    service,
+    proxyNames,
+    delays: delays,
+  ).ranked;
+}
+
+/// The merged ranking plus its qualified segment: the tested nodes that
+/// passed [ScoringEngine.filterForService], in ranked order, ahead of the
+/// untested tail. Compliance decisions need the segment on its own — an
+/// untested name appearing in the merged list is a fallback pool member,
+/// not a node known to comply.
+({List<String> ranked, List<String> qualified}) _rankedPartsForService(
+  SmartAnchorInput input,
+  ServiceToggleConfig service,
+  List<String> proxyNames, {
+  Map<String, int> delays = const {},
+}) {
   input = _remapInputForMergedConfig(input, proxyNames);
   proxyNames = applyRegionFilter(input, service, proxyNames);
   final tested = <NodeMetadataCache>[];
@@ -672,7 +691,7 @@ List<String> rankedProxiesForService(
       );
     }();
   }
-  return _rankForService(
+  return _rankPartsForService(
     service,
     proxyNames,
     input,
@@ -706,29 +725,36 @@ String? lockReselectTarget(
 /// [lockReselectTarget] plus the ranking it decided from, so the runtime
 /// compliance check can log (and membership-check) the same decision the
 /// setup-time sanitizer makes through [lockReselectTarget].
-({String? target, List<String> ranked}) lockReselectDecision(
+///
+/// A selection complies only inside the ranking's qualified segment: an
+/// untested selection appears in the merged ranking as fallback pool,
+/// which used to count as compliance and pinned services on nodes whose
+/// country was never known. It now yields to any known qualified node
+/// and stays only while none is known.
+({String? target, List<String> ranked, bool currentUnknown})
+lockReselectDecision(
   SmartAnchorInput input,
   ServiceToggleConfig service,
   List<String> proxyNames,
   String currentName, {
   Map<String, int> delays = const {},
 }) {
-  final ranked = rankedProxiesForService(
+  final parts = _rankedPartsForService(
     input,
     service,
     proxyNames,
     delays: delays,
   );
-  if (ranked.isEmpty || ranked.contains(currentName)) {
-    return (target: null, ranked: ranked);
-  }
+  final ranked = parts.ranked;
+  final qualified = parts.qualified;
+  final effective = _remapInputForMergedConfig(input, proxyNames);
+  final currentMeta = effective.metadataByProxy[currentName];
+  final currentUnknown = currentMeta == null;
   // Purity hysteresis: a current node whose only disqualification is a
   // purity score inside the band stays — re-probe noise around the
   // threshold must not tear a working service off its node. Every other
   // disqualification (lock, WAF, region block, region filter) still
   // forces the move.
-  final effective = _remapInputForMergedConfig(input, proxyNames);
-  final currentMeta = effective.metadataByProxy[currentName];
   if (currentMeta != null &&
       applyRegionFilter(effective, service, [currentName]).isNotEmpty &&
       ScoringEngine.failsOnlyPurityWithinBand(
@@ -736,12 +762,33 @@ String? lockReselectTarget(
         service.lockedCountries,
         effective.accessByService[service.serviceId]?[currentName],
       )) {
-    return (target: null, ranked: ranked);
+    return (target: null, ranked: ranked, currentUnknown: currentUnknown);
   }
-  return (target: ranked.first, ranked: ranked);
+  if (qualified.contains(currentName)) {
+    return (target: null, ranked: ranked, currentUnknown: currentUnknown);
+  }
+  if (currentUnknown) {
+    return (
+      target: qualified.isEmpty ? null : qualified.first,
+      ranked: ranked,
+      currentUnknown: currentUnknown,
+    );
+  }
+  if (qualified.isNotEmpty) {
+    return (
+      target: qualified.first,
+      ranked: ranked,
+      currentUnknown: currentUnknown,
+    );
+  }
+  return (
+    target: ranked.isEmpty ? null : ranked.first,
+    ranked: ranked,
+    currentUnknown: currentUnknown,
+  );
 }
 
-List<String> _rankForService(
+({List<String> ranked, List<String> qualified}) _rankPartsForService(
   ServiceToggleConfig service,
   List<String> proxyNames,
   SmartAnchorInput input, {
@@ -765,16 +812,19 @@ List<String> _rankForService(
   if (anchor == null) {
     // No node passes the lock, so no known node may serve this service.
     // Only nodes without metadata stay as the emergency pool.
-    return untested;
+    return (ranked: untested, qualified: const <String>[]);
   }
-  final ranked = ScoringEngine.rankForService(
-    tested,
-    anchor,
-    lock,
-    access,
-    delays: delays,
-  );
-  return [...ranked.map((node) => node.proxyName), ...untested];
+  final qualified = [
+    for (final node in ScoringEngine.rankForService(
+      tested,
+      anchor,
+      lock,
+      access,
+      delays: delays,
+    ))
+      node.proxyName,
+  ];
+  return (ranked: [...qualified, ...untested], qualified: qualified);
 }
 
 ServiceAnchor? _electAnchor(

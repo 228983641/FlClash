@@ -11,11 +11,12 @@ String saComplianceDecisionLine({
   required String groupName,
   required String currentName,
   required String target,
+  required bool currentUnknown,
   required List<String> rankedTop,
 }) {
   return '[SA] compliance service=$serviceId group=$groupName '
       'current=$currentName -> $target reason=lock-change '
-      'rankedTop=${rankedTop.join(',')}';
+      'currentUnknown=$currentUnknown rankedTop=${rankedTop.join(',')}';
 }
 
 String saComplianceSummaryLine({

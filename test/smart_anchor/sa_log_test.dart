@@ -10,10 +10,28 @@ void main() {
         groupName: '🎯 Smart-Claude',
         currentName: 'TW-1',
         target: 'US-1',
+        currentUnknown: false,
         rankedTop: const ['US-1', 'US-2', 'JP-1'],
       ),
       '[SA] compliance service=claude group=🎯 Smart-Claude '
-      'current=TW-1 -> US-1 reason=lock-change rankedTop=US-1,US-2,JP-1',
+      'current=TW-1 -> US-1 reason=lock-change '
+      'currentUnknown=false rankedTop=US-1,US-2,JP-1',
+    );
+  });
+
+  test('compliance decision line marks an untested current node', () {
+    expect(
+      saComplianceDecisionLine(
+        serviceId: 'claude',
+        groupName: '🎯 Smart-Claude',
+        currentName: 'bestcf',
+        target: 'TW-1',
+        currentUnknown: true,
+        rankedTop: const ['TW-1'],
+      ),
+      '[SA] compliance service=claude group=🎯 Smart-Claude '
+      'current=bestcf -> TW-1 reason=lock-change '
+      'currentUnknown=true rankedTop=TW-1',
     );
   });
 

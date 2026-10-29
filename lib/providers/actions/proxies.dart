@@ -642,6 +642,7 @@ class ProxiesAction extends _$ProxiesAction {
           groupName: groupName,
           currentName: currentName,
           target: target,
+          currentUnknown: decision.currentUnknown,
           rankedTop: decision.ranked.take(3).toList(),
         ),
       );
