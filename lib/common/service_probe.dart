@@ -171,8 +171,10 @@ IpInfo Function(String) _json(IpInfo Function(Map<String, dynamic>) parse) {
   return (body) => parse(jsonDecode(body) as Map<String, dynamic>);
 }
 
+const cloudflareTraceUrl = 'https://www.cloudflare.com/cdn-cgi/trace';
+
 final Map<String, IpInfo Function(String)> ipInfoSources = {
-  'https://www.cloudflare.com/cdn-cgi/trace': IpInfo.fromCloudflareTrace,
+  cloudflareTraceUrl: IpInfo.fromCloudflareTrace,
   'https://api.ip.sb/geoip': _json(IpInfo.fromIpSbJson),
   'https://ipinfo.io/json': _json(IpInfo.fromIpInfoIoJson),
   'https://ipwho.is': _json(IpInfo.fromIpWhoIsJson),

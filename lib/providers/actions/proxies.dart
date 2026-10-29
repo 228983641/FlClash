@@ -14,6 +14,28 @@ class _DelayTestTarget {
 
 typedef _DelayTestBatch = ({List<Proxy> proxies, String? testUrl});
 
+/// Whether switching [groupName] must close live connections even when
+/// the global setting is off. A smart-group switch changes the egress a
+/// service's long-lived connections were opened through; leaving them
+/// alive would keep the account on the old exit after a lock change or a
+/// failover moved the group, so smart groups and machine-driven switches
+/// always close.
+bool smartSwitchForcesClose({
+  required String groupName,
+  required String trigger,
+  required SmartAnchorInput smart,
+}) {
+  if (trigger == 'lock-change' || trigger.startsWith('auto-failover')) {
+    return true;
+  }
+  for (final service in smart.services) {
+    if (service.isEnabled && smartGroupName(service) == groupName) {
+      return true;
+    }
+  }
+  return false;
+}
+
 Map<String, int> flattenDelays(DelayMap delayMap) {
   final delays = <String, int>{};
   for (final byProxy in delayMap.values) {
@@ -378,8 +400,14 @@ class ProxiesAction extends _$ProxiesAction {
           fallback.add(name);
         }
       }
+      // A borrowed verdict is another service's measurement; it must
+      // never count as this service's node failing.
+      final currentAccess =
+          smart.accessByService[service.serviceId]?[currentName];
       final currentReason =
-          smart.accessByService[service.serviceId]?[currentName]?.reason;
+          currentAccess != null && currentAccess.borrowedFrom == null
+          ? currentAccess.reason
+          : null;
       final target = _failoverGuard.noteResult(
         serviceId: service.serviceId,
         currentName: currentName,
@@ -644,7 +672,14 @@ class ProxiesAction extends _$ProxiesAction {
       return;
     }
     try {
-      if (ref.read(appSettingProvider).closeConnections) {
+      final closeAll =
+          ref.read(appSettingProvider).closeConnections ||
+          smartSwitchForcesClose(
+            groupName: groupName,
+            trigger: trigger,
+            smart: ref.read(smartAnchorProvider),
+          );
+      if (closeAll) {
         await PerfTrace.time(
           'switch-proxy-reset',
           () => _core.closeConnections(),

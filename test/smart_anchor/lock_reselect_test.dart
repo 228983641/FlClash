@@ -1,6 +1,7 @@
 import 'package:fl_clash/smart_anchor/models/node_metadata.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
+import 'package:fl_clash/smart_anchor/services/service_access.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 NodeMetadataCache meta(String name, String country, double purity) {
@@ -95,6 +96,73 @@ void main() {
       'HK-1',
     ], 'TW-1');
     expect(target, isNull);
+  });
+
+  group('purity hysteresis', () {
+    SmartAnchorInput bandInput(
+      double currentPurity, {
+      String currentCountry = 'US',
+      bool currentBlocked = false,
+    }) {
+      return SmartAnchorInput(
+        services: [usLocked],
+        metadataByProxy: {
+          'US-cur': meta('US-cur', currentCountry, currentPurity),
+          'US-1': meta('US-1', 'US', 90),
+        },
+        accessByService: {
+          if (currentBlocked)
+            'gemini': {
+              'US-cur': ServiceAccessResult(
+                serviceId: 'gemini',
+                proxyName: 'US-cur',
+                egressIp: '1.2.3.4',
+                reason: ServiceAccessReason.regionBlocked,
+                checkedAt: DateTime.now().millisecondsSinceEpoch,
+              ),
+            },
+        },
+      );
+    }
+
+    test('a current node at purity 40 stays', () {
+      final target = lockReselectTarget(bandInput(40), usLocked, [
+        'US-cur',
+        'US-1',
+      ], 'US-cur');
+      expect(target, isNull);
+    });
+
+    test('a current node at purity 30 is reselected', () {
+      final target = lockReselectTarget(bandInput(30), usLocked, [
+        'US-cur',
+        'US-1',
+      ], 'US-cur');
+      expect(target, 'US-1');
+    });
+
+    test('purity 40 with a fresh region block is reselected', () {
+      // The block verdict also derives a US-wide region ban, so the other
+      // US node leaves the ranking too and only the unprobed pool remains;
+      // the point is the band does not keep the blocked node.
+      final target = lockReselectTarget(
+        bandInput(40, currentBlocked: true),
+        usLocked,
+        ['US-cur', 'US-1', 'mystery'],
+        'US-cur',
+      );
+      expect(target, 'mystery');
+    });
+
+    test('purity 40 outside the lock is reselected', () {
+      final target = lockReselectTarget(
+        bandInput(40, currentCountry: 'TW'),
+        usLocked,
+        ['US-cur', 'US-1'],
+        'US-cur',
+      );
+      expect(target, 'US-1');
+    });
   });
 
   test('without a lock every known selection complies', () {

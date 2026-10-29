@@ -14,6 +14,7 @@ class ServiceAccessResult {
     required this.reason,
     required this.checkedAt,
     this.ttlHours = 24,
+    this.borrowedFrom,
   });
 
   final String serviceId;
@@ -22,6 +23,14 @@ class ServiceAccessResult {
   final ServiceAccessReason reason;
   final int checkedAt;
   final int ttlHours;
+
+  /// The service whose own probe produced this result, when the service
+  /// itself has no core checker and borrowed a donor's verdict. Null means
+  /// the result is the service's own measurement. Borrowed verdicts may
+  /// exclude a node or a region, but they are not evidence about this
+  /// service: the failover guard ignores them and they never count as a
+  /// confirmed reachability.
+  final String? borrowedFrom;
 
   bool get isAccessible => reason == ServiceAccessReason.accessible;
 
@@ -39,6 +48,7 @@ class ServiceAccessResult {
     'reason': reason.name,
     'checkedAt': checkedAt,
     'ttlHours': ttlHours,
+    'borrowedFrom': borrowedFrom,
   };
 
   factory ServiceAccessResult.fromJson(Map<String, dynamic> json) {
@@ -49,6 +59,7 @@ class ServiceAccessResult {
       reason: ServiceAccessReason.values.byName(json['reason'] as String),
       checkedAt: json['checkedAt'] as int,
       ttlHours: (json['ttlHours'] as num?)?.toInt() ?? 24,
+      borrowedFrom: json['borrowedFrom'] as String?,
     );
   }
 }

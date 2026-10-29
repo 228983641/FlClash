@@ -56,7 +56,10 @@ class FailoverGuard {
         if (name == 'DIRECT' || name == 'REJECT' || name == 'REJECT-DROP') {
           continue;
         }
-        if (accessByProxy[name]?.reason == ServiceAccessReason.regionBlocked) {
+        final candidateAccess = accessByProxy[name];
+        if (candidateAccess != null &&
+            candidateAccess.borrowedFrom == null &&
+            candidateAccess.reason == ServiceAccessReason.regionBlocked) {
           continue;
         }
         _switchTimes[serviceId] = [...recent, nowMs];

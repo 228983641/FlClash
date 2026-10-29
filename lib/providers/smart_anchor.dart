@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/common/function.dart';
 import 'package:fl_clash/common/request.dart';
 import 'package:fl_clash/common/service_probe.dart';
+import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/smart_anchor/models/anchor_path.dart';
 import 'package:fl_clash/smart_anchor/models/service_anchor.dart';
@@ -385,7 +387,18 @@ class SmartAnchor extends _$SmartAnchor {
         targets: targets,
         scope: serviceCheckScopeProbe,
       ),
-      geoLookup: geoLookupFromService(geoService, true),
+      geoLookup: geoLookupFromService(geoService),
+      wafLookup: (name) async => wafPassFromTraceProbe(
+        await core.probe(
+          ProbeParams(
+            url: cloudflareTraceUrl,
+            proxyName: name,
+            headers: const {'User-Agent': browserUa},
+            timeout: outboundIpTimeoutDuration.inMilliseconds,
+            maxBody: 4096,
+          ),
+        ),
+      ),
     );
     final rankByProxy = <String, int>{};
     for (final service in enabled) {

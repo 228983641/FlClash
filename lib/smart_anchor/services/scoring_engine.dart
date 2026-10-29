@@ -23,6 +23,38 @@ class ScoringEngine {
         node.purityScore >= 50;
   }
 
+  /// A re-probe can push a working node's purity under the candidate
+  /// threshold on measurement noise alone. Inside this band the node is
+  /// not a candidate for anyone, but a service already using it is not
+  /// torn off it either; below the band the cliff applies as usual.
+  static const double purityHysteresisFloor = 35;
+
+  /// Whether [node]'s only hard-filter failure is a purity score inside
+  /// the hysteresis band: country lock, WAF and a fresh region-block
+  /// verdict must all pass, so the band never excuses a real violation.
+  static bool failsOnlyPurityWithinBand(
+    NodeMetadataCache node,
+    List<String> lockedCountries,
+    ServiceAccessResult? access,
+  ) {
+    if (node.purityScore < purityHysteresisFloor || node.purityScore >= 50) {
+      return false;
+    }
+    final lock = lockedCountries
+        .map((country) => country.toUpperCase())
+        .toList();
+    if (lock.isNotEmpty && !lock.contains(node.countryCode.toUpperCase())) {
+      return false;
+    }
+    if (!node.wafPass) {
+      return false;
+    }
+    if (access != null && !access.isExpired && access.blocksRanking) {
+      return false;
+    }
+    return true;
+  }
+
   static List<NodeMetadataCache> filterForTarget(
     List<NodeMetadataCache> nodes,
     List<String> lockedCountries,
@@ -82,7 +114,12 @@ class ScoringEngine {
     final untested = <NodeMetadataCache>[];
     for (final node in filtered) {
       final access = accessByProxy[node.proxyName];
-      if (access != null && !access.isExpired && access.isAccessible) {
+      // Only the service's own probe confirms reachability; a borrowed
+      // verdict says the donor answered, not that this service did.
+      if (access != null &&
+          !access.isExpired &&
+          access.isAccessible &&
+          access.borrowedFrom == null) {
         accessible.add(node);
       } else {
         untested.add(node);

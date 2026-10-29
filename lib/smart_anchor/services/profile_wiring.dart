@@ -424,6 +424,7 @@ SmartAnchorInput _remapInputForMergedConfig(
         reason: access.reason,
         checkedAt: access.checkedAt,
         ttlHours: access.ttlHours,
+        borrowedFrom: access.borrowedFrom,
       );
     }
     if (remapped.isNotEmpty) {
@@ -619,6 +620,22 @@ String? lockReselectTarget(
     delays: delays,
   );
   if (ranked.isEmpty || ranked.contains(currentName)) {
+    return null;
+  }
+  // Purity hysteresis: a current node whose only disqualification is a
+  // purity score inside the band stays — re-probe noise around the
+  // threshold must not tear a working service off its node. Every other
+  // disqualification (lock, WAF, region block, region filter) still
+  // forces the move.
+  final effective = _remapInputForMergedConfig(input, proxyNames);
+  final currentMeta = effective.metadataByProxy[currentName];
+  if (currentMeta != null &&
+      applyRegionFilter(effective, service, [currentName]).isNotEmpty &&
+      ScoringEngine.failsOnlyPurityWithinBand(
+        currentMeta,
+        service.lockedCountries,
+        effective.accessByService[service.serviceId]?[currentName],
+      )) {
     return null;
   }
   return ranked.first;

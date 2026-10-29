@@ -18,6 +18,7 @@ import 'package:fl_clash/providers/state.dart';
 import 'package:fl_clash/smart_anchor/models/node_metadata.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
 import 'package:fl_clash/smart_anchor/services/persistence.dart';
+import 'package:fl_clash/smart_anchor/services/service_access.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:flutter/widgets.dart';
@@ -38,6 +39,49 @@ class _EnabledSmartAnchor extends SmartAnchor {
   @override
   SmartAnchorInput build() =>
       SmartAnchorInput(services: [defaultServiceToggles.first]);
+}
+
+class _FailoverSmartAnchor extends SmartAnchor {
+  _FailoverSmartAnchor({required this.borrowed});
+
+  final bool borrowed;
+
+  @override
+  SmartAnchorInput build() {
+    NodeMetadataCache node(String name) {
+      return NodeMetadataCache(
+        proxyName: name,
+        entryServer: 'entry.example',
+        egressIp: '1.2.3.4',
+        countryCode: 'US',
+        latitude: 34.0522,
+        longitude: -118.2437,
+        asn: 'AS20057',
+        ipType: 'residential',
+        fraudScore: 0,
+        purityScore: 90,
+        wafPass: true,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+    }
+
+    return SmartAnchorInput(
+      services: [defaultServiceToggles.first],
+      metadataByProxy: {'US-1': node('US-1'), 'US-2': node('US-2')},
+      accessByService: {
+        'claude': {
+          'US-1': ServiceAccessResult(
+            serviceId: 'claude',
+            proxyName: 'US-1',
+            egressIp: '1.2.3.4',
+            reason: ServiceAccessReason.networkFailed,
+            checkedAt: DateTime.now().millisecondsSinceEpoch,
+            borrowedFrom: borrowed ? 'openai' : null,
+          ),
+        },
+      },
+    );
+  }
 }
 
 class _ComplianceSmartAnchor extends SmartAnchor {
@@ -424,6 +468,72 @@ void main() {
 
       verify(core.resetConnections).called(1);
       verifyNever(core.closeConnections);
+    });
+
+    test(
+      'smart group switch closes connections when the setting is off',
+      () async {
+        final container = buildContainer(smartAnchor: _EnabledSmartAnchor.new);
+        container.read(appSettingProvider.notifier).value =
+            const AppSettingProps(closeConnections: false);
+
+        await actionOf(
+          container,
+        ).changeProxy(groupName: '🎯 Smart-Claude', proxyName: 'HK-01');
+
+        verify(core.closeConnections).called(1);
+        verifyNever(core.resetConnections);
+      },
+    );
+
+    test(
+      'lock-change switch closes connections when the setting is off',
+      () async {
+        final container = buildContainer();
+        container.read(appSettingProvider.notifier).value =
+            const AppSettingProps(closeConnections: false);
+
+        await actionOf(container).changeProxy(
+          groupName: 'Proxy',
+          proxyName: 'HK-01',
+          trigger: 'lock-change',
+        );
+
+        verify(core.closeConnections).called(1);
+        verifyNever(core.resetConnections);
+      },
+    );
+
+    test(
+      'auto-failover switch closes connections when the setting is off',
+      () async {
+        final container = buildContainer();
+        container.read(appSettingProvider.notifier).value =
+            const AppSettingProps(closeConnections: false);
+
+        await actionOf(container).changeProxy(
+          groupName: 'Proxy',
+          proxyName: 'HK-01',
+          trigger: 'auto-failover',
+        );
+
+        verify(core.closeConnections).called(1);
+        verifyNever(core.resetConnections);
+      },
+    );
+
+    test('smart group with the setting on still closes exactly once', () async {
+      final container = buildContainer(smartAnchor: _EnabledSmartAnchor.new);
+      container.read(appSettingProvider.notifier).value = const AppSettingProps(
+        closeConnections: true,
+      );
+
+      await actionOf(
+        container,
+      ).changeProxy(groupName: '🎯 Smart-Claude', proxyName: 'HK-01');
+
+      verify(core.closeConnections).called(1);
+      verifyNever(core.resetConnections);
     });
 
     test('a failing connection reset does not fail the switch', () async {
@@ -1325,6 +1435,146 @@ void main() {
         'Proxy',
         'Auto',
       });
+    });
+  });
+
+  group('smartSwitchForcesClose', () {
+    final enabled = SmartAnchorInput(services: [defaultServiceToggles.first]);
+    final disabled = SmartAnchorInput(
+      services: [defaultServiceToggles.first.copyWith(isEnabled: false)],
+    );
+
+    test('smart groups and machine triggers force a close, taps do not', () {
+      expect(
+        smartSwitchForcesClose(
+          groupName: '🎯 Smart-Claude',
+          trigger: 'tap',
+          smart: enabled,
+        ),
+        isTrue,
+      );
+      expect(
+        smartSwitchForcesClose(
+          groupName: 'Proxy',
+          trigger: 'tap',
+          smart: enabled,
+        ),
+        isFalse,
+      );
+      expect(
+        smartSwitchForcesClose(
+          groupName: 'Proxy',
+          trigger: 'lock-change',
+          smart: enabled,
+        ),
+        isTrue,
+      );
+      expect(
+        smartSwitchForcesClose(
+          groupName: 'Proxy',
+          trigger: 'auto-failover-unprobed',
+          smart: enabled,
+        ),
+        isTrue,
+      );
+      expect(
+        smartSwitchForcesClose(
+          groupName: '🎯 Smart-Claude',
+          trigger: 'tap',
+          smart: disabled,
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  group('smartAnchorFailoverCheck', () {
+    late db.Database testDatabase;
+
+    setUp(() {
+      testDatabase = db.Database(NativeDatabase.memory());
+      db.database = testDatabase;
+    });
+
+    tearDown(() => testDatabase.close());
+
+    ProviderContainer failoverContainer({required bool borrowed}) {
+      const groupName = '🎯 Smart-Claude';
+      const profile = Profile(
+        id: 7,
+        autoUpdateDuration: Duration.zero,
+        selectedMap: {groupName: 'US-1'},
+      );
+      final container = buildContainer(
+        profile: profile,
+        smartAnchor: () => _FailoverSmartAnchor(borrowed: borrowed),
+      );
+      const members = [
+        Proxy(name: 'US-1', type: 'ss'),
+        Proxy(name: 'US-2', type: 'ss'),
+      ];
+      container.read(groupsProvider.notifier).value = const [
+        Group(
+          type: GroupType.Selector,
+          name: groupName,
+          all: members,
+          now: 'US-1',
+        ),
+        Group(
+          type: GroupType.Selector,
+          name: 'Proxy',
+          all: members,
+          now: 'US-1',
+        ),
+      ];
+      return container;
+    }
+
+    // Saves from the checks land asynchronously; drain them before the
+    // tearDown closes the database, as the monitor-tick group does.
+    Future<void> drainSaves(bool Function(SmartAnchorSnapshot?) done) async {
+      final store = SmartAnchorStore.drift();
+      for (var attempt = 0; attempt < 100; attempt++) {
+        if (done(await store.load())) {
+          return;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+    }
+
+    test('a borrowed failure never counts toward a switch', () async {
+      final container = failoverContainer(borrowed: true);
+
+      actionOf(container).smartAnchorFailoverCheck();
+      actionOf(container).smartAnchorFailoverCheck();
+
+      expect(
+        container.read(smartAnchorProvider).switchEvents['claude'],
+        isNull,
+      );
+      expect(
+        container.read(currentProfileProvider)?.selectedMap['🎯 Smart-Claude'],
+        'US-1',
+      );
+      await drainSaves(
+        (snapshot) => snapshot?.paths['claude']?.isNotEmpty == true,
+      );
+    });
+
+    test('the same failure measured by the service itself switches', () async {
+      final container = failoverContainer(borrowed: false);
+
+      actionOf(container).smartAnchorFailoverCheck();
+      actionOf(container).smartAnchorFailoverCheck();
+
+      final events = container.read(smartAnchorProvider).switchEvents['claude'];
+      expect(events, hasLength(1));
+      expect(events!.single.reason, 'networkFailed');
+      expect(events.single.toProxy, 'US-2');
+      debouncer.cancel((FunctionTag.changeProxy, '🎯 Smart-Claude'));
+      await drainSaves(
+        (snapshot) => snapshot?.switchEvents['claude']?.isNotEmpty == true,
+      );
     });
   });
 

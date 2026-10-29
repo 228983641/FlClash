@@ -82,6 +82,29 @@ void main() {
     );
   });
 
+  test('a borrowed region block does not bar a candidate', () {
+    final guard = FailoverGuard();
+    const preferred = ['A', 'B'];
+    final access = {
+      'B': ServiceAccessResult(
+        serviceId: 'youtube',
+        proxyName: 'B',
+        egressIp: '1.2.3.4',
+        reason: ServiceAccessReason.regionBlocked,
+        checkedAt: DateTime.now().millisecondsSinceEpoch,
+        borrowedFrom: 'google',
+      ),
+    };
+    note(guard, preferred: preferred, accessByProxy: access);
+    final target = note(
+      guard,
+      preferred: preferred,
+      accessByProxy: access,
+      nowMs: 2000,
+    );
+    expect(target?.name, 'B');
+  });
+
   test('never switches to a built-in target', () {
     final guard = FailoverGuard();
     const preferred = ['A', 'REJECT', 'DIRECT', 'REJECT-DROP', 'B'];

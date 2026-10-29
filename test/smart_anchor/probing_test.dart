@@ -181,8 +181,12 @@ void main() {
         };
       },
       geoLookup:
-          ({required ip, required proxyName, required entryServer}) async =>
-              fakeNode(),
+          ({
+            required ip,
+            required proxyName,
+            required entryServer,
+            required wafPass,
+          }) async => fakeNode(),
     );
     final outcome = await prober.probeNode(
       proxyName: 'US-01',
@@ -195,7 +199,12 @@ void main() {
       outcome.accessByService['claude']?.reason,
       ServiceAccessReason.accessible,
     );
-    expect(outcome.accessByService.containsKey('cloudflare'), isFalse);
+    // Cloudflare has no target of its own; it borrows Google's verdict.
+    expect(
+      outcome.accessByService['cloudflare']?.reason,
+      ServiceAccessReason.accessible,
+    );
+    expect(outcome.accessByService['cloudflare']?.borrowedFrom, 'google');
   });
 
   test('probeNode without egress still reports service checks', () async {
@@ -207,8 +216,12 @@ void main() {
         };
       },
       geoLookup:
-          ({required ip, required proxyName, required entryServer}) async =>
-              null,
+          ({
+            required ip,
+            required proxyName,
+            required entryServer,
+            required wafPass,
+          }) async => null,
     );
     final outcome = await prober.probeNode(
       proxyName: 'US-01',
@@ -237,8 +250,12 @@ void main() {
         };
       },
       geoLookup:
-          ({required ip, required proxyName, required entryServer}) async =>
-              fakeNode(),
+          ({
+            required ip,
+            required proxyName,
+            required entryServer,
+            required wafPass,
+          }) async => fakeNode(),
     );
     final outcome = await prober.probeNode(
       proxyName: 'US-01',
@@ -251,5 +268,258 @@ void main() {
       outcome.accessByService['gemini']?.reason,
       ServiceAccessReason.accessible,
     );
+  });
+
+  group('borrowed probing', () {
+    test(
+      'every checker-less preset service has a donor, natives have none',
+      () {
+        const borrowers = {
+          'cloudflare',
+          'x',
+          'copilot',
+          'meta-ai',
+          'grok',
+          'perplexity',
+          'mistral',
+          'poe',
+          'appletv',
+          'muse',
+        };
+        for (final service in defaultServiceToggles) {
+          final id = service.serviceId;
+          if (serviceTargetForServiceId(id) != null) {
+            expect(fallbackProbeServiceId(id), isNull, reason: id);
+          } else {
+            expect(borrowers, contains(id), reason: id);
+            expect(fallbackProbeServiceId(id), isNotNull, reason: id);
+          }
+        }
+        expect(fallbackProbeServiceId('disney'), isNull);
+        expect(fallbackProbeServiceId('meta-ai'), 'claude');
+        expect(fallbackProbeServiceId('grok'), 'openai');
+        expect(fallbackProbeServiceId('x'), 'google');
+        expect(fallbackProbeServiceId('cloudflare'), 'google');
+        expect(fallbackProbeServiceId('appletv'), 'netflix');
+      },
+    );
+
+    test(
+      'one donor probe fans out to its borrowers, stamped as borrowed',
+      () async {
+        final requested = <ServiceTarget>[];
+        final prober = SmartAnchorProber(
+          egressLookup: (_) async =>
+              const IpInfo(ip: '1.2.3.4', countryCode: 'US'),
+          serviceCheckLookup: (_, targets) async {
+            requested.addAll(targets);
+            return {
+              for (final target in targets)
+                target: const ServiceCheck(ServiceProbeStatus.available),
+            };
+          },
+          geoLookup:
+              ({
+                required ip,
+                required proxyName,
+                required entryServer,
+                required wafPass,
+              }) async => fakeNode(),
+        );
+        final outcome = await prober.probeNode(
+          proxyName: 'US-01',
+          entryServer: '',
+          serviceIds: ['claude', 'grok', 'meta-ai', 'x', 'appletv'],
+          nowMs: DateTime.now().millisecondsSinceEpoch,
+        );
+        expect(requested.toSet(), {
+          ServiceTarget.claude,
+          ServiceTarget.chatgpt,
+          ServiceTarget.google,
+          ServiceTarget.netflix,
+        });
+        expect(outcome.accessByService['claude']?.borrowedFrom, isNull);
+        expect(outcome.accessByService['grok']?.borrowedFrom, 'openai');
+        expect(outcome.accessByService['meta-ai']?.borrowedFrom, 'claude');
+        expect(outcome.accessByService['x']?.borrowedFrom, 'google');
+        expect(outcome.accessByService['appletv']?.borrowedFrom, 'netflix');
+        for (final id in ['grok', 'meta-ai', 'x', 'appletv']) {
+          expect(
+            outcome.accessByService[id]?.reason,
+            ServiceAccessReason.accessible,
+            reason: id,
+          );
+        }
+      },
+    );
+
+    test(
+      'borrowing works while the donor service itself is disabled',
+      () async {
+        final prober = SmartAnchorProber(
+          egressLookup: (_) async => null,
+          serviceCheckLookup: (_, targets) async {
+            return {
+              for (final target in targets)
+                target: const ServiceCheck(ServiceProbeStatus.blocked),
+            };
+          },
+          geoLookup:
+              ({
+                required ip,
+                required proxyName,
+                required entryServer,
+                required wafPass,
+              }) async => null,
+        );
+        final outcome = await prober.probeNode(
+          proxyName: 'US-01',
+          entryServer: '',
+          serviceIds: ['grok'],
+          nowMs: DateTime.now().millisecondsSinceEpoch,
+        );
+        expect(outcome.accessByService.containsKey('openai'), isFalse);
+        expect(
+          outcome.accessByService['grok']?.reason,
+          ServiceAccessReason.regionBlocked,
+        );
+        expect(outcome.accessByService['grok']?.borrowedFrom, 'openai');
+      },
+    );
+
+    test('a cancelled donor check records nothing for its borrowers', () async {
+      final prober = SmartAnchorProber(
+        egressLookup: (_) async => null,
+        serviceCheckLookup: (_, _) async {
+          return {
+            ServiceTarget.chatgpt: const ServiceCheck(
+              ServiceProbeStatus.cancelled,
+            ),
+          };
+        },
+        geoLookup:
+            ({
+              required ip,
+              required proxyName,
+              required entryServer,
+              required wafPass,
+            }) async => null,
+      );
+      final outcome = await prober.probeNode(
+        proxyName: 'US-01',
+        entryServer: '',
+        serviceIds: ['openai', 'grok'],
+        nowMs: DateTime.now().millisecondsSinceEpoch,
+      );
+      expect(outcome.accessByService, isEmpty);
+    });
+
+    test(
+      'the borrowed stamp survives a json round trip, old data has none',
+      () {
+        const borrowed = ServiceAccessResult(
+          serviceId: 'grok',
+          proxyName: 'US-01',
+          egressIp: '1.2.3.4',
+          reason: ServiceAccessReason.regionBlocked,
+          checkedAt: 42,
+          borrowedFrom: 'openai',
+        );
+        final restored = ServiceAccessResult.fromJson(borrowed.toJson());
+        expect(restored.borrowedFrom, 'openai');
+        final legacy = ServiceAccessResult.fromJson({
+          'serviceId': 'grok',
+          'proxyName': 'US-01',
+          'egressIp': '1.2.3.4',
+          'reason': 'accessible',
+          'checkedAt': 42,
+          'ttlHours': 24,
+        });
+        expect(legacy.borrowedFrom, isNull);
+      },
+    );
+  });
+
+  group('waf probe', () {
+    test('only positive block evidence fails the node', () {
+      expect(wafPassFromTraceProbe(null), isTrue);
+      expect(
+        wafPassFromTraceProbe(const ProbeResult(error: 'timeout')),
+        isTrue,
+      );
+      expect(
+        wafPassFromTraceProbe(
+          const ProbeResult(statusCode: 200, body: 'ip=1.2.3.4\nloc=US\n'),
+        ),
+        isTrue,
+      );
+      expect(
+        wafPassFromTraceProbe(const ProbeResult(statusCode: 403)),
+        isFalse,
+      );
+      expect(
+        wafPassFromTraceProbe(
+          const ProbeResult(
+            statusCode: 503,
+            body: '<title>Just a moment...</title>',
+          ),
+        ),
+        isFalse,
+      );
+      expect(wafPassFromTraceProbe(const ProbeResult(statusCode: 500)), isTrue);
+    });
+
+    test('the prober feeds the waf verdict into the geo lookup', () async {
+      bool? seenWaf;
+      final prober = SmartAnchorProber(
+        egressLookup: (_) async =>
+            const IpInfo(ip: '1.2.3.4', countryCode: 'US'),
+        serviceCheckLookup: (_, _) async => const {},
+        geoLookup:
+            ({
+              required ip,
+              required proxyName,
+              required entryServer,
+              required wafPass,
+            }) async {
+              seenWaf = wafPass;
+              return fakeNode();
+            },
+        wafLookup: (_) async => false,
+      );
+      await prober.probeNode(
+        proxyName: 'US-01',
+        entryServer: '',
+        serviceIds: const [],
+        nowMs: 0,
+      );
+      expect(seenWaf, isFalse);
+    });
+
+    test('without a waf lookup the geo lookup defaults to pass', () async {
+      bool? seenWaf;
+      final prober = SmartAnchorProber(
+        egressLookup: (_) async =>
+            const IpInfo(ip: '1.2.3.4', countryCode: 'US'),
+        serviceCheckLookup: (_, _) async => const {},
+        geoLookup:
+            ({
+              required ip,
+              required proxyName,
+              required entryServer,
+              required wafPass,
+            }) async {
+              seenWaf = wafPass;
+              return fakeNode();
+            },
+      );
+      await prober.probeNode(
+        proxyName: 'US-01',
+        entryServer: '',
+        serviceIds: const [],
+        nowMs: 0,
+      );
+      expect(seenWaf, isTrue);
+    });
   });
 }
