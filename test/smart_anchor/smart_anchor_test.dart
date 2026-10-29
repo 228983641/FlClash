@@ -86,9 +86,11 @@ void main() {
       );
     });
 
-    test('distance penalty is log-capped at 25', () {
-      expect(ScoringEngine.distancePenalty(0), 0);
-      expect(ScoringEngine.distancePenalty(100000), 25);
+    test('distance affinity spans 5 and saturates at 3000 km', () {
+      expect(ScoringEngine.distanceAffinity(0), 5);
+      expect(ScoringEngine.distanceAffinity(1500), 2.5);
+      expect(ScoringEngine.distanceAffinity(3000), 0);
+      expect(ScoringEngine.distanceAffinity(100000), 0);
     });
 
     test('same ASN and subnet bonuses lift priority', () {
@@ -126,12 +128,20 @@ void main() {
       expect(ranked.first.proxyName, 'fast');
     });
 
-    test('delay penalty caps and ignores unknown delays', () {
+    test('delay penalty spans 30 and ignores unknown delays', () {
       expect(ScoringEngine.delayPenalty(null), 0);
       expect(ScoringEngine.delayPenalty(0), 0);
-      expect(ScoringEngine.delayPenalty(-1), 10);
-      expect(ScoringEngine.delayPenalty(100), 1);
-      expect(ScoringEngine.delayPenalty(5000), 10);
+      expect(ScoringEngine.delayPenalty(-1), 30);
+      expect(ScoringEngine.delayPenalty(100), 5);
+      expect(ScoringEngine.delayPenalty(400), 20);
+      expect(ScoringEngine.delayPenalty(5000), 30);
+    });
+
+    test('purity compresses into a 0 to 12 range', () {
+      expect(ScoringEngine.purityCompressed(50), 0);
+      expect(ScoringEngine.purityCompressed(90), 9.6);
+      expect(ScoringEngine.purityCompressed(100), 12);
+      expect(ScoringEngine.purityCompressed(30), 0);
     });
   });
 

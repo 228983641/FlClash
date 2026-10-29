@@ -1,15 +1,23 @@
 import 'service_access.dart';
 
+class FailoverTarget {
+  const FailoverTarget(this.name, {required this.isFallback});
+
+  final String name;
+  final bool isFallback;
+}
+
 class FailoverGuard {
   final Map<String, int> _failures = {};
   final Map<String, String?> _lastCurrent = {};
   final Map<String, List<int>> _switchTimes = {};
 
-  String? noteResult({
+  FailoverTarget? noteResult({
     required String serviceId,
     required String currentName,
     required ServiceAccessReason? reason,
-    required List<String> ranked,
+    required List<String> preferred,
+    required List<String> fallback,
     required Map<String, ServiceAccessResult> accessByProxy,
     required int nowMs,
   }) {
@@ -37,18 +45,23 @@ class FailoverGuard {
       _switchTimes[serviceId] = recent;
       return null;
     }
-    for (final name in ranked) {
-      if (name == currentName) {
-        continue;
+    for (final (candidates, isFallback) in [
+      (preferred, false),
+      (fallback, true),
+    ]) {
+      for (final name in candidates) {
+        if (name == currentName) {
+          continue;
+        }
+        if (name == 'DIRECT' || name == 'REJECT' || name == 'REJECT-DROP') {
+          continue;
+        }
+        if (accessByProxy[name]?.reason == ServiceAccessReason.regionBlocked) {
+          continue;
+        }
+        _switchTimes[serviceId] = [...recent, nowMs];
+        return FailoverTarget(name, isFallback: isFallback);
       }
-      if (name == 'DIRECT' || name == 'REJECT' || name == 'REJECT-DROP') {
-        continue;
-      }
-      if (accessByProxy[name]?.reason == ServiceAccessReason.regionBlocked) {
-        continue;
-      }
-      _switchTimes[serviceId] = [...recent, nowMs];
-      return name;
     }
     return null;
   }

@@ -117,18 +117,37 @@ class ScoringEngine {
 
   static double _toRad(double deg) => deg * math.pi / 180;
 
-  static double distancePenalty(double distanceKm) {
-    return math.min(25.0, 4.0 * math.log(distanceKm / 50.0 + 1));
+  static double purityCompressed(double purityScore) {
+    return ((purityScore - 50) * 0.24).clamp(0.0, 12.0);
   }
 
   static double delayPenalty(int? delayMs) {
-    if (delayMs == null || delayMs == 0) {
+    if (delayMs == null) {
       return 0.0;
     }
     if (delayMs < 0) {
-      return 10.0;
+      return 30.0;
     }
-    return math.min(10.0, delayMs / 100.0);
+    return math.min(30.0, delayMs / 20.0);
+  }
+
+  static double distanceAffinity(double distanceKm) {
+    final capped = math.min(distanceKm, 3000.0);
+    return 5.0 * (1 - capped / 3000.0);
+  }
+
+  static double proximityBonus(NodeMetadataCache node, ServiceAnchor anchor) {
+    var bonus = distanceAffinity(
+      haversineKm(
+        anchor.latitude,
+        anchor.longitude,
+        node.latitude,
+        node.longitude,
+      ),
+    );
+    if (node.asn == anchor.asn) bonus += 6;
+    if (node.sameSubnet24(anchor.subnet24)) bonus += 4;
+    return bonus;
   }
 
   static double priority(
@@ -136,16 +155,9 @@ class ScoringEngine {
     ServiceAnchor anchor, {
     int? delayMs,
   }) {
-    final distance = haversineKm(
-      anchor.latitude,
-      anchor.longitude,
-      node.latitude,
-      node.longitude,
-    );
-    var score = node.purityScore - distancePenalty(distance);
-    if (node.asn == anchor.asn) score += 15;
-    if (node.sameSubnet24(anchor.subnet24)) score += 10;
-    return score - delayPenalty(delayMs);
+    return purityCompressed(node.purityScore) +
+        proximityBonus(node, anchor) -
+        delayPenalty(delayMs);
   }
 
   static List<NodeMetadataCache> rank(
@@ -153,14 +165,36 @@ class ScoringEngine {
     ServiceAnchor anchor, {
     Map<String, int> delays = const {},
   }) {
+    double distanceOf(NodeMetadataCache node) {
+      return haversineKm(
+        anchor.latitude,
+        anchor.longitude,
+        node.latitude,
+        node.longitude,
+      );
+    }
+
     final sorted = List<NodeMetadataCache>.of(nodes);
-    sorted.sort(
-      (a, b) => priority(
+    sorted.sort((a, b) {
+      final aDelay = delays[a.proxyName];
+      final bDelay = delays[b.proxyName];
+      if ((aDelay == null) != (bDelay == null)) {
+        return aDelay == null ? 1 : -1;
+      }
+      final byScore = priority(
         b,
         anchor,
-        delayMs: delays[b.proxyName],
-      ).compareTo(priority(a, anchor, delayMs: delays[a.proxyName])),
-    );
+        delayMs: bDelay,
+      ).compareTo(priority(a, anchor, delayMs: aDelay));
+      if (byScore != 0) {
+        return byScore;
+      }
+      final byDistance = distanceOf(a).compareTo(distanceOf(b));
+      if (byDistance != 0) {
+        return byDistance;
+      }
+      return a.proxyName.compareTo(b.proxyName);
+    });
     return sorted;
   }
 }

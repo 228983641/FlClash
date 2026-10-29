@@ -12,40 +12,40 @@ ServiceAccessResult resultFor(String name, ServiceAccessReason reason) {
   );
 }
 
+FailoverTarget? note(
+  FailoverGuard guard, {
+  String currentName = 'A',
+  ServiceAccessReason? reason = ServiceAccessReason.networkFailed,
+  List<String> preferred = const [],
+  List<String> fallback = const [],
+  Map<String, ServiceAccessResult> accessByProxy = const {},
+  int nowMs = 1000,
+}) {
+  return guard.noteResult(
+    serviceId: 'youtube',
+    currentName: currentName,
+    reason: reason,
+    preferred: preferred,
+    fallback: fallback,
+    accessByProxy: accessByProxy,
+    nowMs: nowMs,
+  );
+}
+
 void main() {
   test('two failures switch once, and a recovered node never pulls back', () {
     final guard = FailoverGuard();
-    const ranked = ['A', 'B'];
-    final access = <String, ServiceAccessResult>{};
+    const preferred = ['A', 'B'];
+    expect(note(guard, preferred: preferred), isNull);
+    final target = note(guard, preferred: preferred, nowMs: 2000);
+    expect(target?.name, 'B');
+    expect(target?.isFallback, isFalse);
     expect(
-      guard.noteResult(
-        serviceId: 'youtube',
-        currentName: 'A',
-        reason: ServiceAccessReason.networkFailed,
-        ranked: ranked,
-        accessByProxy: access,
-        nowMs: 1000,
-      ),
-      isNull,
-    );
-    expect(
-      guard.noteResult(
-        serviceId: 'youtube',
-        currentName: 'A',
-        reason: ServiceAccessReason.networkFailed,
-        ranked: ranked,
-        accessByProxy: access,
-        nowMs: 2000,
-      ),
-      'B',
-    );
-    expect(
-      guard.noteResult(
-        serviceId: 'youtube',
+      note(
+        guard,
         currentName: 'B',
         reason: ServiceAccessReason.accessible,
-        ranked: ranked,
-        accessByProxy: access,
+        preferred: preferred,
         nowMs: 3000,
       ),
       isNull,
@@ -55,13 +55,10 @@ void main() {
   test('ranking changes alone never switch the current node', () {
     final guard = FailoverGuard();
     expect(
-      guard.noteResult(
-        serviceId: 'youtube',
-        currentName: 'A',
+      note(
+        guard,
         reason: ServiceAccessReason.accessible,
-        ranked: ['B', 'A'],
-        accessByProxy: {},
-        nowMs: 1000,
+        preferred: ['B', 'A'],
       ),
       isNull,
     );
@@ -69,98 +66,49 @@ void main() {
 
   test('a manual switch resets the failure count', () {
     final guard = FailoverGuard();
-    const ranked = ['A', 'B'];
-    guard.noteResult(
-      serviceId: 'youtube',
-      currentName: 'A',
-      reason: ServiceAccessReason.networkFailed,
-      ranked: ranked,
-      accessByProxy: {},
-      nowMs: 1000,
-    );
-    expect(
-      guard.noteResult(
-        serviceId: 'youtube',
-        currentName: 'B',
-        reason: ServiceAccessReason.networkFailed,
-        ranked: ranked,
-        accessByProxy: {},
-        nowMs: 2000,
-      ),
-      isNull,
-    );
+    const preferred = ['A', 'B'];
+    note(guard, preferred: preferred);
+    expect(note(guard, currentName: 'B', preferred: preferred), isNull);
   });
 
   test('never switches to a region-blocked node', () {
     final guard = FailoverGuard();
-    const ranked = ['A', 'B'];
+    const preferred = ['A', 'B'];
     final access = {'B': resultFor('B', ServiceAccessReason.regionBlocked)};
-    guard.noteResult(
-      serviceId: 'youtube',
-      currentName: 'A',
-      reason: ServiceAccessReason.networkFailed,
-      ranked: ranked,
-      accessByProxy: access,
-      nowMs: 1000,
-    );
+    note(guard, preferred: preferred, accessByProxy: access);
     expect(
-      guard.noteResult(
-        serviceId: 'youtube',
-        currentName: 'A',
-        reason: ServiceAccessReason.networkFailed,
-        ranked: ranked,
-        accessByProxy: access,
-        nowMs: 2000,
-      ),
+      note(guard, preferred: preferred, accessByProxy: access, nowMs: 2000),
       isNull,
     );
   });
 
   test('never switches to a built-in target', () {
     final guard = FailoverGuard();
-    const ranked = ['A', 'REJECT', 'DIRECT', 'REJECT-DROP', 'B'];
-    final access = <String, ServiceAccessResult>{};
-    guard.noteResult(
-      serviceId: 'youtube',
-      currentName: 'A',
-      reason: ServiceAccessReason.networkFailed,
-      ranked: ranked,
-      accessByProxy: access,
-      nowMs: 1000,
-    );
-    expect(
-      guard.noteResult(
-        serviceId: 'youtube',
-        currentName: 'A',
-        reason: ServiceAccessReason.networkFailed,
-        ranked: ranked,
-        accessByProxy: access,
-        nowMs: 2000,
-      ),
-      'B',
-    );
+    const preferred = ['A', 'REJECT', 'DIRECT', 'REJECT-DROP', 'B'];
+    note(guard, preferred: preferred);
+    final target = note(guard, preferred: preferred, nowMs: 2000);
+    expect(target?.name, 'B');
+    expect(target?.isFallback, isFalse);
   });
 
   test('no more than three switches in ten minutes, then frozen', () {
     final guard = FailoverGuard();
-    const ranked = ['A', 'B', 'C', 'D', 'E'];
+    const preferred = ['A', 'B', 'C', 'D', 'E'];
     var current = 'A';
     var switches = 0;
     for (var cycle = 0; cycle < 8; cycle++) {
-      String? next;
+      FailoverTarget? target;
       for (var attempt = 0; attempt < 2; attempt++) {
-        next = guard.noteResult(
-          serviceId: 'youtube',
+        target = note(
+          guard,
           currentName: current,
-          reason: ServiceAccessReason.networkFailed,
-          ranked: ranked,
-          accessByProxy: {},
+          preferred: preferred,
           nowMs: 1000 + cycle * 1000,
         );
       }
-      if (next != null) {
+      if (target != null) {
         switches += 1;
-        current = next;
+        current = target.name;
       }
     }
     expect(switches, 3);
@@ -168,24 +116,96 @@ void main() {
 
   test('a service outage never counts as a node failure', () {
     final guard = FailoverGuard();
-    const ranked = ['A', 'B'];
-    guard.noteResult(
-      serviceId: 'youtube',
-      currentName: 'A',
-      reason: ServiceAccessReason.serviceDown,
-      ranked: ranked,
-      accessByProxy: {},
-      nowMs: 1000,
-    );
+    const preferred = ['A', 'B'];
+    note(guard, reason: ServiceAccessReason.serviceDown, preferred: preferred);
     expect(
-      guard.noteResult(
-        serviceId: 'youtube',
-        currentName: 'A',
+      note(
+        guard,
         reason: ServiceAccessReason.serviceDown,
-        ranked: ranked,
-        accessByProxy: {},
+        preferred: preferred,
         nowMs: 2000,
       ),
+      isNull,
+    );
+  });
+
+  test('preferred candidates win over fallback ones', () {
+    final guard = FailoverGuard();
+    note(guard, preferred: ['K1'], fallback: ['U1']);
+    final target = note(
+      guard,
+      preferred: ['K1'],
+      fallback: ['U1'],
+      nowMs: 2000,
+    );
+    expect(target?.name, 'K1');
+    expect(target?.isFallback, isFalse);
+  });
+
+  test('fallback is used and flagged when no preferred candidate remains', () {
+    final guard = FailoverGuard();
+    const fallback = ['U1', 'U2'];
+    note(guard, fallback: fallback);
+    final target = note(guard, fallback: fallback, nowMs: 2000);
+    expect(target?.name, 'U1');
+    expect(target?.isFallback, isTrue);
+  });
+
+  test('fallback scan skips built-in and region-blocked names too', () {
+    final guard = FailoverGuard();
+    const fallback = ['DIRECT', 'U-blocked', 'U2'];
+    final access = {
+      'U-blocked': resultFor('U-blocked', ServiceAccessReason.regionBlocked),
+    };
+    note(guard, fallback: fallback, accessByProxy: access);
+    final target = note(
+      guard,
+      fallback: fallback,
+      accessByProxy: access,
+      nowMs: 2000,
+    );
+    expect(target?.name, 'U2');
+    expect(target?.isFallback, isTrue);
+  });
+
+  test('a blocked preferred layer falls through to the fallback layer', () {
+    final guard = FailoverGuard();
+    const preferred = ['K-blocked'];
+    const fallback = ['U1'];
+    final access = {
+      'K-blocked': resultFor('K-blocked', ServiceAccessReason.regionBlocked),
+    };
+    note(
+      guard,
+      preferred: preferred,
+      fallback: fallback,
+      accessByProxy: access,
+    );
+    final target = note(
+      guard,
+      preferred: preferred,
+      fallback: fallback,
+      accessByProxy: access,
+      nowMs: 2000,
+    );
+    expect(target?.name, 'U1');
+    expect(target?.isFallback, isTrue);
+  });
+
+  test('failures count once per probe across both layers', () {
+    final guard = FailoverGuard();
+    const preferred = ['K1'];
+    const fallback = ['U1'];
+    expect(note(guard, preferred: preferred, fallback: fallback), isNull);
+    final target = note(
+      guard,
+      preferred: preferred,
+      fallback: fallback,
+      nowMs: 2000,
+    );
+    expect(target?.name, 'K1');
+    expect(
+      note(guard, currentName: 'K1', preferred: preferred, fallback: fallback),
       isNull,
     );
   });

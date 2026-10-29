@@ -517,6 +517,31 @@ List<String> rankedProxiesForService(
   );
 }
 
+/// The node a service group must move to when its current selection falls
+/// outside the ranking the current lock produces, or null when the
+/// selection still complies (or nothing compliant is known). Setup
+/// reapplies the previously saved selection and the failover check never
+/// moves a node that still works, so without this a group keeps serving a
+/// country the user just locked out.
+String? lockReselectTarget(
+  SmartAnchorInput input,
+  ServiceToggleConfig service,
+  List<String> proxyNames,
+  String currentName, {
+  Map<String, int> delays = const {},
+}) {
+  final ranked = rankedProxiesForService(
+    input,
+    service,
+    proxyNames,
+    delays: delays,
+  );
+  if (ranked.isEmpty || ranked.contains(currentName)) {
+    return null;
+  }
+  return ranked.first;
+}
+
 List<String> _rankForService(
   ServiceToggleConfig service,
   List<String> proxyNames,

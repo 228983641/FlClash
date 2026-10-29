@@ -128,6 +128,11 @@ String _switchReasonLabel(AppLocalizations appLocalizations, String reason) {
       return appLocalizations.smartAnchorReasonRegionBlocked;
     case 'networkFailed':
       return appLocalizations.smartAnchorReasonNetworkFailed;
+    case 'auto-failover':
+    case 'auto-failover-unprobed':
+      return appLocalizations.smartAnchorPathAuto;
+    case 'lock-change':
+      return appLocalizations.countryLock;
     default:
       return reason;
   }

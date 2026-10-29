@@ -222,6 +222,7 @@ class ProxiesAction extends _$ProxiesAction {
       smartAnchorAutoDelayTestForTesting = pending;
       unawaited(pending);
     }
+    smartAnchorLockComplianceCheck();
   }
 
   final FailoverGuard _failoverGuard = FailoverGuard();
@@ -272,6 +273,7 @@ class ProxiesAction extends _$ProxiesAction {
             delays: delays,
             force: hadNoDelays,
           );
+      smartAnchorLockComplianceCheck();
       smartAnchorFailoverCheck();
     } finally {
       _smartAnchorAutoDelayTesting = false;
@@ -362,17 +364,31 @@ class ProxiesAction extends _$ProxiesAction {
         names,
         delays: delays,
       );
+      final preferred = <String>[];
+      final fallback = <String>[];
+      for (final name in ranked) {
+        if (smart.metadataByProxy.containsKey(name)) {
+          preferred.add(name);
+        } else {
+          fallback.add(name);
+        }
+      }
       final currentReason =
           smart.accessByService[service.serviceId]?[currentName]?.reason;
-      final next = _failoverGuard.noteResult(
+      final target = _failoverGuard.noteResult(
         serviceId: service.serviceId,
         currentName: currentName,
         reason: currentReason,
-        ranked: ranked,
+        preferred: preferred,
+        fallback: fallback,
         accessByProxy: smart.accessByService[service.serviceId] ?? const {},
         nowMs: nowMs,
       );
-      if (next != null) {
+      if (target != null) {
+        final next = target.name;
+        final switchReason = target.isFallback
+            ? 'auto-failover-unprobed'
+            : currentReason?.name ?? 'unknown';
         ref
             .read(smartAnchorProvider.notifier)
             .recordSwitchEvent(
@@ -380,15 +396,70 @@ class ProxiesAction extends _$ProxiesAction {
                 serviceId: service.serviceId,
                 fromProxy: currentName,
                 toProxy: next,
-                reason: currentReason?.name ?? 'unknown',
+                reason: switchReason,
                 switchedAt: nowMs,
               ),
             );
         _pendingAutoSwitch[service.serviceId] = next;
-        _pendingAutoReason[service.serviceId] =
-            currentReason?.name ?? 'unknown';
+        _pendingAutoReason[service.serviceId] = switchReason;
         changeProxyDebounce(groupName, next, trigger: 'auto-failover');
       }
+    }
+  }
+
+  /// A lock is a hard constraint, not a ranking hint: when a group's saved
+  /// selection falls outside the ranking the current lock produces, move
+  /// it to the top compliant node right away instead of waiting for the
+  /// failure-driven failover check, which never moves a working node.
+  void smartAnchorLockComplianceCheck() {
+    final smart = ref.read(smartAnchorProvider);
+    final groups = ref.read(groupsProvider);
+    if (groups.isEmpty) {
+      return;
+    }
+    final groupNames = {for (final group in groups) group.name};
+    final names = <String>[];
+    for (final group in groups) {
+      for (final proxy in group.all) {
+        if (!groupNames.contains(proxy.name) && !names.contains(proxy.name)) {
+          names.add(proxy.name);
+        }
+      }
+    }
+    final delays = flattenDelays(ref.read(delayDataSourceProvider));
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    for (final service in smart.services.where(
+      (service) => service.isEnabled,
+    )) {
+      final groupName = smartGroupName(service);
+      final currentName = groups.getGroup(groupName)?.now;
+      if (currentName == null) {
+        continue;
+      }
+      final target = lockReselectTarget(
+        smart,
+        service,
+        names,
+        currentName,
+        delays: delays,
+      );
+      if (target == null) {
+        continue;
+      }
+      ref
+          .read(smartAnchorProvider.notifier)
+          .recordSwitchEvent(
+            SwitchEvent(
+              serviceId: service.serviceId,
+              fromProxy: currentName,
+              toProxy: target,
+              reason: 'lock-change',
+              switchedAt: nowMs,
+            ),
+          );
+      _pendingAutoSwitch[service.serviceId] = target;
+      _pendingAutoReason[service.serviceId] = 'lock-change';
+      changeProxyDebounce(groupName, target, trigger: 'lock-change');
     }
   }
 
