@@ -128,3 +128,164 @@ String saAnchorRejectLine({
 }) {
   return '[SA] anchor-reject service=$serviceId node=$node reason=$why';
 }
+
+String saAnchorReplaceLine({
+  required String serviceId,
+  required String from,
+  required String to,
+  required String why,
+}) {
+  return '[SA] anchor-replace service=$serviceId from=$from to=$to '
+      'reason=$why';
+}
+
+String saRankAnchorsLine({required Map<String, String> anchors}) {
+  final services = anchors.keys.toList()..sort();
+  final pairs = [
+    for (final serviceId in services) '$serviceId=${anchors[serviceId]}',
+  ];
+  return '[SA] rank-anchors ${pairs.join(' ')}';
+}
+
+String saDelayRoundLine({
+  required int targets,
+  required int screenAnswered,
+  required int refined,
+  required int ok,
+  required int timeout,
+  required int failed,
+  required int unmeasured,
+  required int durationMs,
+  required bool usedFallback,
+  String? fallbackReason,
+}) {
+  final mode = usedFallback ? 'fallback' : 'batch';
+  final reason = fallbackReason == null
+      ? ''
+      : ' fallbackReason=$fallbackReason';
+  return '[SA] delay-round targets=$targets screenAnswered=$screenAnswered '
+      'refined=$refined ok=$ok timeout=$timeout failed=$failed '
+      'unmeasured=$unmeasured durationMs=$durationMs mode=$mode$reason';
+}
+
+String saMetaFailLine({required String node, required String reason}) {
+  return '[SA] meta-fail node=$node reason=$reason';
+}
+
+String saMetaRoundLine({
+  required int probed,
+  required int metaOk,
+  required int metaFailed,
+  required int noEgress,
+  required int geoFailed,
+  required int wafPass,
+  required int wafFail,
+  required int wafUnknown,
+}) {
+  return '[SA] meta-round probed=$probed ok=$metaOk failed=$metaFailed '
+      'noEgress=$noEgress geoFailed=$geoFailed wafPass=$wafPass '
+      'wafFail=$wafFail wafUnknown=$wafUnknown';
+}
+
+String saPurityTierLine({
+  required String node,
+  required String fromTier,
+  required String toTier,
+  required double score,
+}) {
+  return '[SA] purity-tier node=$node from=$fromTier to=$toTier '
+      'score=${score.round()}';
+}
+
+String saBorrowFanoutLine({
+  required String donor,
+  required List<String> borrowers,
+  required int nodes,
+}) {
+  final sorted = List.of(borrowers)..sort();
+  return '[SA] borrow-fanout donor=$donor borrowers=${sorted.join(',')} '
+      'nodes=$nodes';
+}
+
+String saBorrowExcludeLine({
+  required String serviceId,
+  required String node,
+  required String donor,
+  required String via,
+}) {
+  return '[SA] borrow-exclude service=$serviceId node=$node donor=$donor '
+      'via=$via';
+}
+
+String saDerivedRegionsLine({
+  required String serviceId,
+  required Set<String> blockedBefore,
+  required Set<String> blockedAfter,
+}) {
+  String render(Set<String> countries) {
+    final sorted = countries.toList()..sort();
+    return '{${sorted.join(',')}}';
+  }
+
+  return '[SA] derived-regions service=$serviceId '
+      'blocked=${render(blockedBefore)}->${render(blockedAfter)}';
+}
+
+String saFailoverFreezeLine({required String serviceId, required int untilMs}) {
+  return '[SA] failover-freeze service=$serviceId until=$untilMs';
+}
+
+String saFailoverFreezeEndLine({required String serviceId}) {
+  return '[SA] failover-freeze-end service=$serviceId';
+}
+
+String saMergeSummaryLine({
+  required int sources,
+  required int proxiesIn,
+  required int proxiesOut,
+  required int pruned,
+}) {
+  return '[SA] merge-summary sources=$sources proxiesIn=$proxiesIn '
+      'proxiesOut=$proxiesOut pruned=$pruned';
+}
+
+String saSanitizeLine({
+  required String groupName,
+  required String from,
+  required String to,
+}) {
+  return '[SA] sanitize group=$groupName old=$from new=$to '
+      'reason=not-in-ranking';
+}
+
+String saStrippedAmbiguousLine({
+  required String name,
+  required int candidates,
+}) {
+  return '[SA] stripped-ambiguous name=$name candidates=$candidates';
+}
+
+String saLockChangeLine({
+  required String serviceId,
+  required int services,
+  required int anchorsCleared,
+  required List<String> countries,
+}) {
+  final codes = countries.isEmpty ? 'none' : countries.join(',');
+  return '[SA] lock-change service=$serviceId services=$services '
+      'anchorsCleared=$anchorsCleared countries=$codes';
+}
+
+String saTickLine({
+  required int anchors,
+  required int compliance,
+  required int probeUpdated,
+  required int failover,
+}) {
+  return '[SA] tick anchors=$anchors compliance=$compliance '
+      'probeUpdated=$probeUpdated failover=$failover';
+}
+
+String saReprobeLine({required String source}) {
+  return '[SA] reprobe source=$source';
+}

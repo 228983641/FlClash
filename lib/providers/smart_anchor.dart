@@ -16,6 +16,7 @@ import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
 import 'package:fl_clash/smart_anchor/services/persistence.dart';
 import 'package:fl_clash/smart_anchor/services/probing.dart';
 import 'package:fl_clash/smart_anchor/services/sa_log.dart';
+import 'package:fl_clash/smart_anchor/services/scoring_engine.dart';
 import 'package:fl_clash/smart_anchor/services/subscription_merger.dart';
 import 'package:fl_clash/smart_anchor/services/service_access.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
@@ -240,20 +241,32 @@ class SmartAnchor extends _$SmartAnchor {
       );
     }
     var next = state.copyWith(services: _mergedServices(byId));
+    var anchorsCleared = 0;
     if (changed) {
       // Drop the targets' anchors in the same update: the save it triggers
       // then carries no stale anchor, instead of a separate delete racing
       // that save's write phase and resurrecting the anchor on restart.
       final anchors = Map.of(next.anchors);
-      var removed = false;
       for (final id in targets) {
-        removed = anchors.remove(id) != null || removed;
+        if (anchors.remove(id) != null) {
+          anchorsCleared++;
+        }
       }
-      if (removed) {
+      if (anchorsCleared > 0) {
         next = next.copyWith(anchors: anchors);
       }
     }
     update(next);
+    if (changed) {
+      commonPrint.log(
+        saLockChangeLine(
+          serviceId: serviceId,
+          services: targets.length,
+          anchorsCleared: anchorsCleared,
+          countries: normalized,
+        ),
+      );
+    }
   }
 
   void setSharedLockGroup(String groupId, bool enabled) {
@@ -380,6 +393,7 @@ class SmartAnchor extends _$SmartAnchor {
       fetcher: _dioGeoFetcher,
       keyPools: const {},
     );
+    final wafOutcomeByNode = <String, String>{};
     final prober = SmartAnchorProber(
       egressLookup: (name) async =>
           parseOutboundIp(await lookupOutboundIp(core, name)),
@@ -390,8 +404,8 @@ class SmartAnchor extends _$SmartAnchor {
         scope: serviceCheckScopeProbe,
       ),
       geoLookup: geoLookupFromService(geoService),
-      wafLookup: (name) async => wafPassFromTraceProbe(
-        await core.probe(
+      wafLookup: (name) async {
+        final result = await core.probe(
           ProbeParams(
             url: cloudflareTraceUrl,
             proxyName: name,
@@ -399,8 +413,13 @@ class SmartAnchor extends _$SmartAnchor {
             timeout: outboundIpTimeoutDuration.inMilliseconds,
             maxBody: 4096,
           ),
-        ),
-      ),
+        );
+        final pass = wafPassFromTraceProbe(result);
+        wafOutcomeByNode[name] = result == null || result.error != null
+            ? 'unknown'
+            : (pass ? 'pass' : 'fail');
+        return pass;
+      },
     );
     final rankByProxy = <String, int>{};
     for (final service in enabled) {
@@ -431,6 +450,15 @@ class SmartAnchor extends _$SmartAnchor {
     };
     var changed = false;
     final reasonCounts = <ServiceAccessReason, int>{};
+    final currentNames = {currentProxyName, ...currentProxyNames};
+    var metaOk = 0;
+    var noEgress = 0;
+    var geoFailed = 0;
+    var wafPassCount = 0;
+    var wafFailCount = 0;
+    var wafUnknownCount = 0;
+    final fanoutByDonor =
+        <String, ({Set<String> borrowers, Set<String> nodes})>{};
     const probeConcurrency = 4;
     for (var i = 0; i < targets.length; i += probeConcurrency) {
       final end = i + probeConcurrency < targets.length
@@ -459,16 +487,65 @@ class SmartAnchor extends _$SmartAnchor {
           continue;
         }
         final result = outcome.value;
+        final failure = result.metadataFailure;
         if (result.metadata != null) {
+          metaOk++;
+          if (currentNames.contains(outcome.key)) {
+            final previous = metadata[outcome.key];
+            if (previous != null) {
+              final fromTier = ScoringEngine.trustTier(previous.purityScore);
+              final toTier = ScoringEngine.trustTier(
+                result.metadata!.purityScore,
+              );
+              if (fromTier != toTier) {
+                commonPrint.log(
+                  saPurityTierLine(
+                    node: outcome.key,
+                    fromTier: fromTier,
+                    toTier: toTier,
+                    score: result.metadata!.purityScore,
+                  ),
+                );
+              }
+            }
+          }
           metadata[outcome.key] = result.metadata!;
           updated++;
           changed = true;
+        } else if (failure != null) {
+          if (failure == 'no-egress') {
+            noEgress++;
+          } else {
+            geoFailed++;
+          }
+          commonPrint.log(saMetaFailLine(node: outcome.key, reason: failure));
+        }
+        if (failure == 'no-egress') {
+          wafUnknownCount++;
+        } else {
+          switch (wafOutcomeByNode[outcome.key]) {
+            case 'pass':
+              wafPassCount++;
+            case 'fail':
+              wafFailCount++;
+            default:
+              wafUnknownCount++;
+          }
         }
         for (final entry in result.accessByService.entries) {
           (access[entry.key] ??= {})[outcome.key] = entry.value;
           reasonCounts[entry.value.reason] =
               (reasonCounts[entry.value.reason] ?? 0) + 1;
           changed = true;
+          final donor = entry.value.borrowedFrom;
+          if (donor != null) {
+            final fanout = fanoutByDonor[donor] ??= (
+              borrowers: <String>{},
+              nodes: <String>{},
+            );
+            fanout.borrowers.add(entry.key);
+            fanout.nodes.add(outcome.key);
+          }
         }
       }
     }
@@ -480,6 +557,29 @@ class SmartAnchor extends _$SmartAnchor {
           reasonCounts: reasonCounts,
         ),
       );
+      commonPrint.log(
+        saMetaRoundLine(
+          probed: targets.length,
+          metaOk: metaOk,
+          metaFailed: noEgress + geoFailed,
+          noEgress: noEgress,
+          geoFailed: geoFailed,
+          wafPass: wafPassCount,
+          wafFail: wafFailCount,
+          wafUnknown: wafUnknownCount,
+        ),
+      );
+      final donors = fanoutByDonor.keys.toList()..sort();
+      for (final donor in donors) {
+        final fanout = fanoutByDonor[donor]!;
+        commonPrint.log(
+          saBorrowFanoutLine(
+            donor: donor,
+            borrowers: fanout.borrowers.toList(),
+            nodes: fanout.nodes.length,
+          ),
+        );
+      }
       final remaining = proxyNames
           .where((name) => probeMetadataStale(metadata[name]))
           .length;
@@ -492,9 +592,45 @@ class SmartAnchor extends _$SmartAnchor {
       );
     }
     if (changed) {
-      update(
-        state.copyWith(metadataByProxy: metadata, accessByService: access),
+      final nextInput = state.copyWith(
+        metadataByProxy: metadata,
+        accessByService: access,
       );
+      for (final service in enabled) {
+        final before = detectedUnsupportedRegions(state, service.serviceId);
+        final after = detectedUnsupportedRegions(nextInput, service.serviceId);
+        if (before.length == after.length && before.containsAll(after)) {
+          continue;
+        }
+        commonPrint.log(
+          saDerivedRegionsLine(
+            serviceId: service.serviceId,
+            blockedBefore: before,
+            blockedAfter: after,
+          ),
+        );
+        for (final country in after.difference(before)) {
+          final serviceAccess = access[service.serviceId] ?? const {};
+          for (final entry in serviceAccess.entries) {
+            final verdict = entry.value;
+            if (verdict.borrowedFrom != null &&
+                verdict.reason == ServiceAccessReason.regionBlocked &&
+                !verdict.isExpired &&
+                metadata[entry.key]?.countryCode == country) {
+              commonPrint.log(
+                saBorrowExcludeLine(
+                  serviceId: service.serviceId,
+                  node: entry.key,
+                  donor: verdict.borrowedFrom!,
+                  via: 'region',
+                ),
+              );
+              break;
+            }
+          }
+        }
+      }
+      update(nextInput);
     }
     return updated;
   }

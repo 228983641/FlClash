@@ -178,10 +178,20 @@ List<String> selectProbeQueue({
 }
 
 class ProbeOutcome {
-  const ProbeOutcome({this.metadata, this.accessByService = const {}});
+  const ProbeOutcome({
+    this.metadata,
+    this.accessByService = const {},
+    this.metadataFailure,
+  });
 
   final NodeMetadataCache? metadata;
   final Map<String, ServiceAccessResult> accessByService;
+
+  /// Why this node produced no metadata: 'no-egress' when no exit IP
+  /// could be measured (a timeout lands here too), 'geo-failed' when an
+  /// exit IP was measured but every GeoIP source failed. Null when
+  /// metadata was produced.
+  final String? metadataFailure;
 }
 
 typedef EgressLookup = Future<IpInfo?> Function(String proxyName);
@@ -223,7 +233,10 @@ class SmartAnchorProber {
   }) async {
     final egress = await egressLookup(proxyName);
     NodeMetadataCache? metadata;
-    if (egress != null) {
+    String? metadataFailure;
+    if (egress == null) {
+      metadataFailure = 'no-egress';
+    } else {
       final wafPass = await wafLookup?.call(proxyName) ?? true;
       metadata = await geoLookup(
         ip: egress.ip,
@@ -231,6 +244,9 @@ class SmartAnchorProber {
         entryServer: entryServer,
         wafPass: wafPass,
       );
+      if (metadata == null) {
+        metadataFailure = 'geo-failed';
+      }
     }
     // Services without a core checker borrow their donor's target; the
     // donor is probed once and its verdict fans out to every borrower.
@@ -284,7 +300,11 @@ class SmartAnchorProber {
         }
       }
     }
-    return ProbeOutcome(metadata: metadata, accessByService: access);
+    return ProbeOutcome(
+      metadata: metadata,
+      accessByService: access,
+      metadataFailure: metadataFailure,
+    );
   }
 }
 

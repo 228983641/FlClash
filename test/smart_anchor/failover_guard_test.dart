@@ -224,6 +224,30 @@ void main() {
     expect(guard.lastCountedFailures, 2);
   });
 
+  test('freeze state is readable and lifts with the window', () {
+    final guard = FailoverGuard();
+    const preferred = ['A', 'B', 'C', 'D', 'E'];
+    var current = 'A';
+    for (var cycle = 0; cycle < 3; cycle++) {
+      FailoverTarget? target;
+      for (var attempt = 0; attempt < 2; attempt++) {
+        target = note(
+          guard,
+          currentName: current,
+          preferred: preferred,
+          nowMs: 1000 + cycle * 1000,
+        );
+      }
+      current = target!.name;
+    }
+    // Switches landed at 1000, 2000, 3000 per the helper's second call.
+    expect(guard.isFrozen('youtube', 3000), isTrue);
+    expect(guard.frozenUntilMs('youtube', 3000), 1000 + 10 * 60 * 1000);
+    expect(guard.isFrozen('youtube', 1000 + 10 * 60 * 1000 + 1), isFalse);
+    expect(guard.frozenUntilMs('youtube', 1000 + 10 * 60 * 1000 + 1), isNull);
+    expect(guard.isFrozen('claude', 3000), isFalse);
+  });
+
   test('failures count once per probe across both layers', () {
     final guard = FailoverGuard();
     const preferred = ['K1'];

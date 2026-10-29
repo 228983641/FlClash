@@ -18,6 +18,31 @@ class FailoverGuard {
   /// the count that led to it.
   int get lastCountedFailures => _lastCountedFailures;
 
+  static const int _freezeWindowMs = 10 * 60 * 1000;
+  static const int _freezeSwitchLimit = 3;
+
+  List<int> _recentSwitches(String serviceId, int nowMs) {
+    return (_switchTimes[serviceId] ?? [])
+        .where((time) => nowMs - time <= _freezeWindowMs)
+        .toList();
+  }
+
+  /// Whether [noteResult] currently refuses switches for [serviceId]
+  /// because it already switched at the limit inside the window.
+  bool isFrozen(String serviceId, int nowMs) {
+    return _recentSwitches(serviceId, nowMs).length >= _freezeSwitchLimit;
+  }
+
+  /// When the freeze lifts: the moment the switch that keeps the window
+  /// at the limit ages out of it. Null while not frozen.
+  int? frozenUntilMs(String serviceId, int nowMs) {
+    final recent = _recentSwitches(serviceId, nowMs)..sort();
+    if (recent.length < _freezeSwitchLimit) {
+      return null;
+    }
+    return recent[recent.length - _freezeSwitchLimit] + _freezeWindowMs;
+  }
+
   FailoverTarget? noteResult({
     required String serviceId,
     required String currentName,

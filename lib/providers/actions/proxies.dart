@@ -61,6 +61,31 @@ class _DelayTestJob {
   final Duration timeout;
   final Set<String> startedOnDispatch = {};
   bool cancelled = false;
+
+  int screenAnswered = 0;
+  int refinedCount = 0;
+  int okCount = 0;
+  int timeoutCount = 0;
+  int failedCount = 0;
+  int unmeasuredCount = 0;
+  bool usedFallback = false;
+  String? fallbackReason;
+
+  /// Tallies one target's final value: the screen result for a node the
+  /// refine pass skipped, the refined result (or its screen stand-in)
+  /// for one it covered. Core conventions: >0 measured, -1 timeout,
+  /// -2 failed, absent = never measured.
+  void tallyFinal(int? value) {
+    if (value == null) {
+      unmeasuredCount++;
+    } else if (value > 0) {
+      okCount++;
+    } else if (value == -1) {
+      timeoutCount++;
+    } else {
+      failedCount++;
+    }
+  }
 }
 
 @Riverpod(keepAlive: true)
@@ -251,6 +276,7 @@ class ProxiesAction extends _$ProxiesAction {
   }
 
   final FailoverGuard _failoverGuard = FailoverGuard();
+  final Set<String> _failoverFrozenLogged = {};
   bool _smartAnchorAutoDelayTesting = false;
 
   @visibleForTesting
@@ -269,6 +295,7 @@ class ProxiesAction extends _$ProxiesAction {
     try {
       var delays = flattenDelays(ref.read(delayDataSourceProvider));
       final hadNoDelays = delays.isEmpty;
+      var didDelayWork = hadNoDelays;
       if (hadNoDelays) {
         await delayTestGroups(groups);
         delays = flattenDelays(ref.read(delayDataSourceProvider));
@@ -287,9 +314,13 @@ class ProxiesAction extends _$ProxiesAction {
           }
         }
         if (missing.isNotEmpty) {
+          didDelayWork = true;
           await delayTest(missing);
           delays = flattenDelays(ref.read(delayDataSourceProvider));
         }
+      }
+      if (didDelayWork) {
+        commonPrint.log(saReprobeLine(source: 'profile-refresh'));
       }
       await ref
           .read(smartAnchorProvider.notifier)
@@ -379,14 +410,15 @@ class ProxiesAction extends _$ProxiesAction {
     }
   }
 
-  void smartAnchorFailoverCheck() {
+  int smartAnchorFailoverCheck() {
     final smart = ref.read(smartAnchorProvider);
     final groups = ref.read(groupsProvider);
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     _observePathPoints(smart, groups, nowMs);
     if (!smart.autoFailoverEnabled) {
-      return;
+      return 0;
     }
+    var switches = 0;
     final groupNames = {for (final group in groups) group.name};
     final delays = flattenDelays(ref.read(delayDataSourceProvider));
     for (final service in smart.services.where(
@@ -453,6 +485,18 @@ class ProxiesAction extends _$ProxiesAction {
           ),
         );
       }
+      final frozen = _failoverGuard.isFrozen(service.serviceId, nowMs);
+      if (frozen && _failoverFrozenLogged.add(service.serviceId)) {
+        commonPrint.log(
+          saFailoverFreezeLine(
+            serviceId: service.serviceId,
+            untilMs:
+                _failoverGuard.frozenUntilMs(service.serviceId, nowMs) ?? nowMs,
+          ),
+        );
+      } else if (!frozen && _failoverFrozenLogged.remove(service.serviceId)) {
+        commonPrint.log(saFailoverFreezeEndLine(serviceId: service.serviceId));
+      }
       if (target != null) {
         final next = target.name;
         final switchReason = target.isFallback
@@ -503,19 +547,21 @@ class ProxiesAction extends _$ProxiesAction {
         _pendingAutoSwitch[service.serviceId] = next;
         _pendingAutoReason[service.serviceId] = switchReason;
         changeProxyDebounce(groupName, next, trigger: 'auto-failover');
+        switches++;
       }
     }
+    return switches;
   }
 
   /// A lock is a hard constraint, not a ranking hint: when a group's saved
   /// selection falls outside the ranking the current lock produces, move
   /// it to the top compliant node right away instead of waiting for the
   /// failure-driven failover check, which never moves a working node.
-  void smartAnchorLockComplianceCheck() {
+  int smartAnchorLockComplianceCheck() {
     final smart = ref.read(smartAnchorProvider);
     final groups = ref.read(groupsProvider);
     if (groups.isEmpty) {
-      return;
+      return 0;
     }
     final groupNames = {for (final group in groups) group.name};
     final delays = flattenDelays(ref.read(delayDataSourceProvider));
@@ -575,6 +621,21 @@ class ProxiesAction extends _$ProxiesAction {
         );
         continue;
       }
+      final currentAccess =
+          smart.accessByService[service.serviceId]?[currentName];
+      if (currentAccess != null &&
+          currentAccess.borrowedFrom != null &&
+          !currentAccess.isExpired &&
+          currentAccess.reason == ServiceAccessReason.regionBlocked) {
+        commonPrint.log(
+          saBorrowExcludeLine(
+            serviceId: service.serviceId,
+            node: currentName,
+            donor: currentAccess.borrowedFrom!,
+            via: 'compliance',
+          ),
+        );
+      }
       commonPrint.log(
         saComplianceDecisionLine(
           serviceId: service.serviceId,
@@ -608,12 +669,37 @@ class ProxiesAction extends _$ProxiesAction {
           noCandidate: noCandidate,
         ),
       );
+      final anchorNodes = <String, String>{};
+      for (final service in smart.services.where(
+        (service) => service.isEnabled,
+      )) {
+        var anchor = smart.anchors[service.serviceId];
+        if (anchor == null) {
+          final group = groupForService(service.serviceId);
+          if (group != null && smart.sharedLockGroupIds.contains(group.id)) {
+            for (final memberId in group.serviceIds) {
+              anchor = smart.anchors[memberId];
+              if (anchor != null) {
+                break;
+              }
+            }
+          }
+        }
+        if (anchor != null) {
+          anchorNodes[service.serviceId] = anchor.lastProxyName;
+        }
+      }
+      if (anchorNodes.isNotEmpty) {
+        commonPrint.log(saRankAnchorsLine(anchors: anchorNodes));
+      }
     }
+    return reselected;
   }
 
-  void _trackAnchorStability(SmartAnchorInput smart) {
+  int _trackAnchorStability(SmartAnchorInput smart) {
     final groups = ref.read(groupsProvider);
     final nowMs = DateTime.now().millisecondsSinceEpoch;
+    var landed = 0;
     for (final service in smart.services.where((s) => s.isEnabled)) {
       final current = groups.getGroup(smartGroupName(service))?.now;
       if (current == null) {
@@ -662,6 +748,17 @@ class ProxiesAction extends _$ProxiesAction {
             countryCode: meta.countryCode,
           ),
         );
+        if (existing != null && existing.lastProxyName != current) {
+          commonPrint.log(
+            saAnchorReplaceLine(
+              serviceId: service.serviceId,
+              from: existing.lastProxyName,
+              to: current,
+              why: 'stability',
+            ),
+          );
+        }
+        landed++;
         ref
             .read(smartAnchorProvider.notifier)
             .setAnchor(
@@ -684,6 +781,26 @@ class ProxiesAction extends _$ProxiesAction {
             );
       }
     }
+    return landed;
+  }
+
+  void _logTickSummary({
+    required int anchors,
+    required int compliance,
+    required int probeUpdated,
+    required int failover,
+  }) {
+    if (anchors + compliance + probeUpdated + failover <= 0) {
+      return;
+    }
+    commonPrint.log(
+      saTickLine(
+        anchors: anchors,
+        compliance: compliance,
+        probeUpdated: probeUpdated,
+        failover: failover,
+      ),
+    );
   }
 
   Future<void> smartAnchorMonitorTick() async {
@@ -696,15 +813,21 @@ class ProxiesAction extends _$ProxiesAction {
         return;
       }
       final smart = ref.read(smartAnchorProvider);
-      _trackAnchorStability(smart);
+      final tickAnchors = _trackAnchorStability(smart);
       final groups = ref.read(groupsProvider);
       _observePathPoints(smart, groups, DateTime.now().millisecondsSinceEpoch);
       // The compliance check also runs on the tick, not only at the end of
       // updateGroups: when a setup push fails before updateGroups runs it,
       // the lock would otherwise stay unenforced until the next apply. It
       // is not gated by the failover toggle — a lock is a hard constraint.
-      smartAnchorLockComplianceCheck();
+      final tickCompliance = smartAnchorLockComplianceCheck();
       if (!smart.autoFailoverEnabled) {
+        _logTickSummary(
+          anchors: tickAnchors,
+          compliance: tickCompliance,
+          probeUpdated: 0,
+          failover: 0,
+        );
         return;
       }
       final groupNames = {for (final group in groups) group.name};
@@ -726,8 +849,9 @@ class ProxiesAction extends _$ProxiesAction {
       // One queued round per tick: the in-use nodes are always probed so
       // the failover check sees fresh access results, and the rest of the
       // round's budget walks the stale-metadata queue toward full coverage.
+      var tickProbed = 0;
       if (names.isNotEmpty) {
-        await ref
+        tickProbed = await ref
             .read(smartAnchorProvider.notifier)
             .probeNodes(
               proxyNames: names,
@@ -738,7 +862,13 @@ class ProxiesAction extends _$ProxiesAction {
               updateThrottle: false,
             );
       }
-      smartAnchorFailoverCheck();
+      final tickFailover = smartAnchorFailoverCheck();
+      _logTickSummary(
+        anchors: tickAnchors,
+        compliance: tickCompliance,
+        probeUpdated: tickProbed,
+        failover: tickFailover,
+      );
     } catch (_) {
     } finally {
       _smartAnchorMonitorRunning = false;
@@ -1045,6 +1175,7 @@ class ProxiesAction extends _$ProxiesAction {
     // for a target to wait in.
     job.startedOnDispatch.addAll(targets.map((target) => target.key));
     pending.apply(acquired: job.held, started: job.startedOnDispatch);
+    final stopwatch = Stopwatch()..start();
     try {
       final byUrl = <String, List<_DelayTestTarget>>{};
       for (final target in targets) {
@@ -1053,6 +1184,20 @@ class ProxiesAction extends _$ProxiesAction {
       await Future.wait(
         byUrl.entries.map(
           (entry) => _runDelayTestBatch(job, entry.key, entry.value),
+        ),
+      );
+      commonPrint.log(
+        saDelayRoundLine(
+          targets: targets.length,
+          screenAnswered: job.screenAnswered,
+          refined: job.refinedCount,
+          ok: job.okCount,
+          timeout: job.timeoutCount,
+          failed: job.failedCount,
+          unmeasured: job.unmeasuredCount,
+          durationMs: stopwatch.elapsedMilliseconds,
+          usedFallback: job.usedFallback,
+          fallbackReason: job.fallbackReason,
         ),
       );
     } finally {
@@ -1092,6 +1237,7 @@ class ProxiesAction extends _$ProxiesAction {
     if (job.cancelled) {
       return;
     }
+    job.screenAnswered += screened.values.where((value) => value > 0).length;
     final refine = <_DelayTestTarget>[];
     for (final target in targets) {
       final value = screened[target.proxyName];
@@ -1101,12 +1247,14 @@ class ProxiesAction extends _$ProxiesAction {
         if (value != null) {
           setDelay(Delay(name: target.proxyName, url: testUrl, value: value));
         }
+        job.tallyFinal(value);
         _settleDelayTarget(job, target);
       }
     }
     if (refine.isEmpty) {
       return;
     }
+    job.refinedCount += refine.length;
     final refined = await _testDelays(
       job,
       testUrl,
@@ -1124,6 +1272,7 @@ class ProxiesAction extends _$ProxiesAction {
       if (value != null) {
         setDelay(Delay(name: target.proxyName, url: testUrl, value: value));
       }
+      job.tallyFinal(value);
       _settleDelayTarget(job, target);
     }
   }
@@ -1159,6 +1308,14 @@ class ProxiesAction extends _$ProxiesAction {
       if (error is CoreMethodException && error.isCoreUnavailable) {
         job.cancelled = true;
         return const {};
+      }
+      job.usedFallback = true;
+      if (job.fallbackReason == null) {
+        var reason = error.toString().replaceAll(RegExp(r'\s+'), ' ').trim();
+        if (reason.length > 120) {
+          reason = reason.substring(0, 120);
+        }
+        job.fallbackReason = reason;
       }
       commonPrint.log(
         'Batch delay test failed, falling back to per-node tests: $error',

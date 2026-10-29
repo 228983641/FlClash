@@ -230,11 +230,38 @@ void main() {
       nowMs: DateTime.now().millisecondsSinceEpoch,
     );
     expect(outcome.metadata, isNull);
+    expect(outcome.metadataFailure, 'no-egress');
     expect(
       outcome.accessByService['claude']?.reason,
       ServiceAccessReason.networkFailed,
     );
   });
+
+  test(
+    'probeNode names a geo failure when egress exists but geo fails',
+    () async {
+      final prober = SmartAnchorProber(
+        egressLookup: (_) async =>
+            const IpInfo(ip: '1.2.3.4', countryCode: 'US'),
+        serviceCheckLookup: (_, _) async => const {},
+        geoLookup:
+            ({
+              required ip,
+              required proxyName,
+              required entryServer,
+              required wafPass,
+            }) async => null,
+      );
+      final outcome = await prober.probeNode(
+        proxyName: 'US-01',
+        entryServer: '',
+        serviceIds: const [],
+        nowMs: DateTime.now().millisecondsSinceEpoch,
+      );
+      expect(outcome.metadata, isNull);
+      expect(outcome.metadataFailure, 'geo-failed');
+    },
+  );
 
   test('probeNode records nothing for a cancelled service check', () async {
     final prober = SmartAnchorProber(

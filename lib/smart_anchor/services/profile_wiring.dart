@@ -117,28 +117,57 @@ Map<String, dynamic> buildSmartConfig(
   return buildSmartConfigWithRanking(rawConfig, input, delays: delays).config;
 }
 
+typedef MergeSummary = ({
+  int sources,
+  int proxiesIn,
+  int proxiesOut,
+  int pruned,
+});
+
 /// [buildSmartConfig] plus the per-service rankings it computed, so the
 /// setup path can sanitize persisted selections against the same ranking
-/// the config was built with instead of discarding it.
-({Map<String, dynamic> config, Map<String, List<String>> rankedByService})
+/// the config was built with instead of discarding it. The merge summary
+/// and the ambiguous stripped names ride along for the caller's logging:
+/// this layer stays pure, so what the build did is reported, not printed.
+({
+  Map<String, dynamic> config,
+  Map<String, List<String>> rankedByService,
+  MergeSummary? mergeSummary,
+  List<({String name, int candidates})> ambiguousStripped,
+})
 buildSmartConfigWithRanking(
   Map<String, dynamic> rawConfig,
   SmartAnchorInput input, {
   Map<String, int> delays = const {},
 }) {
   if (!input.hasWork) {
-    return (config: rawConfig, rankedByService: const {});
+    return (
+      config: rawConfig,
+      rankedByService: const {},
+      mergeSummary: null,
+      ambiguousStripped: const [],
+    );
   }
   var config = Map<String, dynamic>.from(rawConfig);
   var effectiveInput = input;
+  MergeSummary? mergeSummary;
+  var ambiguousStripped = const <({String name, int candidates})>[];
   if (input.aggregationEnabled && input.aggregationSources.isNotEmpty) {
-    config = _applyAggregation(config, input);
+    final applied = _applyAggregation(config, input);
+    config = applied.config;
+    mergeSummary = applied.summary;
+    ambiguousStripped = _ambiguousStrippedNames(input, _proxyNames(config));
     effectiveInput = _remapInputForMergedConfig(input, _proxyNames(config));
     _orderUnifiedGroup(config, effectiveInput);
   }
   final enabled = input.services.where((service) => service.isEnabled);
   if (enabled.isEmpty) {
-    return (config: config, rankedByService: const {});
+    return (
+      config: config,
+      rankedByService: const {},
+      mergeSummary: mergeSummary,
+      ambiguousStripped: ambiguousStripped,
+    );
   }
   final proxyNames = _proxyNames(config);
   final remappedDelays = <String, int>{};
@@ -163,7 +192,47 @@ buildSmartConfigWithRanking(
     rankedProxiesByService: rankedByService,
   );
   _moveUnifiedGroupFirst(injected);
-  return (config: injected, rankedByService: rankedByService);
+  return (
+    config: injected,
+    rankedByService: rankedByService,
+    mergeSummary: mergeSummary,
+    ambiguousStripped: ambiguousStripped,
+  );
+}
+
+// Stripped names shared by several merged nodes while a metadata or
+// access record exists under the stripped name: the merged-config remap
+// skips the fallback for those (the record belongs to one unknown
+// source's node), which is worth one log line per build.
+List<({String name, int candidates})> _ambiguousStrippedNames(
+  SmartAnchorInput input,
+  List<String> proxyNames,
+) {
+  final counts = <String, int>{};
+  final fromPrefixed = <String>{};
+  for (final name in proxyNames) {
+    final stripped = _strippedProxyName(name);
+    counts[stripped] = (counts[stripped] ?? 0) + 1;
+    if (stripped != name) {
+      fromPrefixed.add(stripped);
+    }
+  }
+  final result = <({String name, int candidates})>[];
+  for (final entry in counts.entries) {
+    if (entry.value < 2 || !fromPrefixed.contains(entry.key)) {
+      continue;
+    }
+    final hasRecord =
+        input.metadataByProxy.containsKey(entry.key) ||
+        input.accessByService.values.any(
+          (byProxy) => byProxy.containsKey(entry.key),
+        );
+    if (hasRecord) {
+      result.add((name: entry.key, candidates: entry.value));
+    }
+  }
+  result.sort((a, b) => a.name.compareTo(b.name));
+  return result;
 }
 
 /// The selection map setup should push to the Core, with [lockReselectTarget]'s
@@ -224,7 +293,7 @@ void _moveUnifiedGroupFirst(Map<String, dynamic> config) {
   groups.insert(0, unified);
 }
 
-Map<String, dynamic> _applyAggregation(
+({Map<String, dynamic> config, MergeSummary summary}) _applyAggregation(
   Map<String, dynamic> config,
   SmartAnchorInput input,
 ) {
@@ -259,7 +328,19 @@ Map<String, dynamic> _applyAggregation(
   result['rules'] = merged.rules;
   result['rule-providers'] = merged.ruleProviders;
   result['proxy-providers'] = merged.proxyProviders;
-  return result;
+  var proxiesIn = 0;
+  for (final source in sources) {
+    proxiesIn += source.proxies.length;
+  }
+  return (
+    config: result,
+    summary: (
+      sources: sources.length,
+      proxiesIn: proxiesIn,
+      proxiesOut: merged.proxies.length,
+      pruned: merged.prunedReferences,
+    ),
+  );
 }
 
 // The unified aggregation group is the feature's own list, so its member

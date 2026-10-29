@@ -547,6 +547,33 @@ class SetupAction extends _$SetupAction {
         built.rankedByService,
         selectedMap,
       );
+      final mergeSummary = built.mergeSummary;
+      if (mergeSummary != null) {
+        commonPrint.log(
+          saMergeSummaryLine(
+            sources: mergeSummary.sources,
+            proxiesIn: mergeSummary.proxiesIn,
+            proxiesOut: mergeSummary.proxiesOut,
+            pruned: mergeSummary.pruned,
+          ),
+        );
+      }
+      for (final ambiguous in built.ambiguousStripped) {
+        commonPrint.log(
+          saStrippedAmbiguousLine(
+            name: ambiguous.name,
+            candidates: ambiguous.candidates,
+          ),
+        );
+      }
+      for (final entry in sanitizedSelectedMap.entries) {
+        final before = selectedMap[entry.key];
+        if (before != null && before != entry.value) {
+          commonPrint.log(
+            saSanitizeLine(groupName: entry.key, from: before, to: entry.value),
+          );
+        }
+      }
     }
     final directory = await appPath.profilesPath;
     final injected = await _resolveInjectedProviders(

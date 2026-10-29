@@ -34,6 +34,7 @@ class MergedSubscription {
     required this.proxyProviders,
     required this.mode,
     required this.unifiedGroupName,
+    this.prunedReferences = 0,
   });
 
   final List<Map<String, dynamic>> proxies;
@@ -44,6 +45,11 @@ class MergedSubscription {
   final Map<String, dynamic> proxyProviders;
   final AggregationGroupMode mode;
   final String unifiedGroupName;
+
+  /// References the pruning pass dropped because their target does not
+  /// exist in the merged config (dangling dialer proxies, group members,
+  /// provider uses, emptied groups, and rules pointing nowhere).
+  final int prunedReferences;
 
   bool get degraded => sources.any((source) => !source.ok);
   bool get empty => proxies.isEmpty;
@@ -282,6 +288,7 @@ class SubscriptionMerger {
       };
     }
 
+    var prunedReferences = 0;
     var changed = true;
     while (changed) {
       changed = false;
@@ -291,13 +298,16 @@ class SubscriptionMerger {
         final dialer = proxy['dialer-proxy'];
         return dialer is String && dialer.isNotEmpty && !names.contains(dialer);
       });
+      prunedReferences += proxyCount - merged.length;
       changed |= merged.length != proxyCount;
       names = currentNames();
       final groupCount = mergedGroups.length;
       mergedGroups.removeWhere((group) {
         final members = group['proxies'];
         if (members is List) {
+          final memberCount = members.length;
           members.removeWhere((member) => !names.contains(member.toString()));
+          prunedReferences += memberCount - members.length;
         }
         final use = group['use'];
         if (use is List) {
@@ -305,11 +315,13 @@ class SubscriptionMerger {
             for (final entry in use)
               if (mergedProxyProviders.containsKey(entry.toString())) entry,
           ];
+          prunedReferences += use.length - (group['use'] as List).length;
         }
         final remainingMembers = (group['proxies'] as List?) ?? const [];
         final remainingUse = (group['use'] as List?) ?? const [];
         return remainingMembers.isEmpty && remainingUse.isEmpty;
       });
+      prunedReferences += groupCount - mergedGroups.length;
       changed |= mergedGroups.length != groupCount;
       names = currentNames();
       final ruleCount = mergedRules.length;
@@ -328,6 +340,7 @@ class SubscriptionMerger {
         final target = idx < 0 ? text : text.substring(idx + 1);
         return !names.contains(target);
       });
+      prunedReferences += ruleCount - mergedRules.length;
       changed |= mergedRules.length != ruleCount;
     }
     return MergedSubscription(
@@ -339,6 +352,7 @@ class SubscriptionMerger {
       proxyProviders: mergedProxyProviders,
       mode: mode,
       unifiedGroupName: unifiedName,
+      prunedReferences: prunedReferences,
     );
   }
 

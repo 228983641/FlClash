@@ -71,4 +71,188 @@ void main() {
       'status=unsupported-region delay=-1',
     );
   });
+
+  test('delay round line marks the per-node fallback with its reason', () {
+    expect(
+      saDelayRoundLine(
+        targets: 120,
+        screenAnswered: 40,
+        refined: 40,
+        ok: 38,
+        timeout: 50,
+        failed: 30,
+        unmeasured: 2,
+        durationMs: 4200,
+        usedFallback: true,
+        fallbackReason: 'method not found',
+      ),
+      '[SA] delay-round targets=120 screenAnswered=40 refined=40 ok=38 '
+      'timeout=50 failed=30 unmeasured=2 durationMs=4200 mode=fallback '
+      'fallbackReason=method not found',
+    );
+    expect(
+      saDelayRoundLine(
+        targets: 3,
+        screenAnswered: 3,
+        refined: 3,
+        ok: 3,
+        timeout: 0,
+        failed: 0,
+        unmeasured: 0,
+        durationMs: 900,
+        usedFallback: false,
+      ),
+      '[SA] delay-round targets=3 screenAnswered=3 refined=3 ok=3 '
+      'timeout=0 failed=0 unmeasured=0 durationMs=900 mode=batch',
+    );
+  });
+
+  test('meta round line tallies failures by cause and waf outcomes', () {
+    expect(
+      saMetaRoundLine(
+        probed: 32,
+        metaOk: 20,
+        metaFailed: 12,
+        noEgress: 9,
+        geoFailed: 3,
+        wafPass: 18,
+        wafFail: 2,
+        wafUnknown: 12,
+      ),
+      '[SA] meta-round probed=32 ok=20 failed=12 noEgress=9 geoFailed=3 '
+      'wafPass=18 wafFail=2 wafUnknown=12',
+    );
+    expect(
+      saMetaFailLine(node: 'US-1', reason: 'no-egress'),
+      '[SA] meta-fail node=US-1 reason=no-egress',
+    );
+    expect(
+      saPurityTierLine(
+        node: 'US-1',
+        fromTier: 'safe',
+        toTier: 'watch',
+        score: 62.4,
+      ),
+      '[SA] purity-tier node=US-1 from=safe to=watch score=62',
+    );
+  });
+
+  test('borrow lines name the donor and the exclusion path', () {
+    expect(
+      saBorrowFanoutLine(
+        donor: 'openai',
+        borrowers: const ['poe', 'grok'],
+        nodes: 12,
+      ),
+      '[SA] borrow-fanout donor=openai borrowers=grok,poe nodes=12',
+    );
+    expect(
+      saBorrowExcludeLine(
+        serviceId: 'grok',
+        node: 'SG-1',
+        donor: 'openai',
+        via: 'region',
+      ),
+      '[SA] borrow-exclude service=grok node=SG-1 donor=openai via=region',
+    );
+  });
+
+  test('derived regions line renders both sets sorted', () {
+    expect(
+      saDerivedRegionsLine(
+        serviceId: 'openai',
+        blockedBefore: const {'JP', 'US'},
+        blockedAfter: const {'US'},
+      ),
+      '[SA] derived-regions service=openai blocked={JP,US}->{US}',
+    );
+    expect(
+      saDerivedRegionsLine(
+        serviceId: 'openai',
+        blockedBefore: const {},
+        blockedAfter: const {'SG'},
+      ),
+      '[SA] derived-regions service=openai blocked={}->{SG}',
+    );
+  });
+
+  test('rank anchors line sorts services and anchor replace names both', () {
+    expect(
+      saRankAnchorsLine(anchors: const {'openai': 'JP-2', 'claude': 'US-1'}),
+      '[SA] rank-anchors claude=US-1 openai=JP-2',
+    );
+    expect(
+      saAnchorReplaceLine(
+        serviceId: 'claude',
+        from: 'US-1',
+        to: 'US-9',
+        why: 'stability',
+      ),
+      '[SA] anchor-replace service=claude from=US-1 to=US-9 '
+      'reason=stability',
+    );
+  });
+
+  test('freeze lines bracket the frozen window', () {
+    expect(
+      saFailoverFreezeLine(serviceId: 'youtube', untilMs: 1700000600000),
+      '[SA] failover-freeze service=youtube until=1700000600000',
+    );
+    expect(
+      saFailoverFreezeEndLine(serviceId: 'youtube'),
+      '[SA] failover-freeze-end service=youtube',
+    );
+  });
+
+  test('build lines cover merge, sanitize, ambiguity and lock changes', () {
+    expect(
+      saMergeSummaryLine(
+        sources: 3,
+        proxiesIn: 320,
+        proxiesOut: 298,
+        pruned: 14,
+      ),
+      '[SA] merge-summary sources=3 proxiesIn=320 proxiesOut=298 pruned=14',
+    );
+    expect(
+      saSanitizeLine(groupName: '🎯 Smart-Claude', from: 'TW-1', to: 'US-1'),
+      '[SA] sanitize group=🎯 Smart-Claude old=TW-1 new=US-1 '
+      'reason=not-in-ranking',
+    );
+    expect(
+      saStrippedAmbiguousLine(name: 'US-1', candidates: 3),
+      '[SA] stripped-ambiguous name=US-1 candidates=3',
+    );
+    expect(
+      saLockChangeLine(
+        serviceId: 'claude',
+        services: 5,
+        anchorsCleared: 2,
+        countries: const ['US', 'JP'],
+      ),
+      '[SA] lock-change service=claude services=5 anchorsCleared=2 '
+      'countries=US,JP',
+    );
+    expect(
+      saLockChangeLine(
+        serviceId: 'claude',
+        services: 1,
+        anchorsCleared: 0,
+        countries: const [],
+      ),
+      '[SA] lock-change service=claude services=1 anchorsCleared=0 '
+      'countries=none',
+    );
+  });
+
+  test('tick and reprobe lines stay one-liners', () {
+    expect(
+      saTickLine(anchors: 1, compliance: 2, probeUpdated: 5, failover: 1),
+      '[SA] tick anchors=1 compliance=2 probeUpdated=5 failover=1',
+    );
+    expect(
+      saReprobeLine(source: 'profile-refresh'),
+      '[SA] reprobe source=profile-refresh',
+    );
+  });
 }
