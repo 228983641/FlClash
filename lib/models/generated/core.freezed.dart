@@ -5230,7 +5230,7 @@ as List<RouteHit>,
 /// @nodoc
 mixin _$ServiceCheckParams {
 
-@JsonKey(name: 'proxy-name') String get proxyName; List<String> get names; int get timeout;
+@JsonKey(name: 'proxy-name') String get proxyName; List<String> get names; int get timeout; String get scope;
 /// Create a copy of ServiceCheckParams
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -5244,20 +5244,20 @@ $ServiceCheckParamsCopyWith<ServiceCheckParams> get copyWith => _$ServiceCheckPa
 @override
 bool operator ==(Object other) {
   final _this = this as ServiceCheckParams;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ServiceCheckParams&&(identical(other.proxyName, _this.proxyName) || other.proxyName == _this.proxyName)&&const DeepCollectionEquality().equals(other.names, _this.names)&&(identical(other.timeout, _this.timeout) || other.timeout == _this.timeout));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ServiceCheckParams&&(identical(other.proxyName, _this.proxyName) || other.proxyName == _this.proxyName)&&const DeepCollectionEquality().equals(other.names, _this.names)&&(identical(other.timeout, _this.timeout) || other.timeout == _this.timeout)&&(identical(other.scope, _this.scope) || other.scope == _this.scope));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as ServiceCheckParams;
-  return Object.hash(runtimeType,_this.proxyName,const DeepCollectionEquality().hash(_this.names),_this.timeout);
+  return Object.hash(runtimeType,_this.proxyName,const DeepCollectionEquality().hash(_this.names),_this.timeout,_this.scope);
 }
 
 @override
 String toString() {
   final _this = this as ServiceCheckParams;
-  return 'ServiceCheckParams(proxyName: ${_this.proxyName}, names: ${_this.names}, timeout: ${_this.timeout})';
+  return 'ServiceCheckParams(proxyName: ${_this.proxyName}, names: ${_this.names}, timeout: ${_this.timeout}, scope: ${_this.scope})';
 }
 
 
@@ -5268,7 +5268,7 @@ abstract mixin class $ServiceCheckParamsCopyWith<$Res>  {
   factory $ServiceCheckParamsCopyWith(ServiceCheckParams value, $Res Function(ServiceCheckParams) _then) = _$ServiceCheckParamsCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'proxy-name') String proxyName, List<String> names, int timeout
+@JsonKey(name: 'proxy-name') String proxyName, List<String> names, int timeout, String scope
 });
 
 
@@ -5285,12 +5285,13 @@ class _$ServiceCheckParamsCopyWithImpl<$Res>
 
 /// Create a copy of ServiceCheckParams
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? proxyName = null,Object? names = null,Object? timeout = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? proxyName = null,Object? names = null,Object? timeout = null,Object? scope = null,}) {
   return _then(ServiceCheckParams(
 proxyName: null == proxyName ? _self.proxyName : proxyName // ignore: cast_nullable_to_non_nullable
 as String,names: null == names ? _self.names : names // ignore: cast_nullable_to_non_nullable
 as List<String>,timeout: null == timeout ? _self.timeout : timeout // ignore: cast_nullable_to_non_nullable
-as int,
+as int,scope: null == scope ? _self.scope : scope // ignore: cast_nullable_to_non_nullable
+as String,
   ));
 }
 
@@ -5375,10 +5376,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'proxy-name')  String proxyName,  List<String> names,  int timeout)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'proxy-name')  String proxyName,  List<String> names,  int timeout,  String scope)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ServiceCheckParams() when $default != null:
-return $default(_that.proxyName,_that.names,_that.timeout);case _:
+return $default(_that.proxyName,_that.names,_that.timeout,_that.scope);case _:
   return orElse();
 
 }
@@ -5396,10 +5397,10 @@ return $default(_that.proxyName,_that.names,_that.timeout);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'proxy-name')  String proxyName,  List<String> names,  int timeout)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'proxy-name')  String proxyName,  List<String> names,  int timeout,  String scope)  $default,) {final _that = this;
 switch (_that) {
 case _ServiceCheckParams():
-return $default(_that.proxyName,_that.names,_that.timeout);case _:
+return $default(_that.proxyName,_that.names,_that.timeout,_that.scope);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -5416,10 +5417,10 @@ return $default(_that.proxyName,_that.names,_that.timeout);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'proxy-name')  String proxyName,  List<String> names,  int timeout)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'proxy-name')  String proxyName,  List<String> names,  int timeout,  String scope)?  $default,) {final _that = this;
 switch (_that) {
 case _ServiceCheckParams() when $default != null:
-return $default(_that.proxyName,_that.names,_that.timeout);case _:
+return $default(_that.proxyName,_that.names,_that.timeout,_that.scope);case _:
   return null;
 
 }
@@ -5431,7 +5432,7 @@ return $default(_that.proxyName,_that.names,_that.timeout);case _:
 @JsonSerializable()
 
 class _ServiceCheckParams implements ServiceCheckParams {
-  const _ServiceCheckParams({@JsonKey(name: 'proxy-name') this.proxyName = '',  List<String> names = const [], required this.timeout}): _names = names;
+  const _ServiceCheckParams({@JsonKey(name: 'proxy-name') this.proxyName = '',  List<String> names = const [], required this.timeout, this.scope = ''}): _names = names;
   factory _ServiceCheckParams.fromJson(Map<String, dynamic> json) => _$ServiceCheckParamsFromJson(json);
 
 @override@JsonKey(name: 'proxy-name') final  String proxyName;
@@ -5443,6 +5444,7 @@ class _ServiceCheckParams implements ServiceCheckParams {
 }
 
 @override final  int timeout;
+@override@JsonKey() final  String scope;
 
 /// Create a copy of ServiceCheckParams
 /// with the given fields replaced by the non-null parameter values.
@@ -5457,18 +5459,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _ServiceCheckParams&&(identical(other.proxyName, proxyName) || other.proxyName == proxyName)&&const DeepCollectionEquality().equals(other.names, _names)&&(identical(other.timeout, timeout) || other.timeout == timeout));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _ServiceCheckParams&&(identical(other.proxyName, proxyName) || other.proxyName == proxyName)&&const DeepCollectionEquality().equals(other.names, _names)&&(identical(other.timeout, timeout) || other.timeout == timeout)&&(identical(other.scope, scope) || other.scope == scope));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,proxyName,const DeepCollectionEquality().hash(_names),timeout);
+    return Object.hash(runtimeType,proxyName,const DeepCollectionEquality().hash(_names),timeout,scope);
 }
 
 @override
 String toString() {
-    return 'ServiceCheckParams(proxyName: $proxyName, names: $names, timeout: $timeout)';
+    return 'ServiceCheckParams(proxyName: $proxyName, names: $names, timeout: $timeout, scope: $scope)';
 }
 
 
@@ -5479,7 +5481,7 @@ abstract mixin class _$ServiceCheckParamsCopyWith<$Res> implements $ServiceCheck
   factory _$ServiceCheckParamsCopyWith(_ServiceCheckParams value, $Res Function(_ServiceCheckParams) _then) = __$ServiceCheckParamsCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'proxy-name') String proxyName, List<String> names, int timeout
+@JsonKey(name: 'proxy-name') String proxyName, List<String> names, int timeout, String scope
 });
 
 
@@ -5496,12 +5498,13 @@ class __$ServiceCheckParamsCopyWithImpl<$Res>
 
 /// Create a copy of ServiceCheckParams
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? proxyName = null,Object? names = null,Object? timeout = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? proxyName = null,Object? names = null,Object? timeout = null,Object? scope = null,}) {
   return _then(_ServiceCheckParams(
 proxyName: null == proxyName ? _self.proxyName : proxyName // ignore: cast_nullable_to_non_nullable
 as String,names: null == names ? _self._names : names // ignore: cast_nullable_to_non_nullable
 as List<String>,timeout: null == timeout ? _self.timeout : timeout // ignore: cast_nullable_to_non_nullable
-as int,
+as int,scope: null == scope ? _self.scope : scope // ignore: cast_nullable_to_non_nullable
+as String,
   ));
 }
 

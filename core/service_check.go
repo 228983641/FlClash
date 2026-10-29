@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 	"time"
@@ -38,6 +39,7 @@ const (
 	serviceComingSoon        = "coming-soon"
 	serviceTimeout           = "timeout"
 	serviceFailed            = "failed"
+	serviceCancelled         = "cancelled"
 )
 
 // An empty Names runs every check.
@@ -45,6 +47,11 @@ type ServiceCheckParams struct {
 	ProxyName string   `json:"proxy-name"`
 	Names     []string `json:"names"`
 	Timeout   int64    `json:"timeout"`
+	// Scope names the host caller (the status panel or the smart-anchor
+	// prober). Claims and slots are kept per scope, so one caller's checks
+	// never cancel or starve the other's. Callers that send no scope share
+	// the empty scope and the prober's slots.
+	Scope string `json:"scope"`
 }
 
 // runServiceCheck stamps Name; a blank Status means a rule has yet to judge it.
@@ -60,12 +67,37 @@ type ServiceCheckItem struct {
 	Hits         []RouteHit `json:"hits,omitempty"`
 }
 
+// The panel scope value the host sends; every other scope shares the
+// prober pool below.
+const scopePanel = "panel"
+
 var (
-	serviceCheckSlots = make(slots, serviceCheckConcurrency)
+	// One slot pool per caller scope, so a panel sweep cannot starve the
+	// prober and the prober cannot starve the panel. Each pool keeps the
+	// old sweep bound; together they cap service checks at twice that.
+	servicePanelCheckSlots = make(slots, serviceCheckConcurrency)
+	serviceProbeCheckSlots = make(slots, serviceCheckConcurrency)
 
 	serviceClaimsMu sync.Mutex
-	serviceClaims   = map[string]*context.CancelFunc{}
+	serviceClaims   = map[string]*serviceClaim{}
 )
+
+type serviceClaim struct {
+	cancel context.CancelCauseFunc
+}
+
+func slotsForScope(scope string) slots {
+	if scope == scopePanel {
+		return servicePanelCheckSlots
+	}
+	return serviceProbeCheckSlots
+}
+
+// A claim names one check of one route: the same service asked through a
+// different proxy is a different question and must not cancel this one.
+func claimKey(scope, name, proxyName string) string {
+	return scope + "\x00" + name + "\x00" + proxyName
+}
 
 type serviceEnv struct {
 	ctx       context.Context
@@ -128,16 +160,17 @@ func handleServiceCheck(params *ServiceCheckParams) []ServiceCheckItem {
 
 	// Claimed before queueing, so a check waiting for a slot is cancelled the
 	// moment its service is asked again.
-	contexts, release := claimServices(ctx, wanted)
+	contexts, release := claimServices(ctx, params.Scope, params.ProxyName, wanted)
 	defer release()
+	pool := slotsForScope(params.Scope)
 	var running sync.WaitGroup
 	for index, checker := range wanted {
-		granted := serviceCheckSlots.acquire(contexts[index])
+		granted := pool.acquire(contexts[index])
 		running.Add(1)
 		go func(index int, checker serviceChecker) {
 			defer running.Done()
 			if granted {
-				defer serviceCheckSlots.release()
+				defer pool.release()
 			}
 			items[index] = runServiceCheck(contexts[index], checker, params.ProxyName, timeout)
 		}(index, checker)
@@ -154,6 +187,14 @@ func runServiceCheck(ctx context.Context, checker serviceChecker, proxyName stri
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			item = ServiceCheckItem{Status: serviceFailed}
+		}
+		// A check replaced by a newer request from the same caller never
+		// judged its node; report it as cancelled so the host does not
+		// mistake the outcome for a node failure.
+		if (item.Status == serviceFailed || item.Status == serviceTimeout) &&
+			errors.Is(context.Cause(ctx), errServiceCheckReplaced) {
+			item.Status = serviceCancelled
+			item.Delay = 0
 		}
 		item.Name = checker.name
 		item.CheckedAt = time.Now().UnixMilli()
@@ -181,9 +222,17 @@ func retryable(item ServiceCheckItem) bool {
 		(item.Status == serviceFailed && len(item.Chains) == 0)
 }
 
+// errServiceCheckReplaced is the cancellation cause of a check a newer
+// request from the same caller scope superseded; runServiceCheck turns
+// such an outcome into serviceCancelled.
+var errServiceCheckReplaced = errors.New("service check replaced by a newer request")
+
 // The host asks for a service again only once the older answer can no longer
 // be used, so a newer check cancels the older one and frees its probe slots.
-func claimServices(parent context.Context, checkers []serviceChecker) ([]context.Context, func()) {
+// Claims are keyed by caller scope and route as well as service: one
+// caller asking again never cancels the other caller's check, nor a
+// check of the same service through another proxy.
+func claimServices(parent context.Context, scope, proxyName string, checkers []serviceChecker) ([]context.Context, func()) {
 	contexts := make([]context.Context, len(checkers))
 	claimed := make(map[string]context.Context, len(checkers))
 	var releases []func()
@@ -191,7 +240,7 @@ func claimServices(parent context.Context, checkers []serviceChecker) ([]context
 		ctx, ok := claimed[checker.name]
 		if !ok {
 			var release func()
-			ctx, release = claimService(parent, checker.name)
+			ctx, release = claimService(parent, claimKey(scope, checker.name, proxyName))
 			claimed[checker.name] = ctx
 			releases = append(releases, release)
 		}
@@ -204,20 +253,20 @@ func claimServices(parent context.Context, checkers []serviceChecker) ([]context
 	}
 }
 
-func claimService(parent context.Context, name string) (context.Context, func()) {
-	ctx, cancel := context.WithCancel(parent)
-	claim := &cancel
+func claimService(parent context.Context, key string) (context.Context, func()) {
+	ctx, cancel := context.WithCancelCause(parent)
+	claim := &serviceClaim{cancel: cancel}
 	serviceClaimsMu.Lock()
-	if previous := serviceClaims[name]; previous != nil {
-		(*previous)()
+	if previous := serviceClaims[key]; previous != nil {
+		previous.cancel(errServiceCheckReplaced)
 	}
-	serviceClaims[name] = claim
+	serviceClaims[key] = claim
 	serviceClaimsMu.Unlock()
 	return ctx, func() {
-		cancel()
+		cancel(context.Canceled)
 		serviceClaimsMu.Lock()
-		if serviceClaims[name] == claim {
-			delete(serviceClaims, name)
+		if serviceClaims[key] == claim {
+			delete(serviceClaims, key)
 		}
 		serviceClaimsMu.Unlock()
 	}

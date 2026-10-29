@@ -22,6 +22,23 @@ NodeMetadataCache fakeNode() {
   );
 }
 
+NodeMetadataCache metadataFor(String name, {required bool fresh}) {
+  return NodeMetadataCache(
+    proxyName: name,
+    entryServer: 'entry.example',
+    egressIp: '1.2.3.4',
+    countryCode: 'US',
+    latitude: 34.0522,
+    longitude: -118.2437,
+    asn: 'AS20057',
+    ipType: 'residential',
+    fraudScore: 0,
+    purityScore: 90,
+    wafPass: true,
+    updatedAt: fresh ? DateTime.now().millisecondsSinceEpoch : 0,
+  );
+}
+
 void main() {
   test('core service statuses map to access reasons', () {
     expect(
@@ -46,6 +63,10 @@ void main() {
       accessReasonFromStatus(ServiceProbeStatus.unavailable),
       ServiceAccessReason.unknown,
     );
+    expect(
+      accessReasonFromStatus(ServiceProbeStatus.cancelled),
+      ServiceAccessReason.unknown,
+    );
   });
 
   test('service ids map to core targets, unknown services map to null', () {
@@ -55,67 +76,89 @@ void main() {
     expect(serviceTargetForServiceId('x'), isNull);
   });
 
-  test('probe targets put the current node first and cap at top-k', () {
-    final targets = selectProbeTargets(
-      ranked: ['A', 'B', 'C', 'D'],
-      current: 'C',
-      topK: 2,
-    );
-    expect(targets, ['C', 'A', 'B']);
-  });
+  group('probe queue', () {
+    test('puts current nodes first, even when their metadata is fresh', () {
+      final targets = selectProbeQueue(
+        proxyNames: ['A', 'B', 'C'],
+        currentProxyNames: ['C'],
+        metadataByProxy: {'C': metadataFor('C', fresh: true)},
+        rankByProxy: const {},
+      );
+      expect(targets, ['C', 'A', 'B']);
+    });
 
-  test('full probe targets keep nodes faster than the median delay', () {
-    final targets = selectFullProbeTargets(
-      proxyNames: ['A', 'B', 'C', 'D'],
-      current: 'C',
-      delays: {'A': 100, 'B': 200, 'C': 300, 'D': 400},
-    );
-    expect(targets, ['C', 'A', 'B']);
-  });
+    test('skips fresh nodes outside the current set', () {
+      final targets = selectProbeQueue(
+        proxyNames: ['A', 'B', 'C'],
+        currentProxyNames: const [],
+        metadataByProxy: {
+          'A': metadataFor('A', fresh: true),
+          'B': metadataFor('B', fresh: false),
+        },
+        rankByProxy: const {},
+      );
+      expect(targets, ['B', 'C']);
+    });
 
-  test('full probe targets ignore outliers the mean would include', () {
-    final targets = selectFullProbeTargets(
-      proxyNames: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'],
-      current: '',
-      delays: {
-        'A': 50,
-        'B': 60,
-        'C': 70,
-        'D': 80,
-        'E': 90,
-        'F': 100,
-        'G': 200,
-        'H': 300,
-        'I': 400,
-        'J': 5000,
-      },
-    );
-    expect(targets, ['A', 'B', 'C', 'D', 'E']);
-  });
+    test('orders stale nodes by best rank, then by list order', () {
+      final targets = selectProbeQueue(
+        proxyNames: ['A', 'B', 'C', 'D'],
+        currentProxyNames: const [],
+        metadataByProxy: const {},
+        rankByProxy: {'C': 0, 'A': 2},
+      );
+      expect(targets, ['C', 'A', 'B', 'D']);
+    });
 
-  test('full probe targets use the middle value for odd counts', () {
-    final targets = selectFullProbeTargets(
-      proxyNames: ['A', 'B', 'C'],
-      current: '',
-      delays: {'A': 100, 'B': 200, 'C': 300},
-    );
-    expect(targets, ['A', 'B']);
-  });
+    test('budget trims the tail but never a current node', () {
+      final targets = selectProbeQueue(
+        proxyNames: ['A', 'B', 'C', 'D'],
+        currentProxyNames: ['D'],
+        metadataByProxy: const {},
+        rankByProxy: const {},
+        budget: 2,
+      );
+      expect(targets, ['D', 'A']);
+      final currentsOnly = selectProbeQueue(
+        proxyNames: ['A', 'B'],
+        currentProxyNames: ['A', 'B'],
+        metadataByProxy: const {},
+        rankByProxy: const {},
+        budget: 1,
+      );
+      expect(currentsOnly, ['A', 'B']);
+    });
 
-  test('full probe targets ignore unmeasured and timed out nodes', () {
-    final targets = selectFullProbeTargets(
-      proxyNames: ['A', 'B', 'C'],
-      current: '',
-      delays: {'A': 100, 'B': -1},
-    );
-    expect(targets, ['A']);
-  });
-
-  test('full probe targets are empty without measured delays', () {
-    expect(
-      selectFullProbeTargets(proxyNames: ['A'], current: 'A', delays: {}),
-      isEmpty,
-    );
+    test('repeated rounds walk the queue to full coverage', () {
+      const names = ['A', 'B', 'C', 'D', 'E', 'F'];
+      final metadata = <String, NodeMetadataCache>{};
+      const ranks = {'E': 0, 'C': 1, 'A': 2};
+      final covered = <String>[];
+      for (var round = 0; round < 3; round++) {
+        final targets = selectProbeQueue(
+          proxyNames: names,
+          currentProxyNames: const [],
+          metadataByProxy: metadata,
+          rankByProxy: ranks,
+          budget: 2,
+        );
+        covered.addAll(targets);
+        for (final name in targets) {
+          metadata[name] = metadataFor(name, fresh: true);
+        }
+      }
+      expect(covered, ['E', 'C', 'A', 'B', 'D', 'F']);
+      expect(
+        selectProbeQueue(
+          proxyNames: names,
+          currentProxyNames: const [],
+          metadataByProxy: metadata,
+          rankByProxy: ranks,
+          budget: 2,
+        ),
+        isEmpty,
+      );
+    });
   });
 
   test('probeNode combines egress, geo and service checks', () async {
@@ -167,6 +210,36 @@ void main() {
     expect(
       outcome.accessByService['claude']?.reason,
       ServiceAccessReason.networkFailed,
+    );
+  });
+
+  test('probeNode records nothing for a cancelled service check', () async {
+    final prober = SmartAnchorProber(
+      egressLookup: (_) async => const IpInfo(ip: '1.2.3.4', countryCode: 'US'),
+      serviceCheckLookup: (_, _) async {
+        return {
+          ServiceTarget.claude: const ServiceCheck(
+            ServiceProbeStatus.cancelled,
+          ),
+          ServiceTarget.gemini: const ServiceCheck(
+            ServiceProbeStatus.available,
+          ),
+        };
+      },
+      geoLookup:
+          ({required ip, required proxyName, required entryServer}) async =>
+              fakeNode(),
+    );
+    final outcome = await prober.probeNode(
+      proxyName: 'US-01',
+      entryServer: '',
+      serviceIds: ['claude', 'gemini'],
+      nowMs: DateTime.now().millisecondsSinceEpoch,
+    );
+    expect(outcome.accessByService.containsKey('claude'), isFalse);
+    expect(
+      outcome.accessByService['gemini']?.reason,
+      ServiceAccessReason.accessible,
     );
   });
 }

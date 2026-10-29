@@ -197,10 +197,12 @@ class ProxiesAction extends _$ProxiesAction {
       final groups = ref.read(groupsProvider);
       final groupNames = {for (final group in groups) group.name};
       final names = <String>{};
-      var current = '';
+      final currents = <String>[];
       for (final group in groups) {
-        if (group.name.startsWith('🎯 Smart-') && group.now != null) {
-          current = group.now!;
+        if (group.name.startsWith('🎯 Smart-') &&
+            group.now != null &&
+            !currents.contains(group.now)) {
+          currents.add(group.now!);
         }
         for (final proxy in group.all) {
           if (!groupNames.contains(proxy.name)) {
@@ -215,7 +217,8 @@ class ProxiesAction extends _$ProxiesAction {
           _smartAnchorProbeAfterDelayTest(
             groups: groups,
             names: names.toList(),
-            current: current,
+            current: currents.isEmpty ? '' : currents.last,
+            currents: currents,
           ).catchError((Object e) {
             commonPrint.log('smart anchor auto delay test failed: $e');
           });
@@ -235,6 +238,7 @@ class ProxiesAction extends _$ProxiesAction {
     required List<Group> groups,
     required List<String> names,
     required String current,
+    required List<String> currents,
   }) async {
     if (_smartAnchorAutoDelayTesting) {
       return;
@@ -270,6 +274,7 @@ class ProxiesAction extends _$ProxiesAction {
           .probeNodes(
             proxyNames: names,
             currentProxyName: current,
+            currentProxyNames: currents,
             delays: delays,
             force: hadNoDelays,
           );
@@ -526,17 +531,33 @@ class ProxiesAction extends _$ProxiesAction {
       if (!smart.autoFailoverEnabled) {
         return;
       }
-      final probed = <String>{};
+      final groupNames = {for (final group in groups) group.name};
+      final names = <String>[];
+      for (final group in groups) {
+        for (final proxy in group.all) {
+          if (!groupNames.contains(proxy.name) && !names.contains(proxy.name)) {
+            names.add(proxy.name);
+          }
+        }
+      }
+      final currents = <String>[];
       for (final service in smart.services.where((s) => s.isEnabled)) {
         final current = groups.getGroup(smartGroupName(service))?.now;
-        if (current == null || !probed.add(current)) {
-          continue;
+        if (current != null && !currents.contains(current)) {
+          currents.add(current);
         }
+      }
+      // One queued round per tick: the in-use nodes are always probed so
+      // the failover check sees fresh access results, and the rest of the
+      // round's budget walks the stale-metadata queue toward full coverage.
+      if (names.isNotEmpty) {
         await ref
             .read(smartAnchorProvider.notifier)
             .probeNodes(
-              proxyNames: [current],
-              currentProxyName: current,
+              proxyNames: names,
+              currentProxyName: currents.isEmpty ? '' : currents.first,
+              currentProxyNames: currents,
+              delays: flattenDelays(ref.read(delayDataSourceProvider)),
               force: true,
               updateThrottle: false,
             );

@@ -20,7 +20,8 @@ class ServiceStatus extends _$ServiceStatus
   @override
   bool isFailure(ServiceCheck value) =>
       value.status == ServiceProbeStatus.timeout ||
-      value.status == ServiceProbeStatus.failed;
+      value.status == ServiceProbeStatus.failed ||
+      value.status == ServiceProbeStatus.cancelled;
 
   @override
   Future<Map<ServiceTarget, ProbeAnswer<ServiceCheck>>> probe(
@@ -31,6 +32,7 @@ class ServiceStatus extends _$ServiceStatus
       ref.read(coreHandlerProvider),
       proxyName: route.proxied ? '' : directOutbound,
       targets: [target],
+      scope: serviceCheckScopePanel,
     );
     final check = checks[target];
     return {

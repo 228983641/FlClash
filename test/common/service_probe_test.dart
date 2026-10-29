@@ -148,6 +148,20 @@ void main() {
       },
     );
 
+    test('forwards the caller scope to the Core', () async {
+      late ServiceCheckParams sent;
+      when(() => core.serviceCheck(any())).thenAnswer((invocation) async {
+        sent = invocation.positionalArguments.single as ServiceCheckParams;
+        return const [];
+      });
+
+      await checkServices(controller, scope: serviceCheckScopePanel);
+      expect(sent.scope, serviceCheckScopePanel);
+
+      await checkServices(controller);
+      expect(sent.scope, isEmpty);
+    });
+
     test('an empty target list asks for every service', () async {
       late ServiceCheckParams sent;
       when(() => core.serviceCheck(any())).thenAnswer((invocation) async {

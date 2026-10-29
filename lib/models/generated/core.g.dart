@@ -404,6 +404,7 @@ _ServiceCheckParams _$ServiceCheckParamsFromJson(Map<String, dynamic> json) =>
           (json['names'] as List<dynamic>?)?.map((e) => e as String).toList() ??
           const [],
       timeout: (json['timeout'] as num).toInt(),
+      scope: json['scope'] as String? ?? '',
     );
 
 Map<String, dynamic> _$ServiceCheckParamsToJson(_ServiceCheckParams instance) =>
@@ -411,6 +412,7 @@ Map<String, dynamic> _$ServiceCheckParamsToJson(_ServiceCheckParams instance) =>
       'proxy-name': instance.proxyName,
       'names': instance.names,
       'timeout': instance.timeout,
+      'scope': instance.scope,
     };
 
 _ServiceCheckItem _$ServiceCheckItemFromJson(Map<String, dynamic> json) =>

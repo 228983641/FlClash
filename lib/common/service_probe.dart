@@ -48,7 +48,8 @@ enum ServiceProbeStatus {
   originalsOnly('originals-only'),
   comingSoon('coming-soon'),
   timeout('timeout'),
-  failed('failed');
+  failed('failed'),
+  cancelled('cancelled');
 
   const ServiceProbeStatus(this.id);
 
@@ -136,6 +137,13 @@ class ServiceCheck {
       'ServiceCheck(${status.id}, delay: $delay, node: $node, region: $region)';
 }
 
+/// Caller scopes for Core service checks. The Core keeps its replacement
+/// claims and probe slots per scope, so the status panel and the
+/// smart-anchor prober never cancel or starve each other. Callers that pass
+/// no scope share the Core's empty scope.
+const serviceCheckScopePanel = 'panel';
+const serviceCheckScopeProbe = 'probe';
+
 /// An empty [proxyName] lets the Core route by its rules; an empty [targets]
 /// checks every service.
 Future<Map<ServiceTarget, ServiceCheck>> checkServices(
@@ -143,12 +151,14 @@ Future<Map<ServiceTarget, ServiceCheck>> checkServices(
   String proxyName = '',
   List<ServiceTarget> targets = const [],
   Duration timeout = probeTimeoutDuration,
+  String scope = '',
 }) async {
   final items = await core.serviceCheck(
     ServiceCheckParams(
       proxyName: proxyName,
       names: targets.map((target) => target.id).toList(),
       timeout: timeout.inMilliseconds,
+      scope: scope,
     ),
   );
   return {

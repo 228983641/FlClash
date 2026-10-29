@@ -38,6 +38,7 @@ ServiceAccessReason accessReasonFromStatus(ServiceProbeStatus status) {
     case ServiceProbeStatus.unavailable:
     case ServiceProbeStatus.originalsOnly:
     case ServiceProbeStatus.comingSoon:
+    case ServiceProbeStatus.cancelled:
       return ServiceAccessReason.unknown;
   }
 }
@@ -58,62 +59,76 @@ ServiceAccessResult accessResultFromStatus({
   );
 }
 
-List<String> selectFullProbeTargets({
-  required List<String> proxyNames,
-  required String current,
-  required Map<String, int> delays,
-}) {
-  final measured = <String, int>{};
-  for (final name in proxyNames) {
-    final delay = delays[name];
-    if (delay != null && delay > 0) {
-      measured[name] = delay;
-    }
-  }
-  if (measured.isEmpty) {
-    return [];
-  }
-  final sorted = measured.values.toList()..sort();
-  final middle = sorted.length ~/ 2;
-  final median = sorted.length.isOdd
-      ? sorted[middle].toDouble()
-      : (sorted[middle - 1] + sorted[middle]) / 2;
-  final aboveMedian =
-      measured.entries
-          .where((entry) => entry.value <= median)
-          .map((entry) => entry.key)
-          .toList()
-        ..sort((a, b) => measured[a]!.compareTo(measured[b]!));
-  final targets = <String>[];
-  if (current.isNotEmpty && !targets.contains(current)) {
-    targets.add(current);
-  }
-  for (final name in aboveMedian) {
-    if (!targets.contains(name)) {
-      targets.add(name);
-    }
-  }
-  return targets;
-}
+/// How many nodes one probe round may cover. Rounds are triggered by
+/// setup and by the monitor tick, so a bounded round still walks the whole
+/// queue over time instead of truncating coverage by list position.
+const int probeRoundBudget = 32;
 
-List<String> selectProbeTargets({
-  required List<String> ranked,
-  required String current,
-  int topK = 20,
+/// Whether a node with this metadata should be (re)probed once the queue
+/// reaches it: no metadata yet, or metadata past its TTL.
+bool probeMetadataStale(NodeMetadataCache? metadata) =>
+    metadata == null || metadata.isExpired;
+
+/// One round of probe targets, best first:
+///
+/// 1. the node each enabled service group is currently using — its access
+///    results feed the failover check, so it is probed even when its
+///    metadata is still fresh, and currents are never cut by the budget;
+/// 2. nodes with missing or expired metadata, best rank first —
+///    [rankByProxy] carries each node's best (lowest) rank across the
+///    enabled services' rankings;
+/// 3. the remaining stale nodes in [proxyNames] order.
+///
+/// Fresh nodes outside the current set are skipped; they re-enter the
+/// queue when their metadata expires. A node probed this round drops out
+/// of the stale set, so the next round resumes where this one stopped and
+/// repeated rounds cover every node.
+List<String> selectProbeQueue({
+  required List<String> proxyNames,
+  required List<String> currentProxyNames,
+  required Map<String, NodeMetadataCache> metadataByProxy,
+  required Map<String, int> rankByProxy,
+  int budget = probeRoundBudget,
 }) {
   final targets = <String>[];
-  if (current.isNotEmpty && !targets.contains(current)) {
-    targets.add(current);
-  }
-  for (final name in ranked) {
-    if (targets.length >= topK + (current.isNotEmpty ? 1 : 0)) {
-      break;
-    }
-    if (!targets.contains(name)) {
+  final seen = <String>{};
+  void add(String name) {
+    if (name.isNotEmpty && seen.add(name)) {
       targets.add(name);
     }
   }
-  return targets;
+
+  var currents = 0;
+  for (final name in currentProxyNames) {
+    if (name.isNotEmpty && !seen.contains(name)) {
+      currents++;
+    }
+    add(name);
+  }
+  final order = {
+    for (var index = 0; index < proxyNames.length; index++)
+      proxyNames[index]: index,
+  };
+  final stale = [
+    for (final name in proxyNames)
+      if (probeMetadataStale(metadataByProxy[name])) name,
+  ];
+  final ranked =
+      [
+        for (final name in stale)
+          if (rankByProxy.containsKey(name)) name,
+      ]..sort((a, b) {
+        final byRank = rankByProxy[a]!.compareTo(rankByProxy[b]!);
+        return byRank != 0 ? byRank : order[a]!.compareTo(order[b]!);
+      });
+  for (final name in ranked) {
+    add(name);
+  }
+  for (final name in stale) {
+    add(name);
+  }
+  final limit = budget > currents ? budget : currents;
+  return targets.take(limit).toList();
 }
 
 class ProbeOutcome {
@@ -177,6 +192,12 @@ class SmartAnchorProber {
       for (final entry in checks.entries) {
         final serviceId = targets[entry.key];
         if (serviceId == null) {
+          continue;
+        }
+        // A check cancelled because a newer request from this same caller
+        // replaced it says nothing about the node; recording an outcome
+        // for it would read as a node failure downstream.
+        if (entry.value.status == ServiceProbeStatus.cancelled) {
           continue;
         }
         access[serviceId] = accessResultFromStatus(

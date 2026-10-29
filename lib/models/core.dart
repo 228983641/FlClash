@@ -288,6 +288,7 @@ abstract class ServiceCheckParams with _$ServiceCheckParams {
     @JsonKey(name: 'proxy-name') @Default('') String proxyName,
     @Default([]) List<String> names,
     required int timeout,
+    @Default('') String scope,
   }) = _ServiceCheckParams;
 
   factory ServiceCheckParams.fromJson(Map<String, Object?> json) =>

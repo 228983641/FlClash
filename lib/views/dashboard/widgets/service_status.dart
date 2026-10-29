@@ -33,7 +33,8 @@ String _statusLabel(BuildContext context, ServiceProbeStatus status) {
     ServiceProbeStatus.originalsOnly => localizations.serviceOriginalsOnly,
     ServiceProbeStatus.comingSoon => localizations.serviceComingSoon,
     ServiceProbeStatus.timeout => localizations.timeout,
-    ServiceProbeStatus.failed => localizations.serviceFailed,
+    ServiceProbeStatus.failed ||
+    ServiceProbeStatus.cancelled => localizations.serviceFailed,
   };
 }
 
@@ -49,7 +50,8 @@ Color _statusColor(BuildContext context, ServiceProbeStatus status) {
     ServiceProbeStatus.comingSoon => colorScheme.warning,
     ServiceProbeStatus.unavailable ||
     ServiceProbeStatus.timeout ||
-    ServiceProbeStatus.failed => colorScheme.error,
+    ServiceProbeStatus.failed ||
+    ServiceProbeStatus.cancelled => colorScheme.error,
   };
 }
 

@@ -169,12 +169,12 @@ func TestHandleServiceCheckBoundsConcurrencyAcrossRequests(t *testing.T) {
 	tracker.verify(t, 12)
 }
 
-func waitForClaim(t *testing.T, name string) {
+func waitForClaim(t *testing.T, scope, name, proxyName string) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
 	for {
 		serviceClaimsMu.Lock()
-		claimed := serviceClaims[name] != nil
+		claimed := serviceClaims[claimKey(scope, name, proxyName)] != nil
 		serviceClaimsMu.Unlock()
 		if claimed {
 			return
@@ -188,13 +188,13 @@ func waitForClaim(t *testing.T, name string) {
 
 func TestHandleServiceCheckDropsAQueuedCheckAskedAgain(t *testing.T) {
 	for i := 0; i < serviceCheckConcurrency; i++ {
-		serviceCheckSlots <- struct{}{}
+		serviceProbeCheckSlots <- struct{}{}
 	}
 	var freeOnce sync.Once
 	free := func() {
 		freeOnce.Do(func() {
 			for i := 0; i < serviceCheckConcurrency; i++ {
-				<-serviceCheckSlots
+				<-serviceProbeCheckSlots
 			}
 		})
 	}
@@ -213,13 +213,13 @@ func TestHandleServiceCheckDropsAQueuedCheckAskedAgain(t *testing.T) {
 	}
 
 	older := ask()
-	waitForClaim(t, "alpha")
+	waitForClaim(t, "", "alpha", "")
 	newer := ask()
 
 	select {
 	case items := <-older:
-		if items[0].Status != serviceFailed {
-			t.Errorf("older alpha = %q, want it cancelled", items[0].Status)
+		if items[0].Status != serviceCancelled {
+			t.Errorf("older alpha = %q, want it reported cancelled", items[0].Status)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("a check queued for a slot kept waiting after its service was asked again")
@@ -392,14 +392,179 @@ func TestHandleServiceCheckCancelsTheOlderCheckOfTheSameService(t *testing.T) {
 	}
 	select {
 	case items := <-older:
-		if items[0].Status != serviceFailed {
-			t.Errorf("older alpha = %q, want it cancelled", items[0].Status)
+		if items[0].Status != serviceCancelled {
+			t.Errorf("older alpha = %q, want it reported cancelled", items[0].Status)
 		}
 		if items[1].Status != serviceAvailable {
 			t.Errorf("older beta = %q, want it left running", items[1].Status)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("the older sweep kept running after its service was asked again")
+	}
+}
+
+func TestHandleServiceCheckReportsASupersededCheckAsCancelled(t *testing.T) {
+	started := make(chan struct{}, 1)
+	var calls atomic.Int32
+	withServiceCheckers(t, serviceChecker{name: "alpha", check: func(env serviceEnv) ServiceCheckItem {
+		if calls.Add(1) > 1 {
+			return ServiceCheckItem{Status: serviceAvailable}
+		}
+		started <- struct{}{}
+		<-env.ctx.Done()
+		return ServiceCheckItem{Status: serviceFailed}
+	}})
+
+	older := make(chan []ServiceCheckItem, 1)
+	go func() {
+		older <- handleServiceCheck(&ServiceCheckParams{Names: []string{"alpha"}, Timeout: 5000, Scope: "probe"})
+	}()
+	waitForClaim(t, "probe", "alpha", "")
+	<-started
+
+	newer := handleServiceCheck(&ServiceCheckParams{Names: []string{"alpha"}, Timeout: 5000, Scope: "probe"})
+	if newer[0].Status != serviceAvailable {
+		t.Errorf("newer alpha = %q, want %q", newer[0].Status, serviceAvailable)
+	}
+	select {
+	case items := <-older:
+		if items[0].Status != serviceCancelled {
+			t.Errorf("superseded alpha = %q, want %q so the host does not record a node failure", items[0].Status, serviceCancelled)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the superseded check never returned")
+	}
+}
+
+func TestHandleServiceCheckDoesNotCancelAcrossScopes(t *testing.T) {
+	gate := make(chan struct{})
+	var gateOnce sync.Once
+	releaseGate := func() { gateOnce.Do(func() { close(gate) }) }
+	defer releaseGate()
+	started := make(chan struct{}, 1)
+	var calls atomic.Int32
+	withServiceCheckers(t, serviceChecker{name: "alpha", check: func(env serviceEnv) ServiceCheckItem {
+		if calls.Add(1) == 1 {
+			started <- struct{}{}
+			select {
+			case <-gate:
+			case <-env.ctx.Done():
+				return ServiceCheckItem{Status: serviceFailed}
+			}
+		}
+		return ServiceCheckItem{Status: serviceAvailable}
+	}})
+
+	probing := make(chan []ServiceCheckItem, 1)
+	go func() {
+		probing <- handleServiceCheck(&ServiceCheckParams{Names: []string{"alpha"}, Timeout: 5000, Scope: "probe"})
+	}()
+	waitForClaim(t, "probe", "alpha", "")
+	<-started
+
+	panel := handleServiceCheck(&ServiceCheckParams{Names: []string{"alpha"}, Timeout: 5000, Scope: scopePanel})
+	if panel[0].Status != serviceAvailable {
+		t.Fatalf("panel alpha = %q, want %q", panel[0].Status, serviceAvailable)
+	}
+	select {
+	case items := <-probing:
+		t.Fatalf("the prober check ended early with %q; a panel request must not cancel it", items[0].Status)
+	default:
+	}
+	releaseGate()
+	select {
+	case items := <-probing:
+		if items[0].Status != serviceAvailable {
+			t.Errorf("prober alpha = %q, want its own answer %q", items[0].Status, serviceAvailable)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the prober check never finished")
+	}
+}
+
+func TestHandleServiceCheckDoesNotCancelAcrossProxies(t *testing.T) {
+	gate := make(chan struct{})
+	var gateOnce sync.Once
+	releaseGate := func() { gateOnce.Do(func() { close(gate) }) }
+	defer releaseGate()
+	started := make(chan struct{}, 1)
+	var calls atomic.Int32
+	withServiceCheckers(t, serviceChecker{name: "alpha", check: func(env serviceEnv) ServiceCheckItem {
+		if calls.Add(1) == 1 {
+			started <- struct{}{}
+			select {
+			case <-gate:
+			case <-env.ctx.Done():
+				return ServiceCheckItem{Status: serviceFailed}
+			}
+		}
+		return ServiceCheckItem{Status: serviceAvailable}
+	}})
+
+	first := make(chan []ServiceCheckItem, 1)
+	go func() {
+		first <- handleServiceCheck(&ServiceCheckParams{ProxyName: "node-a", Names: []string{"alpha"}, Timeout: 5000, Scope: "probe"})
+	}()
+	waitForClaim(t, "probe", "alpha", "node-a")
+	<-started
+
+	second := handleServiceCheck(&ServiceCheckParams{ProxyName: "node-b", Names: []string{"alpha"}, Timeout: 5000, Scope: "probe"})
+	if second[0].Status != serviceAvailable {
+		t.Fatalf("node-b alpha = %q, want %q", second[0].Status, serviceAvailable)
+	}
+	select {
+	case items := <-first:
+		t.Fatalf("the node-a check ended early with %q; another node's check must not cancel it", items[0].Status)
+	default:
+	}
+	releaseGate()
+	select {
+	case items := <-first:
+		if items[0].Status != serviceAvailable {
+			t.Errorf("node-a alpha = %q, want its own answer %q", items[0].Status, serviceAvailable)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the node-a check never finished")
+	}
+}
+
+func TestServiceCheckSlotPoolsDoNotStarveEachOther(t *testing.T) {
+	for i := 0; i < serviceCheckConcurrency; i++ {
+		serviceProbeCheckSlots <- struct{}{}
+	}
+	var freeOnce sync.Once
+	free := func() {
+		freeOnce.Do(func() {
+			for i := 0; i < serviceCheckConcurrency; i++ {
+				<-serviceProbeCheckSlots
+			}
+		})
+	}
+	t.Cleanup(free)
+	withServiceCheckers(t, stubChecker("alpha", ServiceCheckItem{Status: serviceAvailable}))
+
+	panel := handleServiceCheck(&ServiceCheckParams{Names: []string{"alpha"}, Timeout: 5000, Scope: scopePanel})
+	if panel[0].Status != serviceAvailable {
+		t.Errorf("panel alpha = %q, want %q while the prober pool is full", panel[0].Status, serviceAvailable)
+	}
+
+	queued := make(chan []ServiceCheckItem, 1)
+	go func() {
+		queued <- handleServiceCheck(&ServiceCheckParams{Names: []string{"alpha"}, Timeout: 5000, Scope: "probe"})
+	}()
+	select {
+	case items := <-queued:
+		t.Fatalf("prober check finished with %q while its pool was full", items[0].Status)
+	case <-time.After(100 * time.Millisecond):
+	}
+	free()
+	select {
+	case items := <-queued:
+		if items[0].Status != serviceAvailable {
+			t.Errorf("prober alpha = %q, want %q once a slot frees", items[0].Status, serviceAvailable)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the prober check never got a slot")
 	}
 }
 

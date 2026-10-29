@@ -331,6 +331,7 @@ class SmartAnchor extends _$SmartAnchor {
   Future<int> probeNodes({
     required List<String> proxyNames,
     required String currentProxyName,
+    List<String> currentProxyNames = const [],
     Map<String, String> entryServers = const {},
     Map<String, int> delays = const {},
     bool force = false,
@@ -363,25 +364,35 @@ class SmartAnchor extends _$SmartAnchor {
     final prober = SmartAnchorProber(
       egressLookup: (name) async =>
           parseOutboundIp(await lookupOutboundIp(core, name)),
-      serviceCheckLookup: (name, targets) async =>
-          checkServices(core, proxyName: name, targets: targets),
+      serviceCheckLookup: (name, targets) async => checkServices(
+        core,
+        proxyName: name,
+        targets: targets,
+        scope: serviceCheckScopeProbe,
+      ),
       geoLookup: geoLookupFromService(geoService, true),
     );
-    final baseTargets = selectProbeTargets(
-      ranked: proxyNames,
-      current: currentProxyName,
-    );
-    final fullTargets = selectFullProbeTargets(
-      proxyNames: proxyNames,
-      current: currentProxyName,
-      delays: delays,
-    );
-    final targets = <String>[];
-    for (final name in [...fullTargets, ...baseTargets]) {
-      if (!targets.contains(name)) {
-        targets.add(name);
+    final rankByProxy = <String, int>{};
+    for (final service in enabled) {
+      final ranked = rankedProxiesForService(
+        state,
+        service,
+        proxyNames,
+        delays: delays,
+      );
+      for (var index = 0; index < ranked.length; index++) {
+        final best = rankByProxy[ranked[index]];
+        if (best == null || index < best) {
+          rankByProxy[ranked[index]] = index;
+        }
       }
     }
+    final targets = selectProbeQueue(
+      proxyNames: proxyNames,
+      currentProxyNames: [currentProxyName, ...currentProxyNames],
+      metadataByProxy: state.metadataByProxy,
+      rankByProxy: rankByProxy,
+    );
     final serviceIds = [for (final service in enabled) service.serviceId];
     final metadata = Map.of(state.metadataByProxy);
     final access = <String, Map<String, ServiceAccessResult>>{
