@@ -291,6 +291,15 @@ class CoreController {
     return _interface.asyncTestDelay(url, proxyName, timeout);
   }
 
+  Future<Map<String, int>> getDelays(
+    List<String> proxies,
+    String url,
+    Duration timeout, {
+    bool single = false,
+  }) {
+    return _interface.getDelays(proxies, url, timeout, single: single);
+  }
+
   Future<ProbeResult?> probe(ProbeParams params) => _interface.probe(params);
 
   Future<OutboundIpResult?> outboundIp(OutboundIpParams params) =>

@@ -43,6 +43,7 @@ class _RecordingCoreHandler extends CoreHandlerInterface {
         'url': 'https://example.com',
         'value': 42,
       },
+      CoreMethod.asyncTestDelays => {'DIRECT': 42, 'REJECT': -1},
       CoreMethod.probe => {
         'status-code': 204,
         'delay': 17,
@@ -228,6 +229,19 @@ void main() {
       'DIRECT',
       const Duration(seconds: 8),
     );
+    final delays = await handler.getDelays(
+      const ['DIRECT', 'REJECT'],
+      'https://example.com',
+      const Duration(seconds: 8),
+      single: true,
+    );
+    expect(delays, const {'DIRECT': 42, 'REJECT': -1});
+    expect(handler.calls[CoreMethod.asyncTestDelays], {
+      'proxies': ['DIRECT', 'REJECT'],
+      'test-url': 'https://example.com',
+      'timeout': 8000,
+      'single': true,
+    });
     await handler.probe(
       const ProbeParams(
         url: 'https://example.com',

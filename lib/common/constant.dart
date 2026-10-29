@@ -57,6 +57,13 @@ const defaultDelayTestTimeout = 8000;
 
 const delayTestGuardDuration = Duration(seconds: 30);
 
+/// The per-node budget of a delay screening pass, before the nodes that
+/// answered are measured again with the full configured timeout. A node
+/// that does not answer within the cap counts as failed for the sweep even
+/// if the full timeout would have caught it: the screen exists to find the
+/// low-latency pool cheaply, not to grade slow nodes.
+const delayScreenTimeoutCap = Duration(seconds: 2);
+
 const delayTimedOutValue = -1;
 
 const probeTimeoutDuration = Duration(seconds: 10);

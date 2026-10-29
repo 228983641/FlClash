@@ -52,6 +52,13 @@ mixin CoreInterface {
 
   Future<Delay?> asyncTestDelay(String url, String proxyName, Duration timeout);
 
+  Future<Map<String, int>> getDelays(
+    List<String> proxies,
+    String url,
+    Duration timeout, {
+    bool single = false,
+  });
+
   Future<ProbeResult?> probe(ProbeParams params);
 
   Future<OutboundIpResult?> outboundIp(OutboundIpParams params);
@@ -601,6 +608,38 @@ abstract class CoreHandlerInterface with CoreInterface {
       timeout: delayTestGuardDuration,
     );
     return data == null ? null : Delay.fromJson(data);
+  }
+
+  @override
+  Future<Map<String, int>> getDelays(
+    List<String> proxies,
+    String url,
+    Duration timeout, {
+    bool single = false,
+  }) async {
+    // The Core runs the batch in waves of its own concurrency, each wave
+    // spending the per-node timeout on a queue wait and a probe, which is
+    // what coreGuardFor already budgets for; scale it by the wave count.
+    final waves =
+        (proxies.length + maxConcurrentDelayTests - 1) ~/
+        maxConcurrentDelayTests;
+    final data = await _invokeMethod<Map<String, dynamic>>(
+      method: CoreMethod.asyncTestDelays,
+      arguments: {
+        'proxies': proxies,
+        'test-url': url,
+        'timeout': timeout.inMilliseconds,
+        'single': single,
+      },
+      timeout: coreGuardFor(timeout.inMilliseconds * waves),
+    );
+    if (data == null) {
+      return const {};
+    }
+    return {
+      for (final entry in data.entries)
+        if (entry.value is num) entry.key: (entry.value as num).toInt(),
+    };
   }
 
   @override

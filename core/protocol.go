@@ -34,6 +34,7 @@ const (
 	getTotalTrafficMethod          CoreMethod = "getTotalTraffic"
 	resetTrafficMethod             CoreMethod = "resetTraffic"
 	asyncTestDelayMethod           CoreMethod = "asyncTestDelay"
+	asyncTestDelaysMethod          CoreMethod = "asyncTestDelays"
 	probeMethod                    CoreMethod = "probe"
 	outboundIpMethod               CoreMethod = "outboundIp"
 	serviceCheckMethod             CoreMethod = "serviceCheck"
@@ -189,6 +190,13 @@ type TestDelayParams struct {
 	ProxyName string `json:"proxy-name"`
 	TestUrl   string `json:"test-url"`
 	Timeout   int64  `json:"timeout"`
+}
+
+type TestDelaysParams struct {
+	Proxies []string `json:"proxies"`
+	TestUrl string   `json:"test-url"`
+	Timeout int64    `json:"timeout"`
+	Single  bool     `json:"single"`
 }
 
 type Delay struct {

@@ -39,6 +39,7 @@ void main() {
     registerFallbackValue(
       const ChangeProxyParams(groupName: 'G', proxyName: 'P'),
     );
+    registerFallbackValue(<String>[]);
   });
 
   setUp(() {
@@ -326,6 +327,27 @@ void main() {
       );
       expect(result?.name, 'P1');
       expect(result?.value, 100);
+    });
+
+    test('getDelays delegates the batch with its single flag', () async {
+      when(
+        () => mock.getDelays(any(), any(), any(), single: any(named: 'single')),
+      ).thenAnswer((_) async => const {'P1': 100, 'P2': -1});
+      final result = await controller.getDelays(
+        const ['P1', 'P2'],
+        'test.com',
+        const Duration(seconds: 1),
+        single: true,
+      );
+      expect(result, const {'P1': 100, 'P2': -1});
+      verify(
+        () => mock.getDelays(
+          const ['P1', 'P2'],
+          'test.com',
+          const Duration(seconds: 1),
+          single: true,
+        ),
+      ).called(1);
     });
 
     test('startListener delegates', () async {

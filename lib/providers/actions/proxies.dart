@@ -813,15 +813,19 @@ class ProxiesAction extends _$ProxiesAction {
       Duration(milliseconds: ref.read(appSettingProvider).delayTestTimeout),
     );
     _delayTestJobs.add(job);
-    // TaskPool.run starts a task synchronously while it has an idle slot.
-    job.startedOnDispatch.addAll(
-      targets.take(_delayTestPool.idleSlots).map((target) => target.key),
-    );
+    // The Core schedules a batch itself, so every target counts as started
+    // the moment its batch is dispatched; there is no host-side queue left
+    // for a target to wait in.
+    job.startedOnDispatch.addAll(targets.map((target) => target.key));
     pending.apply(acquired: job.held, started: job.startedOnDispatch);
     try {
+      final byUrl = <String, List<_DelayTestTarget>>{};
+      for (final target in targets) {
+        (byUrl[target.testUrl] ??= []).add(target);
+      }
       await Future.wait(
-        targets.map(
-          (target) => _delayTestPool.run(() => _runDelayTest(job, target)),
+        byUrl.entries.map(
+          (entry) => _runDelayTestBatch(job, entry.key, entry.value),
         ),
       );
     } finally {
@@ -838,36 +842,126 @@ class ProxiesAction extends _$ProxiesAction {
     }
   }
 
-  Future<void> _runDelayTest(_DelayTestJob job, _DelayTestTarget target) async {
+  /// Two passes over one test URL's targets: a single-request screen at a
+  /// capped timeout over all of them, then the standard measurement at the
+  /// full timeout for the ones that answered. A failed screen is the node's
+  /// final result; a node the Core never measured records nothing, as a
+  /// null single test always has.
+  Future<void> _runDelayTestBatch(
+    _DelayTestJob job,
+    String testUrl,
+    List<_DelayTestTarget> targets,
+  ) async {
+    final screenTimeout = job.timeout < delayScreenTimeoutCap
+        ? job.timeout
+        : delayScreenTimeoutCap;
+    final screened = await _testDelays(
+      job,
+      testUrl,
+      targets.map((target) => target.proxyName).toList(),
+      screenTimeout,
+      single: true,
+    );
     if (job.cancelled) {
       return;
     }
-    if (!job.startedOnDispatch.contains(target.key)) {
-      _bufferedStarts.add(target.key);
+    final refine = <_DelayTestTarget>[];
+    for (final target in targets) {
+      final value = screened[target.proxyName];
+      if (value != null && value > 0) {
+        refine.add(target);
+      } else {
+        if (value != null) {
+          setDelay(Delay(name: target.proxyName, url: testUrl, value: value));
+        }
+        _settleDelayTarget(job, target);
+      }
+    }
+    if (refine.isEmpty) {
+      return;
+    }
+    final refined = await _testDelays(
+      job,
+      testUrl,
+      refine.map((target) => target.proxyName).toList(),
+      job.timeout,
+      single: false,
+    );
+    if (job.cancelled) {
+      return;
+    }
+    for (final target in refine) {
+      // A refine that never measured the node keeps the screen's value,
+      // which did measure it.
+      final value = refined[target.proxyName] ?? screened[target.proxyName];
+      if (value != null) {
+        setDelay(Delay(name: target.proxyName, url: testUrl, value: value));
+      }
+      _settleDelayTarget(job, target);
+    }
+  }
+
+  void _settleDelayTarget(_DelayTestJob job, _DelayTestTarget target) {
+    if (job.held.remove(target.key)) {
+      _bufferedFinishes.add(target.key);
       _scheduleDelayFlush();
     }
+  }
+
+  /// One batch call for a whole pass. A Core without the batch method, or
+  /// one that fails the call for any other reason than being gone, falls
+  /// back to the per-node calls the batch replaces.
+  Future<Map<String, int>> _testDelays(
+    _DelayTestJob job,
+    String testUrl,
+    List<String> proxyNames,
+    Duration timeout, {
+    required bool single,
+  }) async {
+    if (job.cancelled) {
+      return const {};
+    }
     try {
-      final delay = await _core.getDelay(
-        target.testUrl,
-        target.proxyName,
-        job.timeout,
+      return await _core.getDelays(
+        proxyNames,
+        testUrl,
+        timeout,
+        single: single,
       );
-      if (delay != null && !job.cancelled) {
-        setDelay(delay);
-      }
     } catch (error) {
       if (error is CoreMethodException && error.isCoreUnavailable) {
         job.cancelled = true;
+        return const {};
       }
       commonPrint.log(
-        'Delay test failed for ${target.proxyName}: $error',
+        'Batch delay test failed, falling back to per-node tests: $error',
         logLevel: coreFailureLogLevel(error),
       );
-    } finally {
-      if (job.held.remove(target.key)) {
-        _bufferedFinishes.add(target.key);
-        _scheduleDelayFlush();
-      }
     }
+    final results = <String, int>{};
+    await Future.wait(
+      proxyNames.map(
+        (proxyName) => _delayTestPool.run(() async {
+          if (job.cancelled) {
+            return;
+          }
+          try {
+            final delay = await _core.getDelay(testUrl, proxyName, timeout);
+            if (delay?.value != null) {
+              results[proxyName] = delay!.value!;
+            }
+          } catch (error) {
+            if (error is CoreMethodException && error.isCoreUnavailable) {
+              job.cancelled = true;
+            }
+            commonPrint.log(
+              'Delay test failed for $proxyName: $error',
+              logLevel: coreFailureLogLevel(error),
+            );
+          }
+        }),
+      ),
+    );
+    return results;
   }
 }
