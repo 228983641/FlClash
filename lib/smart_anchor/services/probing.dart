@@ -14,6 +14,8 @@ ServiceTarget? serviceTargetForServiceId(String serviceId) {
       return ServiceTarget.gemini;
     case 'netflix':
       return ServiceTarget.netflix;
+    case 'disney':
+      return ServiceTarget.disneyPlus;
     case 'youtube':
       return ServiceTarget.youtube;
     case 'google':

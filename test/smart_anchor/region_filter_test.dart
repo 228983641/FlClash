@@ -31,6 +31,16 @@ ServiceAccessResult blocked(String proxy) {
   );
 }
 
+ServiceAccessResult staleBlocked(String proxy) {
+  return ServiceAccessResult(
+    serviceId: 'gemini',
+    proxyName: proxy,
+    egressIp: '1.2.3.4',
+    reason: ServiceAccessReason.regionBlocked,
+    checkedAt: DateTime.now().millisecondsSinceEpoch - 25 * 3600 * 1000,
+  );
+}
+
 const gemini = ServiceToggleConfig(
   serviceId: 'gemini',
   displayName: 'Gemini',
@@ -64,6 +74,41 @@ void main() {
     expect(ranked, isNot(contains('HK-1')));
     expect(ranked, isNot(contains('HK-2')));
     expect(ranked, contains('unprobed'));
+  });
+
+  test('an expired regionBlocked record no longer blacklists its country', () {
+    final input = SmartAnchorInput(
+      services: [gemini],
+      metadataByProxy: {
+        'US-1': regionMeta('US-1', 'US', 90),
+        'HK-1': regionMeta('HK-1', 'HK', 90),
+        'HK-2': regionMeta('HK-2', 'HK', 85),
+      },
+      accessByService: {
+        'gemini': {'HK-1': staleBlocked('HK-1')},
+      },
+    );
+    expect(detectedUnsupportedRegions(input, 'gemini'), isEmpty);
+    final ranked = rankedProxiesForService(input, gemini, [
+      'US-1',
+      'HK-1',
+      'HK-2',
+    ]);
+    expect(ranked, containsAll(['HK-1', 'HK-2']));
+  });
+
+  test('a fresh regionBlocked still blacklists while a stale one lapses', () {
+    final input = SmartAnchorInput(
+      services: [gemini],
+      metadataByProxy: {
+        'HK-1': regionMeta('HK-1', 'HK', 90),
+        'JP-1': regionMeta('JP-1', 'JP', 90),
+      },
+      accessByService: {
+        'gemini': {'HK-1': staleBlocked('HK-1'), 'JP-1': blocked('JP-1')},
+      },
+    );
+    expect(detectedUnsupportedRegions(input, 'gemini'), {'JP'});
   });
 
   test('explicit blacklist overrides the detected default', () {

@@ -59,6 +59,17 @@ class ScoringEngine {
     }).toList();
   }
 
+  /// Whether [node] may become the remembered anchor for a service: the
+  /// same qualification the ranking applies, so a node the lock rules out
+  /// (or a fresh region-block verdict condemns) never anchors a service.
+  static bool anchorEligible(
+    NodeMetadataCache node,
+    List<String> lockedCountries,
+    Map<String, ServiceAccessResult> accessByProxy,
+  ) {
+    return filterForService([node], lockedCountries, accessByProxy).isNotEmpty;
+  }
+
   static List<NodeMetadataCache> rankForService(
     List<NodeMetadataCache> nodes,
     ServiceAnchor anchor,

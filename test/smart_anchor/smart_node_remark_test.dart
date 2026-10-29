@@ -63,6 +63,31 @@ void main() {
     expect(metadataForDisplayProxy(input, '[B] unknown'), isNull);
   });
 
+  test(
+    'metadata lookup skips the fallback when the stripped name collides',
+    () {
+      final input = SmartAnchorInput(
+        metadataByProxy: {'US-near': meta('US-near', 'residential', 88)},
+      );
+      expect(
+        metadataForDisplayProxy(
+          input,
+          '[主订阅] US-near',
+          poolNames: const ['[主订阅] US-near', '[B] US-near'],
+        ),
+        isNull,
+      );
+      expect(
+        metadataForDisplayProxy(
+          input,
+          '[主订阅] US-near',
+          poolNames: const ['[主订阅] US-near', '[B] other'],
+        )?.purityScore,
+        88,
+      );
+    },
+  );
+
   test('node remark shows score and ip type label', () {
     expect(smartNodeRemark(meta('a', 'residential', 88.4)), '纯净度 88 · 家宽');
     expect(smartNodeRemark(meta('b', 'isp', 76)), '纯净度 76 · 家宽');

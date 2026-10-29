@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:fl_clash/common/function.dart';
 import 'package:fl_clash/common/request.dart';
 import 'package:fl_clash/common/service_probe.dart';
 import 'package:fl_clash/providers/core.dart';
@@ -22,6 +23,11 @@ part 'generated/smart_anchor.g.dart';
 class SmartAnchor extends _$SmartAnchor {
   SmartAnchorStore get _store => SmartAnchorStore.drift();
 
+  // Saves and anchor deletes share one queue: save() writes a full
+  // snapshot, so an unserialized earlier save landing after a later change
+  // could resurrect state (e.g. a cleared anchor) it still contains.
+  final _storeScheduler = SerialTaskScheduler();
+
   DateTime? _lastProbeAt;
 
   @override
@@ -34,7 +40,7 @@ class SmartAnchor extends _$SmartAnchor {
 
   void update(SmartAnchorInput next) {
     state = next;
-    unawaited(_store.save(next));
+    unawaited(_storeScheduler.run(() => _store.save(next)));
   }
 
   Future<void> restore() async {
@@ -229,12 +235,21 @@ class SmartAnchor extends _$SmartAnchor {
         targetCountry: normalized.isEmpty ? '' : normalized.first,
       );
     }
-    update(state.copyWith(services: _mergedServices(byId)));
+    var next = state.copyWith(services: _mergedServices(byId));
     if (changed) {
+      // Drop the targets' anchors in the same update: the save it triggers
+      // then carries no stale anchor, instead of a separate delete racing
+      // that save's write phase and resurrecting the anchor on restart.
+      final anchors = Map.of(next.anchors);
+      var removed = false;
       for (final id in targets) {
-        clearAnchor(id);
+        removed = anchors.remove(id) != null || removed;
+      }
+      if (removed) {
+        next = next.copyWith(anchors: anchors);
       }
     }
+    update(next);
   }
 
   void setSharedLockGroup(String groupId, bool enabled) {
@@ -298,7 +313,7 @@ class SmartAnchor extends _$SmartAnchor {
   void clearAnchor(String serviceId) {
     final anchors = Map.of(state.anchors)..remove(serviceId);
     state = state.copyWith(anchors: anchors);
-    unawaited(_store.deleteAnchor(serviceId));
+    unawaited(_storeScheduler.run(() => _store.deleteAnchor(serviceId)));
   }
 
   void setAnchor(String serviceId, ServiceAnchor anchor) {

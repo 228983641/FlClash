@@ -1,6 +1,7 @@
 import 'package:fl_clash/common/service_probe.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/smart_anchor/models/node_metadata.dart';
+import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
 import 'package:fl_clash/smart_anchor/services/probing.dart';
 import 'package:fl_clash/smart_anchor/services/service_access.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -74,6 +75,15 @@ void main() {
     expect(serviceTargetForServiceId('claude'), ServiceTarget.claude);
     expect(serviceTargetForServiceId('cloudflare'), isNull);
     expect(serviceTargetForServiceId('x'), isNull);
+  });
+
+  test('disney maps to the disneyPlus target the core already offers', () {
+    expect(defaultServiceToggles, hasLength(17));
+    expect(
+      defaultServiceToggles.map((service) => service.serviceId),
+      contains('disney'),
+    );
+    expect(serviceTargetForServiceId('disney'), ServiceTarget.disneyPlus);
   });
 
   group('probe queue', () {

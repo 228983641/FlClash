@@ -11,19 +11,21 @@ NodeMetadataCache node({
   String asn = 'AS20057',
   String egressIp = '1.2.3.4',
   double purity = 90,
+  String country = 'US',
+  bool waf = true,
 }) {
   return NodeMetadataCache(
     proxyName: name,
     entryServer: 'entry.example',
     egressIp: egressIp,
-    countryCode: 'US',
+    countryCode: country,
     latitude: lat,
     longitude: lon,
     asn: asn,
     ipType: 'residential',
     fraudScore: 0,
     purityScore: purity,
-    wafPass: true,
+    wafPass: waf,
     updatedAt: DateTime.now().millisecondsSinceEpoch,
   );
 }
@@ -175,5 +177,75 @@ void main() {
       'a-twin',
       'b-twin',
     ]);
+  });
+
+  group('anchorEligible', () {
+    ServiceAccessResult access(ServiceAccessReason reason, {int ageMs = 0}) {
+      return ServiceAccessResult(
+        serviceId: 'claude',
+        proxyName: 'US-1',
+        egressIp: '1.2.3.4',
+        reason: reason,
+        checkedAt: DateTime.now().millisecondsSinceEpoch - ageMs,
+      );
+    }
+
+    test('a compliant node may become the anchor', () {
+      expect(
+        ScoringEngine.anchorEligible(node(name: 'US-1'), const [
+          'US',
+        ], const {}),
+        isTrue,
+      );
+      expect(
+        ScoringEngine.anchorEligible(node(name: 'US-1'), const [], const {}),
+        isTrue,
+      );
+    });
+
+    test('a node outside the lock, impure or WAF-blocked may not', () {
+      expect(
+        ScoringEngine.anchorEligible(node(name: 'SG-1', country: 'SG'), const [
+          'US',
+        ], const {}),
+        isFalse,
+      );
+      expect(
+        ScoringEngine.anchorEligible(node(name: 'US-1', purity: 40), const [
+          'US',
+        ], const {}),
+        isFalse,
+      );
+      expect(
+        ScoringEngine.anchorEligible(node(name: 'US-1', waf: false), const [
+          'US',
+        ], const {}),
+        isFalse,
+      );
+    });
+
+    test('a fresh regionBlocked bars it, an expired one does not', () {
+      expect(
+        ScoringEngine.anchorEligible(
+          node(name: 'US-1'),
+          const ['US'],
+          {'US-1': access(ServiceAccessReason.regionBlocked)},
+        ),
+        isFalse,
+      );
+      expect(
+        ScoringEngine.anchorEligible(
+          node(name: 'US-1'),
+          const ['US'],
+          {
+            'US-1': access(
+              ServiceAccessReason.regionBlocked,
+              ageMs: 25 * 3600 * 1000,
+            ),
+          },
+        ),
+        isTrue,
+      );
+    });
   });
 }

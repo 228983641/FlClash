@@ -491,6 +491,17 @@ class ProxiesAction extends _$ProxiesAction {
         continue;
       }
       if (nowMs - tracked.$2 >= 10 * 60 * 1000) {
+        final access = smart.accessByService[service.serviceId] ?? const {};
+        if (!ScoringEngine.anchorEligible(
+          meta,
+          service.lockedCountries,
+          access,
+        )) {
+          // Not qualified to anchor right now; the stability clock keeps
+          // running, so a later probe that clears the node (fresh metadata,
+          // an expired block verdict) can still land it without a new wait.
+          continue;
+        }
         ref
             .read(smartAnchorProvider.notifier)
             .setAnchor(
@@ -528,6 +539,11 @@ class ProxiesAction extends _$ProxiesAction {
       _trackAnchorStability(smart);
       final groups = ref.read(groupsProvider);
       _observePathPoints(smart, groups, DateTime.now().millisecondsSinceEpoch);
+      // The compliance check also runs on the tick, not only at the end of
+      // updateGroups: when a setup push fails before updateGroups runs it,
+      // the lock would otherwise stay unenforced until the next apply. It
+      // is not gated by the failover toggle — a lock is a hard constraint.
+      smartAnchorLockComplianceCheck();
       if (!smart.autoFailoverEnabled) {
         return;
       }

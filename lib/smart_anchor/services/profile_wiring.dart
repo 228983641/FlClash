@@ -114,8 +114,20 @@ Map<String, dynamic> buildSmartConfig(
   SmartAnchorInput input, {
   Map<String, int> delays = const {},
 }) {
+  return buildSmartConfigWithRanking(rawConfig, input, delays: delays).config;
+}
+
+/// [buildSmartConfig] plus the per-service rankings it computed, so the
+/// setup path can sanitize persisted selections against the same ranking
+/// the config was built with instead of discarding it.
+({Map<String, dynamic> config, Map<String, List<String>> rankedByService})
+buildSmartConfigWithRanking(
+  Map<String, dynamic> rawConfig,
+  SmartAnchorInput input, {
+  Map<String, int> delays = const {},
+}) {
   if (!input.hasWork) {
-    return rawConfig;
+    return (config: rawConfig, rankedByService: const {});
   }
   var config = Map<String, dynamic>.from(rawConfig);
   var effectiveInput = input;
@@ -126,7 +138,7 @@ Map<String, dynamic> buildSmartConfig(
   }
   final enabled = input.services.where((service) => service.isEnabled);
   if (enabled.isEmpty) {
-    return config;
+    return (config: config, rankedByService: const {});
   }
   final proxyNames = _proxyNames(config);
   final remappedDelays = <String, int>{};
@@ -151,7 +163,44 @@ Map<String, dynamic> buildSmartConfig(
     rankedProxiesByService: rankedByService,
   );
   _moveUnifiedGroupFirst(injected);
-  return injected;
+  return (config: injected, rankedByService: rankedByService);
+}
+
+/// The selection map setup should push to the Core, with [lockReselectTarget]'s
+/// rule applied at build time: a persisted smart-group selection that falls
+/// outside the ranking the current lock produces is replaced by the top
+/// ranked node, so the Core's ForceSet cannot serve a locked-out country
+/// until the runtime compliance check gets to run. Compliant selections,
+/// groups without a ranking, and non-smart entries pass through untouched;
+/// the input map is never mutated.
+Map<String, String> sanitizeSelectedMap(
+  List<ServiceToggleConfig> services,
+  Map<String, List<String>> rankedByService,
+  Map<String, String> selectedMap,
+) {
+  if (rankedByService.isEmpty || selectedMap.isEmpty) {
+    return selectedMap;
+  }
+  var sanitized = selectedMap;
+  for (final service in services) {
+    if (!service.isEnabled) {
+      continue;
+    }
+    final ranked = rankedByService[service.serviceId];
+    if (ranked == null || ranked.isEmpty) {
+      continue;
+    }
+    final groupName = smartGroupName(service);
+    final current = selectedMap[groupName];
+    if (current == null || ranked.contains(current)) {
+      continue;
+    }
+    if (identical(sanitized, selectedMap)) {
+      sanitized = Map.of(selectedMap);
+    }
+    sanitized[groupName] = ranked.first;
+  }
+  return sanitized;
 }
 
 void _moveUnifiedGroupFirst(Map<String, dynamic> config) {
@@ -317,11 +366,25 @@ SmartAnchorInput _remapInputForMergedConfig(
   SmartAnchorInput input,
   List<String> proxyNames,
 ) {
+  // A stripped (pre-merge) name shared by several merged nodes cannot be
+  // attributed to just one of them: the record under it was probed against
+  // a single source's node, so the fallback must not fan it out to all.
+  final strippedCounts = <String, int>{};
+  for (final name in proxyNames) {
+    final stripped = _strippedProxyName(name);
+    strippedCounts[stripped] = (strippedCounts[stripped] ?? 0) + 1;
+  }
+  String? unambiguousStripped(String name) {
+    final stripped = _strippedProxyName(name);
+    return strippedCounts[stripped] == 1 ? stripped : null;
+  }
+
   final metadataByProxy = <String, NodeMetadataCache>{};
   for (final name in proxyNames) {
+    final stripped = unambiguousStripped(name);
     final meta =
         input.metadataByProxy[name] ??
-        input.metadataByProxy[_strippedProxyName(name)];
+        (stripped == null ? null : input.metadataByProxy[stripped]);
     if (meta == null) {
       continue;
     }
@@ -347,7 +410,10 @@ SmartAnchorInput _remapInputForMergedConfig(
   for (final entry in input.accessByService.entries) {
     final remapped = <String, ServiceAccessResult>{};
     for (final name in proxyNames) {
-      final access = entry.value[name] ?? entry.value[_strippedProxyName(name)];
+      final stripped = unambiguousStripped(name);
+      final access =
+          entry.value[name] ??
+          (stripped == null ? null : entry.value[stripped]);
       if (access == null) {
         continue;
       }
@@ -372,10 +438,26 @@ SmartAnchorInput _remapInputForMergedConfig(
 
 NodeMetadataCache? metadataForDisplayProxy(
   SmartAnchorInput input,
-  String displayName,
-) {
-  return input.metadataByProxy[displayName] ??
-      input.metadataByProxy[_strippedProxyName(displayName)];
+  String displayName, {
+  List<String> poolNames = const [],
+}) {
+  final exact = input.metadataByProxy[displayName];
+  if (exact != null) {
+    return exact;
+  }
+  final stripped = _strippedProxyName(displayName);
+  if (stripped == displayName) {
+    return null;
+  }
+  // Same attribution guard as the merged-config remap: when several pool
+  // nodes strip to this name, the record under it belongs to one unknown
+  // source's node and must not be shown for all of them.
+  if (poolNames.isNotEmpty &&
+      poolNames.where((name) => _strippedProxyName(name) == stripped).length >
+          1) {
+    return null;
+  }
+  return input.metadataByProxy[stripped];
 }
 
 String smartNodeRemark(NodeMetadataCache? metadata) {
@@ -415,9 +497,9 @@ Set<String> detectedUnsupportedRegions(
     if (country == null || country.isEmpty) {
       continue;
     }
-    if (entry.value.blocksRanking) {
+    if (entry.value.blocksRanking && !entry.value.isExpired) {
       blocked.add(country);
-    } else if (entry.value.isAccessible) {
+    } else if (entry.value.isAccessible && !entry.value.isExpired) {
       working.add(country);
     }
   }

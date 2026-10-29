@@ -310,4 +310,83 @@ void main() {
       '[主订阅] US-unknown',
     ]);
   });
+
+  test('a stripped fallback never leaks across same-named sources', () {
+    final result = buildSmartConfig(
+      {
+        'proxies': [
+          {'name': 'US-near', 'type': 'vless', 'server': 'a.example'},
+          {'name': 'X-01', 'type': 'vless', 'server': 'x.example'},
+        ],
+        'proxy-groups': <dynamic>[],
+        'rules': <dynamic>[],
+      },
+      SmartAnchorInput(
+        services: [claude],
+        aggregationEnabled: true,
+        anchors: {'claude': anchor},
+        metadataByProxy: {
+          'US-near': meta('US-near', 34.0522, -118.2437, 90),
+          'X-01': meta('X-01', 34.0522, -118.2437, 99),
+        },
+        aggregationSources: [
+          const AggregationSourceInput(
+            sourceId: 'extra',
+            sourceLabel: 'B',
+            config: {
+              'proxies': [
+                {'name': 'X-01', 'type': 'vless', 'server': 'y.example'},
+              ],
+              'proxy-groups': [],
+              'rules': [],
+            },
+          ),
+        ],
+      ),
+    );
+    final groups = result['proxy-groups'] as List;
+    final smart = groups.firstWhere(
+      (group) => group['name'] == '🎯 Smart-Claude',
+    );
+    expect(smart['proxies'], ['[主订阅] US-near', '[主订阅] X-01', '[B] X-01']);
+  });
+
+  test('a stripped fallback still applies when the name is unique', () {
+    final result = buildSmartConfig(
+      {
+        'proxies': [
+          {'name': 'US-near', 'type': 'vless', 'server': 'a.example'},
+        ],
+        'proxy-groups': <dynamic>[],
+        'rules': <dynamic>[],
+      },
+      SmartAnchorInput(
+        services: [claude],
+        aggregationEnabled: true,
+        anchors: {'claude': anchor},
+        metadataByProxy: {
+          'US-near': meta('US-near', 34.0522, -118.2437, 90),
+          'X-01': meta('X-01', 34.0522, -118.2437, 99),
+        },
+        aggregationSources: [
+          const AggregationSourceInput(
+            sourceId: 'extra',
+            sourceLabel: 'B',
+            config: {
+              'proxies': [
+                {'name': 'X-01', 'type': 'vless', 'server': 'y.example'},
+              ],
+              'proxy-groups': [],
+              'rules': [],
+            },
+          ),
+        ],
+      ),
+    );
+    final groups = result['proxy-groups'] as List;
+    final smart = groups.firstWhere(
+      (group) => group['name'] == '🎯 Smart-Claude',
+    );
+    expect(smart['proxies'], ['[B] X-01', '[主订阅] US-near']);
+  });
 }

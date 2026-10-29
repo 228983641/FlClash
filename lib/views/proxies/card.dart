@@ -149,12 +149,29 @@ class ProxyCard extends ConsumerWidget {
     final isGroupEntry = GroupType.values.any(
       (type) => type.name == proxy.type,
     );
+    final poolNames = isGroupEntry
+        ? const <String>[]
+        : ref.watch(
+            groupsProvider.select(
+              (groups) =>
+                  groups
+                      .getGroup(groupName)
+                      ?.all
+                      .map((poolProxy) => poolProxy.name)
+                      .toList() ??
+                  const <String>[],
+            ),
+          );
     final remark = isGroupEntry
         ? ''
         : smartNodeRemark(
             ref.watch(
               smartAnchorProvider.select(
-                (input) => metadataForDisplayProxy(input, proxy.name),
+                (input) => metadataForDisplayProxy(
+                  input,
+                  proxy.name,
+                  poolNames: poolNames,
+                ),
               ),
             ),
           );

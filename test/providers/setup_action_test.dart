@@ -16,6 +16,8 @@ import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/providers/database.dart';
 import 'package:fl_clash/providers/smart_anchor.dart';
 import 'package:fl_clash/providers/state.dart';
+import 'package:fl_clash/smart_anchor/models/node_metadata.dart';
+import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter/scheduler.dart';
@@ -71,6 +73,46 @@ class _UnflooredDebounceSetupAction extends SetupAction {
 class _CappedDebounceSetupAction extends _UnflooredDebounceSetupAction {
   @override
   Duration get maxApplyDebounce => const Duration(milliseconds: 300);
+}
+
+class _SanitizeSmartAnchor extends SmartAnchor {
+  @override
+  SmartAnchorInput build() {
+    NodeMetadataCache node(String name, String country, double purity) {
+      return NodeMetadataCache(
+        proxyName: name,
+        entryServer: 'entry.example',
+        egressIp: '1.2.3.4',
+        countryCode: country,
+        latitude: 34.0522,
+        longitude: -118.2437,
+        asn: 'AS20057',
+        ipType: 'residential',
+        fraudScore: 0,
+        purityScore: purity,
+        wafPass: true,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+    }
+
+    return SmartAnchorInput(
+      services: const [
+        ServiceToggleConfig(
+          serviceId: 'claude',
+          displayName: 'Claude',
+          officialName: 'Claude',
+          isEnabled: true,
+          targetCountry: 'US',
+          matchRules: ['DOMAIN-SUFFIX,claude.ai'],
+          dnsDomains: ['claude.ai'],
+        ),
+      ],
+      metadataByProxy: {
+        'TW-1': node('TW-1', 'TW', 100),
+        'US-1': node('US-1', 'US', 90),
+      },
+    );
+  }
 }
 
 class TestCommonAction extends CommonAction {
@@ -1681,6 +1723,62 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 800));
         verify(() => core.setupConfig(any())).called(1);
         await setupAction.setRunning(false);
+      },
+    );
+
+    test(
+      'a sanitized smart selection is pushed even when the yaml is unchanged',
+      () async {
+        const profile = Profile(
+          id: 4242,
+          label: 'p',
+          autoUpdateDuration: Duration.zero,
+          selectedMap: {'🎯 Smart-Claude': 'TW-1', 'Proxy': 'TW-1'},
+        );
+        final core = _MockCoreHandlerInterface();
+        when(() => core.getProfileBase(any())).thenAnswer(
+          (_) async => const ProfileBase(
+            config: {
+              'proxies': [
+                {'name': 'TW-1', 'type': 'ss', 'server': 'tw.example'},
+                {'name': 'US-1', 'type': 'ss', 'server': 'us.example'},
+              ],
+              'proxy-groups': <dynamic>[],
+              'rules': <dynamic>[],
+            },
+            digest: 'd',
+          ),
+        );
+        final pushed = <SetupParams>[];
+        when(() => core.setupConfig(any())).thenAnswer((invocation) async {
+          pushed.add(invocation.positionalArguments.single as SetupParams);
+          return '';
+        });
+        final scoped = ProviderContainer(
+          overrides: [
+            profilesProvider.overrideWith(() => TestProfiles([profile])),
+            currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+            setupStateProvider.overrideWith(
+              (_, profileId) =>
+                  nullProfileSetupState.copyWith(profileId: profileId),
+            ),
+            smartAnchorProvider.overrideWith(_SanitizeSmartAnchor.new),
+            coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
+            commonActionProvider.overrideWith(TestCommonAction.new),
+            setupActionProvider.overrideWith(SetupAction.new),
+          ],
+        );
+        addTearDown(scoped.dispose);
+        final setupAction = scoped.read(setupActionProvider.notifier);
+        await setupAction.applyProfile(force: true);
+        expect(pushed, hasLength(1));
+        expect(pushed.single.selectedMap['🎯 Smart-Claude'], 'US-1');
+        expect(pushed.single.selectedMap['Proxy'], 'TW-1');
+        expect(profile.selectedMap['🎯 Smart-Claude'], 'TW-1');
+
+        await setupAction.applyProfile();
+        expect(pushed, hasLength(2));
+        expect(pushed.last.selectedMap['🎯 Smart-Claude'], 'US-1');
       },
     );
 

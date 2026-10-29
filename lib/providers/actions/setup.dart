@@ -14,6 +14,7 @@ typedef BuiltProfile = ({
   String md5,
   ConfigCounts counts,
   SetupBase? base,
+  Map<String, String> sanitizedSelectedMap,
 });
 
 class _RunRequest {
@@ -478,8 +479,16 @@ class SetupAction extends _$SetupAction {
     required PatchClashConfig patchConfig,
   }) async {
     final profileId = setupState.profileId;
+    final selectedMap = ref.read(selectedMapProvider);
+    var sanitizedSelectedMap = selectedMap;
     if (profileId == null) {
-      return (yaml: '', md5: '', counts: configCountsOf(const {}), base: null);
+      return (
+        yaml: '',
+        md5: '',
+        counts: configCountsOf(const {}),
+        base: null,
+        sanitizedSelectedMap: sanitizedSelectedMap,
+      );
     }
     final defaultUA = globalState.packageInfo.ua;
     final networkSetting = ref.read(
@@ -522,15 +531,21 @@ class SetupAction extends _$SetupAction {
       final enabledServices = smartAnchorInput.services.where(
         (service) => service.isEnabled,
       );
-      rawConfig = await PerfTrace.time(
+      final built = await PerfTrace.time(
         'build-smart-config',
-        () async => buildSmartConfig(
+        () async => buildSmartConfigWithRanking(
           rawConfig,
           smartAnchorInput,
           delays: flattenDelays(ref.read(delayDataSourceProvider)),
         ),
         detail:
             'sources=${smartAnchorInput.aggregationSources.length} services=${enabledServices.length}',
+      );
+      rawConfig = built.config;
+      sanitizedSelectedMap = sanitizeSelectedMap(
+        smartAnchorInput.services,
+        built.rankedByService,
+        selectedMap,
       );
     }
     final directory = await appPath.profilesPath;
@@ -569,7 +584,13 @@ class SetupAction extends _$SetupAction {
       detail: 'profile=$profileId',
     );
     if (profileBase == null) {
-      return (yaml: res.yaml, md5: res.md5, counts: res.counts, base: null);
+      return (
+        yaml: res.yaml,
+        md5: res.md5,
+        counts: res.counts,
+        base: null,
+        sanitizedSelectedMap: sanitizedSelectedMap,
+      );
     }
     final (:base, :path) = profileBase;
     return (
@@ -581,6 +602,7 @@ class SetupAction extends _$SetupAction {
         rules: res.counts.rules + base.rules,
       ),
       base: SetupBase(path: path, overlay: res.yaml),
+      sanitizedSelectedMap: sanitizedSelectedMap,
     );
   }
 
@@ -764,7 +786,17 @@ class SetupAction extends _$SetupAction {
       return getProfile(setupState: state, patchConfig: realPatchConfig);
     }, title: 'build profile');
     final profileFailed = realProfile == null;
-    final setupParams = _setupParams.copyWith(base: realProfile?.base);
+    final rawSelectedMap = ref.read(selectedMapProvider);
+    final sanitizedSelectedMap =
+        realProfile?.sanitizedSelectedMap ?? rawSelectedMap;
+    final setupParams = _setupParams.copyWith(
+      base: realProfile?.base,
+      selectedMap: sanitizedSelectedMap,
+    );
+    // The yaml md5 does not cover the selection map: when sanitizing
+    // rewrote a persisted selection, the Core may still serve the violating
+    // node it was handed earlier, so the push must not be skipped.
+    final selectionDiffers = !mapEquals(sanitizedSelectedMap, rawSelectedMap);
     final inputs = switch (setupState) {
       final state? when !profileFailed => (
         state,
@@ -776,7 +808,10 @@ class SetupAction extends _$SetupAction {
     };
     final yamlString = realProfile?.yaml ?? '';
     final yamlMd5 = realProfile?.md5 ?? '';
-    if (!profileFailed && yamlMd5 == globalState.lastConfigMd5 && !force) {
+    if (!profileFailed &&
+        yamlMd5 == globalState.lastConfigMd5 &&
+        !force &&
+        !selectionDiffers) {
       _appliedInputs = inputs;
       globalState.lastConfigCounts = realProfile.counts;
       await preloadInvoke?.call();

@@ -15,7 +15,9 @@ import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/providers/database.dart';
 import 'package:fl_clash/providers/smart_anchor.dart';
 import 'package:fl_clash/providers/state.dart';
+import 'package:fl_clash/smart_anchor/models/node_metadata.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
+import 'package:fl_clash/smart_anchor/services/persistence.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:flutter/widgets.dart';
@@ -36,6 +38,37 @@ class _EnabledSmartAnchor extends SmartAnchor {
   @override
   SmartAnchorInput build() =>
       SmartAnchorInput(services: [defaultServiceToggles.first]);
+}
+
+class _ComplianceSmartAnchor extends SmartAnchor {
+  @override
+  SmartAnchorInput build() {
+    NodeMetadataCache node(String name, String country, double purity) {
+      return NodeMetadataCache(
+        proxyName: name,
+        entryServer: 'entry.example',
+        egressIp: '1.2.3.4',
+        countryCode: country,
+        latitude: 34.0522,
+        longitude: -118.2437,
+        asn: 'AS20057',
+        ipType: 'residential',
+        fraudScore: 0,
+        purityScore: purity,
+        wafPass: true,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+    }
+
+    return SmartAnchorInput(
+      services: [defaultServiceToggles.first],
+      autoFailoverEnabled: false,
+      metadataByProxy: {
+        'TW-1': node('TW-1', 'TW', 100),
+        'US-1': node('US-1', 'US', 90),
+      },
+    );
+  }
 }
 
 const _testUrl = 'http://delay.test';
@@ -1293,5 +1326,74 @@ void main() {
         'Auto',
       });
     });
+  });
+
+  group('smartAnchorMonitorTick', () {
+    late db.Database testDatabase;
+
+    setUp(() {
+      testDatabase = db.Database(NativeDatabase.memory());
+      db.database = testDatabase;
+    });
+
+    tearDown(() => testDatabase.close());
+
+    test(
+      'runs the lock compliance check even with auto failover off',
+      () async {
+        const groupName = '🎯 Smart-Claude';
+        const profile = Profile(
+          id: 7,
+          autoUpdateDuration: Duration.zero,
+          selectedMap: {groupName: 'TW-1'},
+        );
+        final container = buildContainer(
+          profile: profile,
+          smartAnchor: _ComplianceSmartAnchor.new,
+        );
+        container.read(initProvider.notifier).value = true;
+        container.read(runTimeProvider.notifier).value = 1;
+        const members = [
+          Proxy(name: 'TW-1', type: 'ss'),
+          Proxy(name: 'US-1', type: 'ss'),
+        ];
+        container.read(groupsProvider.notifier).value = const [
+          Group(
+            type: GroupType.Selector,
+            name: groupName,
+            all: members,
+            now: 'TW-1',
+          ),
+          Group(
+            type: GroupType.Selector,
+            name: 'Proxy',
+            all: members,
+            now: 'TW-1',
+          ),
+        ];
+
+        await actionOf(container).smartAnchorMonitorTick();
+
+        expect(
+          container.read(currentProfileProvider)?.selectedMap[groupName],
+          'US-1',
+        );
+        final events = container
+            .read(smartAnchorProvider)
+            .switchEvents['claude'];
+        expect(events, hasLength(1));
+        expect(events!.single.reason, 'lock-change');
+        expect(events.single.toProxy, 'US-1');
+        debouncer.cancel((FunctionTag.changeProxy, groupName));
+        final store = SmartAnchorStore.drift();
+        for (var attempt = 0; attempt < 100; attempt++) {
+          final snapshot = await store.load();
+          if (snapshot?.switchEvents['claude']?.isNotEmpty == true) {
+            break;
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+      },
+    );
   });
 }
