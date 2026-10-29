@@ -11,6 +11,12 @@ class FailoverGuard {
   final Map<String, int> _failures = {};
   final Map<String, String?> _lastCurrent = {};
   final Map<String, List<int>> _switchTimes = {};
+  int _lastCountedFailures = 0;
+
+  /// The failure count the most recent [noteResult] call accumulated to,
+  /// kept after a decision resets the running count so callers can log
+  /// the count that led to it.
+  int get lastCountedFailures => _lastCountedFailures;
 
   FailoverTarget? noteResult({
     required String serviceId,
@@ -34,6 +40,7 @@ class FailoverGuard {
     }
     final count = (_failures[serviceId] ?? 0) + 1;
     _failures[serviceId] = count;
+    _lastCountedFailures = count;
     if (count < 2) {
       return null;
     }

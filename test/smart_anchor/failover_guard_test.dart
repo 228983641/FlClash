@@ -215,6 +215,15 @@ void main() {
     expect(target?.isFallback, isTrue);
   });
 
+  test('lastCountedFailures keeps the count that led to a decision', () {
+    final guard = FailoverGuard();
+    const preferred = ['A', 'B'];
+    expect(note(guard, preferred: preferred), isNull);
+    expect(guard.lastCountedFailures, 1);
+    expect(note(guard, preferred: preferred, nowMs: 2000)?.name, 'B');
+    expect(guard.lastCountedFailures, 2);
+  });
+
   test('failures count once per probe across both layers', () {
     final guard = FailoverGuard();
     const preferred = ['K1'];

@@ -613,6 +613,25 @@ String? lockReselectTarget(
   String currentName, {
   Map<String, int> delays = const {},
 }) {
+  return lockReselectDecision(
+    input,
+    service,
+    proxyNames,
+    currentName,
+    delays: delays,
+  ).target;
+}
+
+/// [lockReselectTarget] plus the ranking it decided from, so the runtime
+/// compliance check can log (and membership-check) the same decision the
+/// setup-time sanitizer makes through [lockReselectTarget].
+({String? target, List<String> ranked}) lockReselectDecision(
+  SmartAnchorInput input,
+  ServiceToggleConfig service,
+  List<String> proxyNames,
+  String currentName, {
+  Map<String, int> delays = const {},
+}) {
   final ranked = rankedProxiesForService(
     input,
     service,
@@ -620,7 +639,7 @@ String? lockReselectTarget(
     delays: delays,
   );
   if (ranked.isEmpty || ranked.contains(currentName)) {
-    return null;
+    return (target: null, ranked: ranked);
   }
   // Purity hysteresis: a current node whose only disqualification is a
   // purity score inside the band stays — re-probe noise around the
@@ -636,9 +655,9 @@ String? lockReselectTarget(
         service.lockedCountries,
         effective.accessByService[service.serviceId]?[currentName],
       )) {
-    return null;
+    return (target: null, ranked: ranked);
   }
-  return ranked.first;
+  return (target: ranked.first, ranked: ranked);
 }
 
 List<String> _rankForService(

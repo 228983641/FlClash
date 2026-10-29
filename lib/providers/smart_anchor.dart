@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/common/function.dart';
+import 'package:fl_clash/common/print.dart';
 import 'package:fl_clash/common/request.dart';
 import 'package:fl_clash/common/service_probe.dart';
 import 'package:fl_clash/models/models.dart';
@@ -14,6 +15,7 @@ import 'package:fl_clash/smart_anchor/models/service_group.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
 import 'package:fl_clash/smart_anchor/services/persistence.dart';
 import 'package:fl_clash/smart_anchor/services/probing.dart';
+import 'package:fl_clash/smart_anchor/services/sa_log.dart';
 import 'package:fl_clash/smart_anchor/services/subscription_merger.dart';
 import 'package:fl_clash/smart_anchor/services/service_access.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
@@ -428,6 +430,7 @@ class SmartAnchor extends _$SmartAnchor {
         entry.key: Map.of(entry.value),
     };
     var changed = false;
+    final reasonCounts = <ServiceAccessReason, int>{};
     const probeConcurrency = 4;
     for (var i = 0; i < targets.length; i += probeConcurrency) {
       final end = i + probeConcurrency < targets.length
@@ -463,9 +466,30 @@ class SmartAnchor extends _$SmartAnchor {
         }
         for (final entry in result.accessByService.entries) {
           (access[entry.key] ??= {})[outcome.key] = entry.value;
+          reasonCounts[entry.value.reason] =
+              (reasonCounts[entry.value.reason] ?? 0) + 1;
           changed = true;
         }
       }
+    }
+    if (targets.isNotEmpty) {
+      commonPrint.log(
+        saProbeRoundLine(
+          nodes: targets.length,
+          metaUpdated: updated,
+          reasonCounts: reasonCounts,
+        ),
+      );
+      final remaining = proxyNames
+          .where((name) => probeMetadataStale(metadata[name]))
+          .length;
+      commonPrint.log(
+        saProbeQueueLine(
+          probed: targets.length,
+          remaining: remaining,
+          total: proxyNames.length,
+        ),
+      );
     }
     if (changed) {
       update(

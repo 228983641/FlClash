@@ -314,6 +314,29 @@ class ProxiesAction extends _$ProxiesAction {
   final Map<String, String> _pendingAutoReason = {};
   final Map<String, (String, int)> _anchorStableSince = {};
 
+  // (group, target) pairs the Core already refused, valued by the member
+  // signature at refusal time. Automated checks must not retry a refused
+  // target while the group's members are unchanged; without this, a
+  // single bad target re-fires on every compliance pass in a tight loop.
+  final Map<String, String> _rejectedSwitchTargets = {};
+  final Set<String> _anchorRejectLogged = {};
+
+  List<String> _memberNamesOf(Group group, Set<String> groupNames) {
+    return [
+      for (final proxy in group.all)
+        if (!groupNames.contains(proxy.name)) proxy.name,
+    ];
+  }
+
+  String _memberSignature(List<String> memberNames) {
+    final sorted = List.of(memberNames)..sort();
+    return '${sorted.length}:${Object.hashAll(sorted)}';
+  }
+
+  bool _switchRejected(String groupName, String target, String signature) {
+    return _rejectedSwitchTargets['$groupName\x00$target'] == signature;
+  }
+
   void _observePathPoints(
     SmartAnchorInput smart,
     List<Group> groups,
@@ -365,14 +388,6 @@ class ProxiesAction extends _$ProxiesAction {
       return;
     }
     final groupNames = {for (final group in groups) group.name};
-    final names = <String>[];
-    for (final group in groups) {
-      for (final proxy in group.all) {
-        if (!groupNames.contains(proxy.name) && !names.contains(proxy.name)) {
-          names.add(proxy.name);
-        }
-      }
-    }
     final delays = flattenDelays(ref.read(delayDataSourceProvider));
     for (final service in smart.services.where(
       (service) => service.isEnabled,
@@ -380,11 +395,17 @@ class ProxiesAction extends _$ProxiesAction {
       final groupName = smartGroupName(service);
       final group = groups.getGroup(groupName);
       final currentName = group?.now;
-      if (currentName == null) {
+      if (group == null || currentName == null) {
         continue;
       }
       _pendingAutoSwitch.remove(service.serviceId);
       _pendingAutoReason.remove(service.serviceId);
+      // Candidates come from this group's own member list, never from a
+      // pool pooled across groups: under aggregation the two name
+      // different things (merged members carry a source prefix, provider
+      // nodes elsewhere in the Core keep bare names), and the Core
+      // refuses a switch to any name that is not a member of the group.
+      final names = _memberNamesOf(group, groupNames);
       final ranked = rankedProxiesForService(
         smart,
         service,
@@ -417,11 +438,57 @@ class ProxiesAction extends _$ProxiesAction {
         accessByProxy: smart.accessByService[service.serviceId] ?? const {},
         nowMs: nowMs,
       );
+      if (currentAccess != null &&
+          (currentAccess.reason == ServiceAccessReason.regionBlocked ||
+              currentAccess.reason == ServiceAccessReason.networkFailed)) {
+        commonPrint.log(
+          saFailoverCountLine(
+            serviceId: service.serviceId,
+            node: currentName,
+            reason: currentAccess.reason,
+            count: currentAccess.borrowedFrom == null
+                ? _failoverGuard.lastCountedFailures
+                : 0,
+            borrowed: currentAccess.borrowedFrom != null,
+          ),
+        );
+      }
       if (target != null) {
         final next = target.name;
         final switchReason = target.isFallback
             ? 'auto-failover-unprobed'
             : currentReason?.name ?? 'unknown';
+        if (!names.contains(next)) {
+          commonPrint.log(
+            saSwitchSkipLine(
+              serviceId: service.serviceId,
+              groupName: groupName,
+              target: next,
+              why: 'not-member',
+            ),
+          );
+          continue;
+        }
+        if (_switchRejected(groupName, next, _memberSignature(names))) {
+          commonPrint.log(
+            saSwitchSkipLine(
+              serviceId: service.serviceId,
+              groupName: groupName,
+              target: next,
+              why: 'rejected',
+            ),
+          );
+          continue;
+        }
+        commonPrint.log(
+          saFailoverSwitchLine(
+            serviceId: service.serviceId,
+            from: currentName,
+            to: next,
+            reason: switchReason,
+            isFallback: target.isFallback,
+          ),
+        );
         ref
             .read(smartAnchorProvider.notifier)
             .recordSwitchEvent(
@@ -451,34 +518,72 @@ class ProxiesAction extends _$ProxiesAction {
       return;
     }
     final groupNames = {for (final group in groups) group.name};
-    final names = <String>[];
-    for (final group in groups) {
-      for (final proxy in group.all) {
-        if (!groupNames.contains(proxy.name) && !names.contains(proxy.name)) {
-          names.add(proxy.name);
-        }
-      }
-    }
     final delays = flattenDelays(ref.read(delayDataSourceProvider));
     final nowMs = DateTime.now().millisecondsSinceEpoch;
+    var checked = 0;
+    var reselected = 0;
+    var noCandidate = 0;
     for (final service in smart.services.where(
       (service) => service.isEnabled,
     )) {
       final groupName = smartGroupName(service);
-      final currentName = groups.getGroup(groupName)?.now;
-      if (currentName == null) {
+      final group = groups.getGroup(groupName);
+      final currentName = group?.now;
+      if (group == null || currentName == null) {
         continue;
       }
-      final target = lockReselectTarget(
+      checked++;
+      // Rank only this group's own members: a pool pooled across groups
+      // mixes merged (source-prefixed) names with bare provider names
+      // from other groups, and the Core refuses any target that is not
+      // a member of the group being switched.
+      final memberNames = _memberNamesOf(group, groupNames);
+      final decision = lockReselectDecision(
         smart,
         service,
-        names,
+        memberNames,
         currentName,
         delays: delays,
       );
+      if (decision.ranked.isEmpty) {
+        noCandidate++;
+        continue;
+      }
+      final target = decision.target;
       if (target == null) {
         continue;
       }
+      if (!memberNames.contains(target)) {
+        commonPrint.log(
+          saSwitchSkipLine(
+            serviceId: service.serviceId,
+            groupName: groupName,
+            target: target,
+            why: 'not-member',
+          ),
+        );
+        continue;
+      }
+      if (_switchRejected(groupName, target, _memberSignature(memberNames))) {
+        commonPrint.log(
+          saSwitchSkipLine(
+            serviceId: service.serviceId,
+            groupName: groupName,
+            target: target,
+            why: 'rejected',
+          ),
+        );
+        continue;
+      }
+      commonPrint.log(
+        saComplianceDecisionLine(
+          serviceId: service.serviceId,
+          groupName: groupName,
+          currentName: currentName,
+          target: target,
+          rankedTop: decision.ranked.take(3).toList(),
+        ),
+      );
       ref
           .read(smartAnchorProvider.notifier)
           .recordSwitchEvent(
@@ -493,6 +598,16 @@ class ProxiesAction extends _$ProxiesAction {
       _pendingAutoSwitch[service.serviceId] = target;
       _pendingAutoReason[service.serviceId] = 'lock-change';
       changeProxyDebounce(groupName, target, trigger: 'lock-change');
+      reselected++;
+    }
+    if (checked > 0) {
+      commonPrint.log(
+        saComplianceSummaryLine(
+          checked: checked,
+          reselected: reselected,
+          noCandidate: noCandidate,
+        ),
+      );
     }
   }
 
@@ -528,8 +643,25 @@ class ProxiesAction extends _$ProxiesAction {
           // Not qualified to anchor right now; the stability clock keeps
           // running, so a later probe that clears the node (fresh metadata,
           // an expired block verdict) can still land it without a new wait.
+          if (_anchorRejectLogged.add('${service.serviceId}\x00$current')) {
+            commonPrint.log(
+              saAnchorRejectLine(
+                serviceId: service.serviceId,
+                node: current,
+                why: 'hard-filter',
+              ),
+            );
+          }
           continue;
         }
+        _anchorRejectLogged.remove('${service.serviceId}\x00$current');
+        commonPrint.log(
+          saAnchorSetLine(
+            serviceId: service.serviceId,
+            node: current,
+            countryCode: meta.countryCode,
+          ),
+        );
         ref
             .read(smartAnchorProvider.notifier)
             .setAnchor(
@@ -661,6 +793,28 @@ class ProxiesAction extends _$ProxiesAction {
         'changeProxy($groupName -> $proxyName) failed: $error',
         logLevel: coreFailureLogLevel(error),
       );
+      final groups = ref.read(groupsProvider);
+      final group = groups.getGroup(groupName);
+      final groupNames = {for (final item in groups) item.name};
+      final memberNames = group == null
+          ? const <String>[]
+          : _memberNamesOf(group, groupNames);
+      commonPrint.log(
+        saSwitchFailedLine(
+          groupName: groupName,
+          target: proxyName,
+          inGroup: memberNames.contains(proxyName),
+          memberCount: memberNames.length,
+        ),
+      );
+      // Only a refusal the Core itself answered (its message comes back
+      // as a MessageException) blacklists the target; a transport error
+      // says nothing about the target and must not block a later retry.
+      if (group != null && error is MessageException) {
+        _rejectedSwitchTargets['$groupName\x00$proxyName'] = _memberSignature(
+          memberNames,
+        );
+      }
       profilesAction.updateCurrentSelectedMap(groupName, rollbackName);
       dialogs.showNotifier(
         currentAppLocalizations.changeProxyFailedTip,
@@ -668,6 +822,7 @@ class ProxiesAction extends _$ProxiesAction {
       );
       return;
     }
+    _rejectedSwitchTargets.remove('$groupName\x00$proxyName');
     if (!result.changed) {
       return;
     }

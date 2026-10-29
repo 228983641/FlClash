@@ -115,6 +115,41 @@ class _ComplianceSmartAnchor extends SmartAnchor {
   }
 }
 
+/// The merged-config name space: 🎯 group members carry a source prefix,
+/// while a provider node living in another group keeps its bare name and
+/// outranks every member. Compliance must still pick a group member.
+class _MergedNamesSmartAnchor extends SmartAnchor {
+  @override
+  SmartAnchorInput build() {
+    NodeMetadataCache node(String name, String country, double purity) {
+      return NodeMetadataCache(
+        proxyName: name,
+        entryServer: 'entry.example',
+        egressIp: '1.2.3.4',
+        countryCode: country,
+        latitude: 34.0522,
+        longitude: -118.2437,
+        asn: 'AS20057',
+        ipType: 'residential',
+        fraudScore: 0,
+        purityScore: purity,
+        wafPass: true,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+    }
+
+    return SmartAnchorInput(
+      services: [defaultServiceToggles.first],
+      autoFailoverEnabled: false,
+      metadataByProxy: {
+        '[蓝天云] TW-1': node('[蓝天云] TW-1', 'TW', 100),
+        '[主订阅] US-1': node('[主订阅] US-1', 'US', 90),
+        'US-03': node('US-03', 'US', 100),
+      },
+    );
+  }
+}
+
 const _testUrl = 'http://delay.test';
 
 Group _group(String name, List<Proxy> all) =>
@@ -1643,6 +1678,155 @@ void main() {
           }
           await Future<void>.delayed(const Duration(milliseconds: 10));
         }
+      },
+    );
+  });
+
+  group('smartAnchorLockComplianceCheck merged names and rejection', () {
+    late db.Database testDatabase;
+
+    setUp(() {
+      testDatabase = db.Database(NativeDatabase.memory());
+      db.database = testDatabase;
+      when(
+        () => core.changeProxy(any()),
+      ).thenAnswer((_) async => const ChangeProxyResult(changed: true));
+      when(core.closeConnections).thenAnswer((_) async => true);
+      when(core.resetConnections).thenAnswer((_) async => true);
+    });
+
+    tearDown(() => testDatabase.close());
+
+    Future<void> drainEvents() async {
+      final store = SmartAnchorStore.drift();
+      for (var attempt = 0; attempt < 100; attempt++) {
+        final snapshot = await store.load();
+        if (snapshot?.switchEvents['claude']?.isNotEmpty == true) {
+          return;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+    }
+
+    test(
+      'compliance target is a smart group member under merged names',
+      () async {
+        const groupName = '🎯 Smart-Claude';
+        const profile = Profile(
+          id: 7,
+          autoUpdateDuration: Duration.zero,
+          selectedMap: {groupName: '[蓝天云] TW-1'},
+        );
+        final container = buildContainer(
+          profile: profile,
+          smartAnchor: _MergedNamesSmartAnchor.new,
+        );
+        container.read(groupsProvider.notifier).value = const [
+          Group(
+            type: GroupType.Selector,
+            name: groupName,
+            all: [
+              Proxy(name: '[蓝天云] TW-1', type: 'ss'),
+              Proxy(name: '[主订阅] US-1', type: 'ss'),
+            ],
+            now: '[蓝天云] TW-1',
+          ),
+          Group(
+            type: GroupType.Selector,
+            name: 'Proxy',
+            all: [
+              Proxy(name: 'US-03', type: 'ss'),
+              Proxy(name: '[主订阅] US-1', type: 'ss'),
+            ],
+            now: 'US-03',
+          ),
+        ];
+
+        actionOf(container).smartAnchorLockComplianceCheck();
+
+        final events = container
+            .read(smartAnchorProvider)
+            .switchEvents['claude'];
+        expect(events, hasLength(1));
+        expect(events!.single.toProxy, '[主订阅] US-1');
+        debouncer.cancel((FunctionTag.changeProxy, groupName));
+        await drainEvents();
+      },
+    );
+
+    test(
+      'a core-rejected target is not retried until group members change',
+      () async {
+        const groupName = '🎯 Smart-Claude';
+        const profile = Profile(
+          id: 7,
+          autoUpdateDuration: Duration.zero,
+          selectedMap: {groupName: 'TW-1'},
+        );
+        final container = buildContainer(
+          profile: profile,
+          smartAnchor: _ComplianceSmartAnchor.new,
+        );
+        const members = [
+          Proxy(name: 'TW-1', type: 'ss'),
+          Proxy(name: 'US-1', type: 'ss'),
+        ];
+        container.read(groupsProvider.notifier).value = const [
+          Group(
+            type: GroupType.Selector,
+            name: groupName,
+            all: members,
+            now: 'TW-1',
+          ),
+          Group(
+            type: GroupType.Selector,
+            name: 'Proxy',
+            all: members,
+            now: 'TW-1',
+          ),
+        ];
+        when(() => core.changeProxy(any())).thenAnswer(
+          (_) async => const ChangeProxyResult(message: 'proxy not exist'),
+        );
+        await actionOf(container).changeProxy(
+          groupName: groupName,
+          proxyName: 'US-1',
+          trigger: 'lock-change',
+        );
+
+        actionOf(container).smartAnchorLockComplianceCheck();
+        expect(
+          container.read(smartAnchorProvider).switchEvents['claude'],
+          isNull,
+        );
+
+        const grownMembers = [
+          Proxy(name: 'TW-1', type: 'ss'),
+          Proxy(name: 'US-1', type: 'ss'),
+          Proxy(name: 'US-2', type: 'ss'),
+        ];
+        container.read(groupsProvider.notifier).value = const [
+          Group(
+            type: GroupType.Selector,
+            name: groupName,
+            all: grownMembers,
+            now: 'TW-1',
+          ),
+          Group(
+            type: GroupType.Selector,
+            name: 'Proxy',
+            all: grownMembers,
+            now: 'TW-1',
+          ),
+        ];
+        actionOf(container).smartAnchorLockComplianceCheck();
+        final events = container
+            .read(smartAnchorProvider)
+            .switchEvents['claude'];
+        expect(events, hasLength(1));
+        expect(events!.single.toProxy, 'US-1');
+        debouncer.cancel((FunctionTag.changeProxy, groupName));
+        await drainEvents();
       },
     );
   });
