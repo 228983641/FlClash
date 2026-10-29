@@ -55,6 +55,25 @@ func TestChatGptIosStatus(t *testing.T) {
 	}
 }
 
+func TestGeminiMissingMarkerStatus(t *testing.T) {
+	cases := []struct {
+		code int
+		body string
+		want string
+	}{
+		{http.StatusOK, "<html>a page without the marker</html>", serviceAvailable},
+		{http.StatusOK, "Gemini is not available in your country", serviceUnsupportedRegion},
+		{http.StatusForbidden, "", serviceRestricted},
+		{http.StatusInternalServerError, "", serviceUnavailable},
+	}
+	for _, testCase := range cases {
+		got := geminiMissingMarkerStatus(&ProbeResult{StatusCode: testCase.code, Body: testCase.body})
+		if got != testCase.want {
+			t.Errorf("geminiMissingMarkerStatus(%d, %q) = %q, want %q", testCase.code, testCase.body, got, testCase.want)
+		}
+	}
+}
+
 func TestTikTokStatus(t *testing.T) {
 	cases := []struct {
 		code int

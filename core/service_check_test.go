@@ -321,6 +321,42 @@ func TestHandleServiceCheckReportsARepeatedTimeout(t *testing.T) {
 	}
 }
 
+func TestHandleServiceCheckRetriesAChainlessFailureOnce(t *testing.T) {
+	var calls atomic.Int32
+	withServiceCheckers(t, serviceChecker{name: "flaky", check: func(serviceEnv) ServiceCheckItem {
+		if calls.Add(1) == 1 {
+			return ServiceCheckItem{Status: serviceFailed}
+		}
+		return ServiceCheckItem{Status: serviceAvailable}
+	}})
+
+	items := handleServiceCheck(&ServiceCheckParams{Timeout: 1000})
+
+	if items[0].Status != serviceAvailable {
+		t.Errorf("status = %q, want the retry's answer", items[0].Status)
+	}
+	if got := calls.Load(); got != 2 {
+		t.Errorf("ran %d times, want 2", got)
+	}
+}
+
+func TestHandleServiceCheckKeepsAJudgedFailure(t *testing.T) {
+	var calls atomic.Int32
+	withServiceCheckers(t, serviceChecker{name: "judged", check: func(serviceEnv) ServiceCheckItem {
+		calls.Add(1)
+		return ServiceCheckItem{Status: serviceFailed, Chains: []string{"node-a"}}
+	}})
+
+	items := handleServiceCheck(&ServiceCheckParams{Timeout: 1000})
+
+	if items[0].Status != serviceFailed {
+		t.Errorf("status = %q, want %q", items[0].Status, serviceFailed)
+	}
+	if got := calls.Load(); got != 1 {
+		t.Errorf("ran %d times, want a judged failure left unretried", got)
+	}
+}
+
 func TestHandleServiceCheckCancelsTheOlderCheckOfTheSameService(t *testing.T) {
 	started := make(chan struct{}, 2)
 	var calls atomic.Int32

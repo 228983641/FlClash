@@ -166,10 +166,19 @@ func runServiceCheck(ctx context.Context, checker serviceChecker, proxyName stri
 	}
 	env := serviceEnv{ctx: ctx, proxyName: proxyName, timeout: timeout, hits: hits}
 	item = checker.check(env)
-	if item.Status == serviceTimeout && hasBudget(ctx, timeout) {
+	if retryable(item) && ctx.Err() == nil && hasBudget(ctx, timeout) {
 		item = checker.check(env)
 	}
 	return item
+}
+
+// retryable reports whether a check ended without an answer from a node: a
+// timeout, or a failure with no route chain, as when the probe got no slot
+// or the connection died before it settled. A failure a rule judged from a
+// response carries its chain and stands as the answer.
+func retryable(item ServiceCheckItem) bool {
+	return item.Status == serviceTimeout ||
+		(item.Status == serviceFailed && len(item.Chains) == 0)
 }
 
 // The host asks for a service again only once the older answer can no longer

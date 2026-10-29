@@ -75,7 +75,7 @@ func checkGemini(env serviceEnv) ServiceCheckItem {
 	}
 	index := strings.Index(result.Body, geminiRegionMarker)
 	if index < 0 || index+len(geminiRegionMarker)+3 > len(result.Body) {
-		item.Status = serviceFailed
+		item.Status = geminiMissingMarkerStatus(result)
 		return item
 	}
 	start := index + len(geminiRegionMarker)
@@ -90,6 +90,23 @@ func checkGemini(env serviceEnv) ServiceCheckItem {
 		item.Status = serviceUnsupportedRegion
 	}
 	return item
+}
+
+// The region marker is a detail of Gemini's page payload, so a page that
+// answers without it has still shown whether the service works there; only
+// its region is unknown.
+func geminiMissingMarkerStatus(result *ProbeResult) string {
+	switch {
+	case bodyContains(result,
+		"gemini is not available",
+		"not available in your country",
+		"not available in your region"):
+		return serviceUnsupportedRegion
+	case result.StatusCode >= 200 && result.StatusCode < 300:
+		return serviceAvailable
+	default:
+		return statusFromCode(result.StatusCode)
+	}
 }
 
 // checkChatGpt folds Verge's separate iOS and Web results into one entry: the
