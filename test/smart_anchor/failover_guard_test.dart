@@ -35,6 +35,24 @@ FailoverTarget? note(
 }
 
 void main() {
+  test('unconfirmed proposals do not consume the freeze budget', () {
+    final guard = FailoverGuard();
+    for (var i = 0; i < 8; i++) {
+      note(guard, preferred: ['B'], nowMs: 1000 + i * 2000);
+      expect(note(guard, preferred: ['B'], nowMs: 2000 + i * 2000)?.name, 'B');
+    }
+    expect(guard.isFrozen('youtube', 17000), isFalse);
+  });
+
+  test('confirmed switches enter cooldown before another decision', () {
+    final guard = FailoverGuard();
+    guard.confirmSwitch('youtube', 1000);
+    note(guard, preferred: ['B'], nowMs: 2000);
+    expect(note(guard, preferred: ['B'], nowMs: 3000), isNull);
+    note(guard, preferred: ['B'], nowMs: 62000);
+    expect(note(guard, preferred: ['B'], nowMs: 63000)?.name, 'B');
+  });
+
   test('reading one failed probe twice does not confirm a failure', () {
     final guard = FailoverGuard();
     expect(note(guard, preferred: ['B'], nowMs: 1000), isNull);
@@ -174,7 +192,7 @@ void main() {
   });
 
   test('no more than three switches in ten minutes, then frozen', () {
-    final guard = FailoverGuard();
+    final guard = FailoverGuard(cooldownMs: 0);
     const preferred = ['A', 'B', 'C', 'D', 'E'];
     var current = 'A';
     var switches = 0;
@@ -190,6 +208,7 @@ void main() {
         );
       }
       if (target != null) {
+        guard.confirmSwitch('youtube', 1000 + cycle * 1000);
         switches += 1;
         current = target.name;
       }
@@ -285,7 +304,7 @@ void main() {
   });
 
   test('freeze state is readable and lifts with the window', () {
-    final guard = FailoverGuard();
+    final guard = FailoverGuard(cooldownMs: 0);
     const preferred = ['A', 'B', 'C', 'D', 'E'];
     var current = 'A';
     for (var cycle = 0; cycle < 3; cycle++) {
@@ -300,6 +319,7 @@ void main() {
         );
       }
       current = target!.name;
+      guard.confirmSwitch('youtube', 1000 + cycle * 1000);
     }
     // Switches landed at 1000, 2000, 3000 per the helper's second call.
     expect(guard.isFrozen('youtube', 3000), isTrue);

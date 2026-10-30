@@ -44,6 +44,8 @@ class App {
     return methodChannel.invokeMethod<bool>('moveTaskToBack');
   }
 
+  Future<void> prepareExit() => methodChannel.invokeMethod<void>('prepareExit');
+
   Future<List<Package>> getPackages() async {
     final packagesString = await methodChannel.invokeMethod<String>(
       'getPackages',

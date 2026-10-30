@@ -16,6 +16,20 @@ void main() {
     App().clearPackageIconCache();
   });
 
+  test(
+    'explicit exit retires the Android engine before activity shutdown',
+    () async {
+      final calls = <String>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call.method);
+            return null;
+          });
+      await App().prepareExit();
+      expect(calls, ['prepareExit']);
+    },
+  );
+
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);

@@ -24,6 +24,7 @@ import androidx.core.view.OnApplyWindowInsetsListener
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.follow.clash.R
+import com.follow.clash.FlutterEngineHost
 import com.follow.clash.common.Components
 import com.follow.clash.common.GlobalState
 import com.follow.clash.common.PendingCallback
@@ -50,7 +51,11 @@ import kotlinx.coroutines.launch
 
 class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware {
 
+    @Volatile
     private var activity: Activity? = null
+
+    val hasActivity: Boolean
+        get() = activity != null
 
     private var activityBinding: ActivityPluginBinding? = null
 
@@ -144,6 +149,11 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
 
     override fun onMethodCall(call: MethodCall, result: Result) {
         when (call.method) {
+            "prepareExit" -> {
+                FlutterEngineHost.retention.clear()
+                result.success(null)
+            }
+
             "moveTaskToBack" -> {
                 activity?.moveTaskToBack(true)
                 result.success(true)

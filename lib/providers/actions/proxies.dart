@@ -178,7 +178,9 @@ class ProxiesAction extends _$ProxiesAction {
     String groupName,
     String proxyName, {
     String trigger = 'tap',
+    VoidCallback? onApplied,
   }) {
+    final profileId = ref.read(currentProfileIdProvider);
     _pendingSelectedRollback.putIfAbsent(
       groupName,
       () => _currentSelectedName(groupName),
@@ -190,11 +192,21 @@ class ProxiesAction extends _$ProxiesAction {
       String groupName,
       String proxyName,
     ) async {
-      await changeProxy(
+      if (!ref.mounted || profileId != ref.read(currentProfileIdProvider)) {
+        _pendingSelectedRollback.remove(groupName);
+        return;
+      }
+      final applied = await changeProxy(
         groupName: groupName,
         proxyName: proxyName,
         trigger: trigger,
       );
+      if (!ref.mounted || profileId != ref.read(currentProfileIdProvider)) {
+        return;
+      }
+      if (applied) {
+        onApplied?.call();
+      }
       updateGroupsDebounce();
     }, args: [groupName, proxyName]);
   }
@@ -376,6 +388,39 @@ class ProxiesAction extends _$ProxiesAction {
   final Map<String, String> _pendingAutoReason = {};
   final Map<String, (String, int)> _anchorStableSince = {};
 
+  void _scheduleSmartSwitch({
+    required ServiceToggleConfig service,
+    required String from,
+    required String to,
+    required String reason,
+    required String trigger,
+  }) {
+    changeProxyDebounce(
+      smartGroupName(service),
+      to,
+      trigger: trigger,
+      onApplied: () {
+        final nowMs = DateTime.now().millisecondsSinceEpoch;
+        ref
+            .read(smartAnchorProvider.notifier)
+            .recordSwitchEvent(
+              SwitchEvent(
+                serviceId: service.serviceId,
+                fromProxy: from,
+                toProxy: to,
+                reason: reason,
+                switchedAt: nowMs,
+              ),
+            );
+        if (trigger == 'auto-failover') {
+          _failoverGuard.confirmSwitch(service.serviceId, nowMs);
+        }
+        _pendingAutoSwitch[service.serviceId] = to;
+        _pendingAutoReason[service.serviceId] = reason;
+      },
+    );
+  }
+
   // (group, target) pairs the Core already refused, valued by the member
   // signature at refusal time. Automated checks must not retry a refused
   // target while the group's members are unchanged; without this, a
@@ -553,20 +598,13 @@ class ProxiesAction extends _$ProxiesAction {
             isFallback: target.isFallback,
           ),
         );
-        ref
-            .read(smartAnchorProvider.notifier)
-            .recordSwitchEvent(
-              SwitchEvent(
-                serviceId: service.serviceId,
-                fromProxy: currentName,
-                toProxy: next,
-                reason: switchReason,
-                switchedAt: nowMs,
-              ),
-            );
-        _pendingAutoSwitch[service.serviceId] = next;
-        _pendingAutoReason[service.serviceId] = switchReason;
-        changeProxyDebounce(groupName, next, trigger: 'auto-failover');
+        _scheduleSmartSwitch(
+          service: service,
+          from: currentName,
+          to: next,
+          reason: switchReason,
+          trigger: 'auto-failover',
+        );
         switches++;
       }
     }
@@ -585,7 +623,6 @@ class ProxiesAction extends _$ProxiesAction {
     }
     final groupNames = {for (final group in groups) group.name};
     final delays = flattenDelays(ref.read(delayDataSourceProvider));
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
     var checked = 0;
     var reselected = 0;
     var noCandidate = 0;
@@ -665,20 +702,13 @@ class ProxiesAction extends _$ProxiesAction {
           rankedTop: decision.ranked.take(3).toList(),
         ),
       );
-      ref
-          .read(smartAnchorProvider.notifier)
-          .recordSwitchEvent(
-            SwitchEvent(
-              serviceId: service.serviceId,
-              fromProxy: currentName,
-              toProxy: target,
-              reason: 'lock-change',
-              switchedAt: nowMs,
-            ),
-          );
-      _pendingAutoSwitch[service.serviceId] = target;
-      _pendingAutoReason[service.serviceId] = 'lock-change';
-      changeProxyDebounce(groupName, target, trigger: 'lock-change');
+      _scheduleSmartSwitch(
+        service: service,
+        from: currentName,
+        to: target,
+        reason: 'lock-change',
+        trigger: 'lock-change',
+      );
       reselected++;
     }
     if (checked > 0) {
@@ -924,7 +954,7 @@ class ProxiesAction extends _$ProxiesAction {
     _scheduleDelayFlush();
   }
 
-  Future<void> changeProxy({
+  Future<bool> changeProxy({
     required String groupName,
     required String proxyName,
     String trigger = 'tap',
@@ -978,11 +1008,11 @@ class ProxiesAction extends _$ProxiesAction {
         currentAppLocalizations.changeProxyFailedTip,
         level: MessageLevel.error,
       );
-      return;
+      return false;
     }
     _rejectedSwitchTargets.remove('$groupName\x00$proxyName');
     if (!result.changed) {
-      return;
+      return false;
     }
     try {
       final closeAll =
@@ -1011,6 +1041,7 @@ class ProxiesAction extends _$ProxiesAction {
         logLevel: coreFailureLogLevel(error),
       );
     }
+    return true;
   }
 
   Future<String> updateProvider(

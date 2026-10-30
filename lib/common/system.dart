@@ -260,6 +260,7 @@ class System {
 
   Future<void> exit() async {
     if (system.isAndroid) {
+      await app?.prepareExit();
       await SystemNavigator.pop();
     }
   }

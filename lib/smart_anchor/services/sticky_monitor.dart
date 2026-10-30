@@ -8,6 +8,9 @@ class FailoverTarget {
 }
 
 class FailoverGuard {
+  FailoverGuard({this.cooldownMs = 60 * 1000});
+
+  final int cooldownMs;
   final Map<String, int> _failures = {};
   final Map<String, String?> _lastCurrent = {};
   final Map<String, int> _lastProbeAt = {};
@@ -21,6 +24,11 @@ class FailoverGuard {
 
   static const int _freezeWindowMs = 10 * 60 * 1000;
   static const int _freezeSwitchLimit = 3;
+
+  void confirmSwitch(String serviceId, int nowMs) {
+    _switchTimes[serviceId] = [..._recentSwitches(serviceId, nowMs), nowMs];
+    _failures[serviceId] = 0;
+  }
 
   List<int> _recentSwitches(String serviceId, int nowMs) {
     return (_switchTimes[serviceId] ?? [])
@@ -79,10 +87,9 @@ class FailoverGuard {
       return null;
     }
     _failures[serviceId] = 0;
-    final recent = (_switchTimes[serviceId] ?? [])
-        .where((time) => nowMs - time <= 10 * 60 * 1000)
-        .toList();
-    if (recent.length >= 3) {
+    final recent = _recentSwitches(serviceId, nowMs);
+    if (recent.length >= _freezeSwitchLimit ||
+        (recent.isNotEmpty && nowMs - recent.last < cooldownMs)) {
       _switchTimes[serviceId] = recent;
       return null;
     }
@@ -105,7 +112,6 @@ class FailoverGuard {
                 candidateAccess.reason == ServiceAccessReason.networkFailed)) {
           continue;
         }
-        _switchTimes[serviceId] = [...recent, nowMs];
         return FailoverTarget(name, isFallback: isFallback);
       }
     }

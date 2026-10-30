@@ -246,6 +246,12 @@ void main() {
   ProxiesAction actionOf(ProviderContainer container) =>
       container.read(proxiesActionProvider.notifier);
 
+  Future<void> applySmartSwitch() async {
+    debouncer.flush((FunctionTag.changeProxy, '🎯 Smart-Claude'));
+    await Future<void>.delayed(Duration.zero);
+    debouncer.cancel(FunctionTag.updateGroups);
+  }
+
   ProviderContainer runningContainer() {
     final container = buildContainer();
     container.read(initProvider.notifier).value = true;
@@ -648,6 +654,38 @@ void main() {
       expect(container.read(currentProfileProvider)?.selectedMap, {
         'Proxy': 'HK-01',
       });
+    });
+
+    for (final result in [
+      const ChangeProxyResult(message: 'proxy not exist'),
+      const ChangeProxyResult(changed: false),
+    ]) {
+      test(
+        'only actual Core changes confirm a queued switch: $result',
+        () async {
+          when(() => core.changeProxy(any())).thenAnswer((_) async => result);
+          final container = buildContainer(profile: _selectedProfile('HK-00'));
+          var confirmations = 0;
+          actionOf(container).changeProxyDebounce(
+            'Proxy',
+            'HK-01',
+            onApplied: () => confirmations++,
+          );
+          debouncer.flush((FunctionTag.changeProxy, 'Proxy'));
+          await Future<void>.delayed(Duration.zero);
+          debouncer.cancel(FunctionTag.updateGroups);
+          expect(confirmations, 0);
+        },
+      );
+    }
+
+    test('queued switches cannot run against a replacement profile', () async {
+      final container = buildContainer(profile: _selectedProfile('HK-00'));
+      actionOf(container).changeProxyDebounce('Proxy', 'HK-01');
+      container.read(currentProfileIdProvider.notifier).value = 99;
+      debouncer.flush((FunctionTag.changeProxy, 'Proxy'));
+      await Future<void>.delayed(Duration.zero);
+      verifyNever(() => core.changeProxy(any()));
     });
 
     test('rolls the selection back when the switch fails', () async {
@@ -1534,6 +1572,10 @@ void main() {
     tearDown(() => testDatabase.close());
 
     ProviderContainer failoverContainer({required bool borrowed}) {
+      when(
+        () => core.changeProxy(any()),
+      ).thenAnswer((_) async => const ChangeProxyResult(changed: true));
+      when(core.closeConnections).thenAnswer((_) async => true);
       const groupName = '🎯 Smart-Claude';
       const profile = Profile(
         id: 7,
@@ -1627,6 +1669,11 @@ void main() {
             );
         actionOf(container).smartAnchorFailoverCheck();
 
+        expect(
+          container.read(smartAnchorProvider).switchEvents['claude'],
+          isNull,
+        );
+        await applySmartSwitch();
         final events = container
             .read(smartAnchorProvider)
             .switchEvents['claude'];
@@ -1691,6 +1738,11 @@ void main() {
           container.read(currentProfileProvider)?.selectedMap[groupName],
           'US-1',
         );
+        when(
+          () => core.changeProxy(any()),
+        ).thenAnswer((_) async => const ChangeProxyResult(changed: true));
+        when(core.closeConnections).thenAnswer((_) async => true);
+        await applySmartSwitch();
         final events = container
             .read(smartAnchorProvider)
             .switchEvents['claude'];
@@ -1772,6 +1824,7 @@ void main() {
 
         actionOf(container).smartAnchorLockComplianceCheck();
 
+        await applySmartSwitch();
         final events = container
             .read(smartAnchorProvider)
             .switchEvents['claude'];
@@ -1848,6 +1901,10 @@ void main() {
           ),
         ];
         actionOf(container).smartAnchorLockComplianceCheck();
+        when(
+          () => core.changeProxy(any()),
+        ).thenAnswer((_) async => const ChangeProxyResult(changed: true));
+        await applySmartSwitch();
         final events = container
             .read(smartAnchorProvider)
             .switchEvents['claude'];

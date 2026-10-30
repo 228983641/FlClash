@@ -119,7 +119,10 @@ internal object AndroidServiceStateHost : ServiceStateHost {
         TileGateway(plugin::handleStart)
     }
 
-    override fun app(): AppGateway? = flutterEngine?.plugin<AppPlugin>()?.let { plugin ->
+    private fun activityEngine(): FlutterEngine? =
+        flutterEngine?.takeIf { it.plugin<AppPlugin>()?.hasActivity == true }
+
+    override fun app(): AppGateway? = activityEngine()?.plugin<AppPlugin>()?.let { plugin ->
         object : AppGateway {
             override fun requestNotificationPermission(callback: (Boolean) -> Unit) =
                 plugin.requestNotificationPermission(callback)

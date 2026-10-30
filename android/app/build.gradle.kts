@@ -22,6 +22,8 @@ val hasReleaseSigning = releaseStoreFile.exists() &&
     releaseKeyAlias != null &&
     releaseKeyPassword != null
 
+val smartAnchorTestBuild = System.getenv("SMART_ANCHOR_TEST_BUILD") == "true"
+
 android {
     namespace = "com.follow.clash"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -33,7 +35,8 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.follow.clash"
+        applicationId = if (smartAnchorTestBuild) "com.follow.clash.smartanchorv2" else "com.follow.clash"
+        manifestPlaceholders["appLabel"] = if (smartAnchorTestBuild) "FlClash SA v2" else "@string/app_name"
         minSdk = flutter.minSdkVersion
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = flutter.versionCode
@@ -60,7 +63,7 @@ android {
     buildTypes {
         debug {
             isMinifyEnabled = false
-            applicationIdSuffix = ".dev"
+            if (!smartAnchorTestBuild) applicationIdSuffix = ".dev"
         }
 
         release {
@@ -70,7 +73,7 @@ android {
                 signingConfig = signingConfigs.getByName("release")
             } else {
                 signingConfig = signingConfigs.getByName("debug")
-                applicationIdSuffix = ".dev"
+                if (!smartAnchorTestBuild) applicationIdSuffix = ".dev"
             }
 
             proguardFiles(
