@@ -141,4 +141,39 @@ void main() {
       ['known', 'unknown'],
     );
   });
+
+  test(
+    'setup sanitization matches runtime compliance for relaxed fallback',
+    () {
+      final service = integrationService(ServiceRestrictionMode.relaxed);
+      final input = SmartAnchorInput(
+        services: [service],
+        metadataByProxy: {
+          'known': integrationNode(
+            'known',
+            country: 'US',
+            city: 'Los Angeles',
+            latitude: 34.0522,
+            longitude: -118.2437,
+          ),
+        },
+      );
+      final runtime = lockReselectDecision(input, service, const [
+        'unknown',
+        'known',
+      ], 'unknown');
+
+      final sanitized = sanitizeSelectedMap(
+        [service],
+        {'gemini': runtime.ranked},
+        {smartGroupName(service): 'unknown'},
+        qualifiedByService: const {
+          'gemini': ['known'],
+        },
+      );
+
+      expect(runtime.target, 'known');
+      expect(sanitized[smartGroupName(service)], runtime.target);
+    },
+  );
 }
