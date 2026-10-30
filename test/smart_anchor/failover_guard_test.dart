@@ -33,6 +33,20 @@ FailoverTarget? note(
 }
 
 void main() {
+  test('reading one failed probe twice does not confirm a failure', () {
+    final guard = FailoverGuard();
+    expect(note(guard, preferred: ['B'], nowMs: 1000), isNull);
+    expect(note(guard, preferred: ['B'], nowMs: 1000), isNull);
+    expect(note(guard, preferred: ['B'], nowMs: 2000)?.name, 'B');
+  });
+
+  test('a candidate that recently failed the network is not a failover target', () {
+    final guard = FailoverGuard();
+    final access = {'B': resultFor('B', ServiceAccessReason.networkFailed)};
+    note(guard, preferred: ['B'], accessByProxy: access, nowMs: 1000);
+    expect(note(guard, preferred: ['B'], accessByProxy: access, nowMs: 2000), isNull);
+  });
+
   test('two failures switch once, and a recovered node never pulls back', () {
     final guard = FailoverGuard();
     const preferred = ['A', 'B'];
