@@ -96,68 +96,115 @@ ServiceAccessResult blocked(String name) {
 }
 
 void main() {
-  test('strict mode blocks an unknown-country node instead of using fallback', () {
-    final decision = buildCandidateDecision(
-      service: usStrict,
-      proxyNames: const ['known', 'unknown'],
-      metadataByProxy: {'known': node('known')},
-      accessByProxy: const {},
-      anchor: anchor,
-    );
-
-    expect(decision.qualified, ['known']);
-    expect(decision.fallback, isEmpty);
-    expect(decision.blocked, ['unknown']);
-    expect(
-      decision.blockedReasons['unknown'],
-      CandidateBlockReason.unknownCountry,
-    );
-  });
-
-  test('relaxed mode keeps an unknown-country node as an explicit fallback', () {
+  test('unknown-country fallback cannot bypass fresh blocking evidence', () {
     final decision = buildCandidateDecision(
       service: usRelaxed,
-      proxyNames: const ['unknown', 'known'],
-      metadataByProxy: {'known': node('known')},
-      accessByProxy: const {},
-      anchor: anchor,
+      proxyNames: const ['unknown'],
+      metadataByProxy: const {},
+      accessByProxy: {'unknown': blocked('unknown')},
     );
-
-    expect(decision.qualified, ['known']);
-    expect(decision.fallback, ['unknown']);
-    expect(decision.ordered, ['known', 'unknown']);
+    expect(decision.ordered, isEmpty);
+    expect(
+      decision.blockedReasons['unknown'],
+      CandidateBlockReason.serviceBlocked,
+    );
   });
 
-  test('a compliant current node stays selected despite a faster candidate', () {
+  test('an old exit verdict does not condemn a newly measured exit', () {
     final decision = buildCandidateDecision(
       service: usStrict,
-      proxyNames: const ['current', 'faster'],
-      metadataByProxy: {
-        'current': node(
-          'current',
-          egressIp: '10.0.0.1',
-          asn: 'AS-US',
-          city: 'Los Angeles',
-          latitude: 34.0522,
-          longitude: -118.2437,
-        ),
-        'faster': node(
-          'faster',
-          city: 'New York',
-          adminRegion: 'New York',
-          latitude: 40.7128,
-          longitude: -74.0060,
-        ),
-      },
-      accessByProxy: const {},
-      anchor: anchor,
-      currentName: 'current',
-      delays: const {'current': 900, 'faster': 30},
+      proxyNames: const ['changed'],
+      metadataByProxy: {'changed': node('changed', egressIp: '30.0.0.1')},
+      accessByProxy: {'changed': blocked('changed')},
     );
-
-    expect(decision.currentCompliant, isTrue);
-    expect(decision.target, isNull);
+    expect(decision.qualified, ['changed']);
   });
+
+  test('expired geography is unknown under a strict lock', () {
+    final expired = NodeMetadataCache.fromJson({
+      ...node('expired').toJson(),
+      'updatedAt': 0,
+    });
+    final decision = buildCandidateDecision(
+      service: usStrict,
+      proxyNames: const ['expired'],
+      metadataByProxy: {'expired': expired},
+      accessByProxy: const {},
+    );
+    expect(decision.qualified, isEmpty);
+  });
+
+  test(
+    'strict mode blocks an unknown-country node instead of using fallback',
+    () {
+      final decision = buildCandidateDecision(
+        service: usStrict,
+        proxyNames: const ['known', 'unknown'],
+        metadataByProxy: {'known': node('known')},
+        accessByProxy: const {},
+        anchor: anchor,
+      );
+
+      expect(decision.qualified, ['known']);
+      expect(decision.fallback, isEmpty);
+      expect(decision.blocked, ['unknown']);
+      expect(
+        decision.blockedReasons['unknown'],
+        CandidateBlockReason.unknownCountry,
+      );
+    },
+  );
+
+  test(
+    'relaxed mode keeps an unknown-country node as an explicit fallback',
+    () {
+      final decision = buildCandidateDecision(
+        service: usRelaxed,
+        proxyNames: const ['unknown', 'known'],
+        metadataByProxy: {'known': node('known')},
+        accessByProxy: const {},
+        anchor: anchor,
+      );
+
+      expect(decision.qualified, ['known']);
+      expect(decision.fallback, ['unknown']);
+      expect(decision.ordered, ['known', 'unknown']);
+    },
+  );
+
+  test(
+    'a compliant current node stays selected despite a faster candidate',
+    () {
+      final decision = buildCandidateDecision(
+        service: usStrict,
+        proxyNames: const ['current', 'faster'],
+        metadataByProxy: {
+          'current': node(
+            'current',
+            egressIp: '10.0.0.1',
+            asn: 'AS-US',
+            city: 'Los Angeles',
+            latitude: 34.0522,
+            longitude: -118.2437,
+          ),
+          'faster': node(
+            'faster',
+            city: 'New York',
+            adminRegion: 'New York',
+            latitude: 40.7128,
+            longitude: -74.0060,
+          ),
+        },
+        accessByProxy: const {},
+        anchor: anchor,
+        currentName: 'current',
+        delays: const {'current': 900, 'faster': 30},
+      );
+
+      expect(decision.currentCompliant, isTrue);
+      expect(decision.target, isNull);
+    },
+  );
 
   test('route tier wins over delay when the current node must move', () {
     final decision = buildCandidateDecision(
@@ -196,10 +243,7 @@ void main() {
 
     expect(decision.qualified, ['same-city', 'same-asn', 'fast-far']);
     expect(decision.target, 'same-city');
-    expect(
-      decision.tierByProxy['same-city'],
-      CandidateRouteTier.sameCity,
-    );
+    expect(decision.tierByProxy['same-city'], CandidateRouteTier.sameCity);
   });
 
   test('the same ASN in another country never becomes a same-country tier', () {
@@ -240,10 +284,7 @@ void main() {
     final decision = buildCandidateDecision(
       service: usStrict,
       proxyNames: const ['blocked', 'working'],
-      metadataByProxy: {
-        'blocked': node('blocked'),
-        'working': node('working'),
-      },
+      metadataByProxy: {'blocked': node('blocked'), 'working': node('working')},
       accessByProxy: {'blocked': blocked('blocked')},
       anchor: anchor,
     );

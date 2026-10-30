@@ -118,7 +118,7 @@ void main() {
     ], 'violator');
 
     expect(decision.ranked, isEmpty);
-    expect(decision.target, isNull);
+    expect(decision.target, 'REJECT');
   });
 
   test('relaxed lock exposes unknown nodes only after qualified nodes', () {

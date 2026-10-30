@@ -24,7 +24,7 @@ NodeMetadataCache meta(
     fraudScore: 0,
     purityScore: purity,
     wafPass: true,
-    updatedAt: 0,
+    updatedAt: DateTime.now().millisecondsSinceEpoch,
   );
 }
 
