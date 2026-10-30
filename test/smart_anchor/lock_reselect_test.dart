@@ -4,7 +4,12 @@ import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:fl_clash/smart_anchor/services/service_access.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-NodeMetadataCache meta(String name, String country, double purity) {
+NodeMetadataCache meta(
+  String name,
+  String country,
+  double purity, {
+  String asn = 'AS1234',
+}) {
   return NodeMetadataCache(
     proxyName: name,
     entryServer: '',
@@ -12,7 +17,7 @@ NodeMetadataCache meta(String name, String country, double purity) {
     countryCode: country,
     latitude: 37.0,
     longitude: -122.0,
-    asn: 'AS1234',
+    asn: asn,
     ipType: 'residential',
     fraudScore: 0,
     purityScore: purity,
@@ -171,15 +176,36 @@ void main() {
     });
 
     test('purity 40 with a fresh region block is reselected', () {
-      // The block verdict also derives a US-wide region ban, so the other
-      // US node leaves the ranking too and only the unprobed pool remains;
-      // the point is the band does not keep the blocked node.
-      final target = lockReselectTarget(
-        bandInput(40, currentBlocked: true),
-        usLocked,
-        ['US-cur', 'US-1', 'mystery'],
-        'US-cur',
+      // A second US node on another ASN corroborates the block, so the
+      // verdicts derive a US-wide region ban and every US node leaves the
+      // ranking; the point is the band does not keep the blocked node.
+      ServiceAccessResult block(String proxy) {
+        return ServiceAccessResult(
+          serviceId: 'gemini',
+          proxyName: proxy,
+          egressIp: '1.2.3.4',
+          reason: ServiceAccessReason.regionBlocked,
+          checkedAt: DateTime.now().millisecondsSinceEpoch,
+        );
+      }
+
+      final input = SmartAnchorInput(
+        services: [usLocked],
+        metadataByProxy: {
+          'US-cur': meta('US-cur', 'US', 40, asn: 'AS100'),
+          'US-1': meta('US-1', 'US', 90),
+          'US-2': meta('US-2', 'US', 80, asn: 'AS200'),
+        },
+        accessByService: {
+          'gemini': {'US-cur': block('US-cur'), 'US-2': block('US-2')},
+        },
       );
+      final target = lockReselectTarget(input, usLocked, [
+        'US-cur',
+        'US-1',
+        'US-2',
+        'mystery',
+      ], 'US-cur');
       expect(target, 'mystery');
     });
 

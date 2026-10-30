@@ -193,6 +193,28 @@ void main() {
       ),
       '[SA] derived-regions service=openai blocked={}->{SG}',
     );
+    expect(
+      saDerivedRegionsLine(
+        serviceId: 'openai',
+        blockedBefore: const {},
+        blockedAfter: const {},
+        heldBack: const {'HK': (proxies: 1, asns: 1)},
+      ),
+      '[SA] derived-regions service=openai blocked={}->{} held={HK:1/1}',
+    );
+    expect(
+      saDerivedRegionsLine(
+        serviceId: 'openai',
+        blockedBefore: const {},
+        blockedAfter: const {'JP'},
+        heldBack: const {
+          'JP': (proxies: 2, asns: 1),
+          'HK': (proxies: 1, asns: 1),
+        },
+      ),
+      '[SA] derived-regions service=openai blocked={}->{JP} '
+      'held={HK:1/1,JP:2/1}',
+    );
   });
 
   test('rank anchors line sorts services and anchor replace names both', () {

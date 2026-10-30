@@ -567,25 +567,84 @@ String _strippedProxyName(String name) {
   return name.substring(close + 2);
 }
 
-Set<String> detectedUnsupportedRegions(
+/// The outcome of weighing a service's fresh region-block evidence per
+/// country: the countries the derivation gate in [derivedRegionEvidence]
+/// let through, and the countries it held back with the tally that fell
+/// short. A country with a fresh accessible verdict is vetoed above the
+/// gate and appears in neither collection.
+class DerivedRegionEvidence {
+  const DerivedRegionEvidence({required this.blocked, required this.heldBack});
+
+  final Set<String> blocked;
+  final Map<String, ({int proxies, int asns})> heldBack;
+}
+
+// Adjustable priors, not measured truths: a single node's region verdict
+// once blacklisted its whole country, which let one bad probe empty a
+// country's candidate pool. Derivation now needs corroboration from a
+// second node on a second ASN, anchored by at least one verdict the
+// service measured itself rather than borrowed.
+const _regionGateMinProxies = 2;
+const _regionGateMinAsns = 2;
+
+DerivedRegionEvidence derivedRegionEvidence(
   SmartAnchorInput input,
   String serviceId,
 ) {
   final access = input.accessByService[serviceId] ?? const {};
-  final blocked = <String>{};
   final working = <String>{};
+  final proxiesByCountry = <String, Set<String>>{};
+  final asnsByCountry = <String, Set<String>>{};
+  final ownCountries = <String>{};
   for (final entry in access.entries) {
-    final country = input.metadataByProxy[entry.key]?.countryCode;
+    final verdict = entry.value;
+    if (verdict.isExpired) {
+      continue;
+    }
+    final metadata = input.metadataByProxy[entry.key];
+    final country = metadata?.countryCode;
     if (country == null || country.isEmpty) {
       continue;
     }
-    if (entry.value.derivesRegionBlock && !entry.value.isExpired) {
-      blocked.add(country);
-    } else if (entry.value.isAccessible && !entry.value.isExpired) {
+    if (verdict.isAccessible) {
       working.add(country);
     }
+    if (!verdict.derivesRegionBlock) {
+      continue;
+    }
+    proxiesByCountry.putIfAbsent(country, () => {}).add(entry.key);
+    final asn = metadata?.asn;
+    if (asn != null && asn.isNotEmpty) {
+      asnsByCountry.putIfAbsent(country, () => {}).add(asn);
+    }
+    if (verdict.borrowedFrom == null) {
+      ownCountries.add(country);
+    }
   }
-  return blocked.difference(working);
+  final blocked = <String>{};
+  final heldBack = <String, ({int proxies, int asns})>{};
+  for (final country in proxiesByCountry.keys) {
+    if (working.contains(country)) {
+      continue;
+    }
+    final proxies = proxiesByCountry[country]!.length;
+    final asns = asnsByCountry[country]?.length ?? 0;
+    if (proxies >= _regionGateMinProxies &&
+        asns >= _regionGateMinAsns &&
+        ownCountries.contains(country)) {
+      blocked.add(country);
+    } else {
+      heldBack[country] = (proxies: proxies, asns: asns);
+    }
+  }
+  return DerivedRegionEvidence(blocked: blocked, heldBack: heldBack);
+}
+
+Set<String> detectedUnsupportedRegions(
+  SmartAnchorInput input,
+  String serviceId,
+) {
+  return derivedRegionEvidence(input, serviceId).blocked;
 }
 
 List<String> applyRegionFilter(

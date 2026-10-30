@@ -597,19 +597,32 @@ class SmartAnchor extends _$SmartAnchor {
         accessByService: access,
       );
       for (final service in enabled) {
-        final before = detectedUnsupportedRegions(state, service.serviceId);
-        final after = detectedUnsupportedRegions(nextInput, service.serviceId);
-        if (before.length == after.length && before.containsAll(after)) {
+        final before = derivedRegionEvidence(state, service.serviceId);
+        final after = derivedRegionEvidence(nextInput, service.serviceId);
+        final blockedChanged =
+            before.blocked.length != after.blocked.length ||
+            !before.blocked.containsAll(after.blocked);
+        var heldChanged = before.heldBack.length != after.heldBack.length;
+        if (!heldChanged) {
+          for (final entry in after.heldBack.entries) {
+            if (before.heldBack[entry.key] != entry.value) {
+              heldChanged = true;
+              break;
+            }
+          }
+        }
+        if (!blockedChanged && !heldChanged) {
           continue;
         }
         commonPrint.log(
           saDerivedRegionsLine(
             serviceId: service.serviceId,
-            blockedBefore: before,
-            blockedAfter: after,
+            blockedBefore: before.blocked,
+            blockedAfter: after.blocked,
+            heldBack: after.heldBack,
           ),
         );
-        for (final country in after.difference(before)) {
+        for (final country in after.blocked.difference(before.blocked)) {
           final serviceAccess = access[service.serviceId] ?? const {};
           for (final entry in serviceAccess.entries) {
             final verdict = entry.value;

@@ -225,14 +225,27 @@ String saDerivedRegionsLine({
   required String serviceId,
   required Set<String> blockedBefore,
   required Set<String> blockedAfter,
+  Map<String, ({int proxies, int asns})> heldBack = const {},
 }) {
   String render(Set<String> countries) {
     final sorted = countries.toList()..sort();
     return '{${sorted.join(',')}}';
   }
 
-  return '[SA] derived-regions service=$serviceId '
+  final line =
+      '[SA] derived-regions service=$serviceId '
       'blocked=${render(blockedBefore)}->${render(blockedAfter)}';
+  if (heldBack.isEmpty) {
+    return line;
+  }
+  final countries = heldBack.keys.toList()..sort();
+  final tallies = countries
+      .map((country) {
+        final tally = heldBack[country]!;
+        return '$country:${tally.proxies}/${tally.asns}';
+      })
+      .join(',');
+  return '$line held={$tallies}';
 }
 
 String saFailoverFreezeLine({required String serviceId, required int untilMs}) {

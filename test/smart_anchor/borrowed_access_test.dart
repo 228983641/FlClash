@@ -6,7 +6,12 @@ import 'package:fl_clash/smart_anchor/services/scoring_engine.dart';
 import 'package:fl_clash/smart_anchor/services/service_access.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-NodeMetadataCache meta(String name, String country, double purity) {
+NodeMetadataCache meta(
+  String name,
+  String country,
+  double purity, {
+  String asn = 'AS1234',
+}) {
   return NodeMetadataCache(
     proxyName: name,
     entryServer: '',
@@ -14,7 +19,7 @@ NodeMetadataCache meta(String name, String country, double purity) {
     countryCode: country,
     latitude: 37.0,
     longitude: -122.0,
-    asn: 'AS1234',
+    asn: asn,
     ipType: 'residential',
     fraudScore: 0,
     purityScore: purity,
@@ -54,7 +59,8 @@ void main() {
       services: [grok],
       metadataByProxy: {
         'US-1': meta('US-1', 'US', 90),
-        'HK-1': meta('HK-1', 'HK', 90),
+        'HK-1': meta('HK-1', 'HK', 90, asn: 'AS100'),
+        'HK-2': meta('HK-2', 'HK', 85, asn: 'AS200'),
       },
       accessByService: {
         'grok': {
@@ -64,13 +70,19 @@ void main() {
             ServiceAccessReason.regionBlocked,
             borrowedFrom: 'openai',
           ),
+          'HK-2': access('grok', 'HK-2', ServiceAccessReason.regionBlocked),
         },
       },
     );
     expect(detectedUnsupportedRegions(input, 'grok'), {'HK'});
-    final ranked = rankedProxiesForService(input, grok, ['US-1', 'HK-1']);
+    final ranked = rankedProxiesForService(input, grok, [
+      'US-1',
+      'HK-1',
+      'HK-2',
+    ]);
     expect(ranked, contains('US-1'));
     expect(ranked, isNot(contains('HK-1')));
+    expect(ranked, isNot(contains('HK-2')));
   });
 
   test('compliance moves a borrower off a node its donor calls blocked', () {
