@@ -1043,5 +1043,7 @@
   "smartAnchorRegionEmpty": "No regions to list yet. Probe nodes first.",
   "smartAnchorRegionCountBlacklist": "Blacklist: {count} regions",
   "smartAnchorRegionCountWhitelist": "Whitelist: {count} regions",
-  "smartAnchorRegionAuto": "Auto (detected unsupported regions)"
+  "smartAnchorRegionAuto": "Auto (detected unsupported regions)",
+  "smartAnchorStrictMode": "厳密な国固定",
+  "smartAnchorStrictModeDesc": "地域情報が新しく確認済みのノードのみ使用します。条件を満たすノードがなければ、このサービスを遮断します。"
 }

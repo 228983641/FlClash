@@ -1487,6 +1487,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorSharedLockDesc": MessageLookupByLibrary.simpleMessage(
       "同公司不同业务共用同一组锁国国家与同一个锚点，登录国家与城市保持一致；关闭后各业务可分别设置。",
     ),
+    "smartAnchorStrictMode": MessageLookupByLibrary.simpleMessage("严格锁国"),
+    "smartAnchorStrictModeDesc": MessageLookupByLibrary.simpleMessage(
+      "仅使用地区证据有效的合格节点；地区未知、证据过期或无合格节点时阻断该业务。",
+    ),
     "smartAnchorSwitchFrozen": MessageLookupByLibrary.simpleMessage(
       "10 分钟内已切换 3 次，自动切换已冻结",
     ),

@@ -1047,9 +1047,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "inputRuleContent": MessageLookupByLibrary.simpleMessage(
       "Saisissez le contenu de la règle",
     ),
-    "installedAppsPermissionDeniedMessage": MessageLookupByLibrary.simpleMessage(
-      "L’autorisation de la liste des apps a été refusée ; les apps installées ne peuvent donc pas être listées. Veuillez l’accorder manuellement dans les réglages du système.",
-    ),
+    "installedAppsPermissionDeniedMessage":
+        MessageLookupByLibrary.simpleMessage(
+          "L’autorisation de la liste des apps a été refusée ; les apps installées ne peuvent donc pas être listées. Veuillez l’accorder manuellement dans les réglages du système.",
+        ),
     "installedAppsPermissionDesc": MessageLookupByLibrary.simpleMessage(
       "Ce système masque la liste des apps installées tant que l’autorisation n’est pas accordée. Accordez-la pour configurer le proxy par app.",
     ),
@@ -2052,6 +2053,12 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "smartAnchorSharedLockDesc": MessageLookupByLibrary.simpleMessage(
       "Services from the same company share one set of locked countries and one anchor, so the login country and city stay consistent. Turn it off and each service can be set separately.",
+    ),
+    "smartAnchorStrictMode": MessageLookupByLibrary.simpleMessage(
+      "Verrouillage strict du pays",
+    ),
+    "smartAnchorStrictModeDesc": MessageLookupByLibrary.simpleMessage(
+      "Utiliser uniquement les nœuds dont la région est vérifiée et récente. Bloquer ce service si aucun nœud admissible ne reste.",
     ),
     "smartAnchorSwitchFrozen": MessageLookupByLibrary.simpleMessage(
       "Auto switch frozen after 3 switches in 10 minutes",

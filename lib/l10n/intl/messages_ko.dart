@@ -1639,6 +1639,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorSharedLockDesc": MessageLookupByLibrary.simpleMessage(
       "Services from the same company share one set of locked countries and one anchor, so the login country and city stay consistent. Turn it off and each service can be set separately.",
     ),
+    "smartAnchorStrictMode": MessageLookupByLibrary.simpleMessage("엄격한 국가 고정"),
+    "smartAnchorStrictModeDesc": MessageLookupByLibrary.simpleMessage(
+      "최신 지역 정보가 확인된 노드만 사용합니다. 적합한 노드가 없으면 이 서비스의 연결을 차단합니다.",
+    ),
     "smartAnchorSwitchFrozen": MessageLookupByLibrary.simpleMessage(
       "Auto switch frozen after 3 switches in 10 minutes",
     ),

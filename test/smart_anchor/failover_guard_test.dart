@@ -20,6 +20,7 @@ FailoverTarget? note(
   List<String> fallback = const [],
   Map<String, ServiceAccessResult> accessByProxy = const {},
   int nowMs = 1000,
+  int? probeAtMs,
 }) {
   return guard.noteResult(
     serviceId: 'youtube',
@@ -29,6 +30,7 @@ FailoverTarget? note(
     fallback: fallback,
     accessByProxy: accessByProxy,
     nowMs: nowMs,
+    probeAtMs: probeAtMs,
   );
 }
 
@@ -40,12 +42,18 @@ void main() {
     expect(note(guard, preferred: ['B'], nowMs: 2000)?.name, 'B');
   });
 
-  test('a candidate that recently failed the network is not a failover target', () {
-    final guard = FailoverGuard();
-    final access = {'B': resultFor('B', ServiceAccessReason.networkFailed)};
-    note(guard, preferred: ['B'], accessByProxy: access, nowMs: 1000);
-    expect(note(guard, preferred: ['B'], accessByProxy: access, nowMs: 2000), isNull);
-  });
+  test(
+    'a candidate that recently failed the network is not a failover target',
+    () {
+      final guard = FailoverGuard();
+      final access = {'B': resultFor('B', ServiceAccessReason.networkFailed)};
+      note(guard, preferred: ['B'], accessByProxy: access, nowMs: 1000);
+      expect(
+        note(guard, preferred: ['B'], accessByProxy: access, nowMs: 2000),
+        isNull,
+      );
+    },
+  );
 
   test('two failures switch once, and a recovered node never pulls back', () {
     final guard = FailoverGuard();
@@ -178,6 +186,7 @@ void main() {
           currentName: current,
           preferred: preferred,
           nowMs: 1000 + cycle * 1000,
+          probeAtMs: 1000 + cycle * 1000 + attempt,
         );
       }
       if (target != null) {
@@ -287,6 +296,7 @@ void main() {
           currentName: current,
           preferred: preferred,
           nowMs: 1000 + cycle * 1000,
+          probeAtMs: 1000 + cycle * 1000 + attempt,
         );
       }
       current = target!.name;

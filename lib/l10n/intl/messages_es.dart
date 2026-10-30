@@ -1048,9 +1048,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "inputRuleContent": MessageLookupByLibrary.simpleMessage(
       "Introduce el contenido de la regla",
     ),
-    "installedAppsPermissionDeniedMessage": MessageLookupByLibrary.simpleMessage(
-      "Se denegó el permiso de lista de apps, por lo que no se pueden mostrar las apps instaladas. Concédelo manualmente en los ajustes del sistema.",
-    ),
+    "installedAppsPermissionDeniedMessage":
+        MessageLookupByLibrary.simpleMessage(
+          "Se denegó el permiso de lista de apps, por lo que no se pueden mostrar las apps instaladas. Concédelo manualmente en los ajustes del sistema.",
+        ),
     "installedAppsPermissionDesc": MessageLookupByLibrary.simpleMessage(
       "Este sistema oculta la lista de apps instaladas hasta que se concede el permiso. Autorízalo para configurar el proxy por app.",
     ),
@@ -2051,6 +2052,12 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "smartAnchorSharedLockDesc": MessageLookupByLibrary.simpleMessage(
       "Services from the same company share one set of locked countries and one anchor, so the login country and city stay consistent. Turn it off and each service can be set separately.",
+    ),
+    "smartAnchorStrictMode": MessageLookupByLibrary.simpleMessage(
+      "Bloqueo estricto de país",
+    ),
+    "smartAnchorStrictModeDesc": MessageLookupByLibrary.simpleMessage(
+      "Usar solo nodos con una región verificada y reciente. Bloquear este servicio si no quedan nodos aptos.",
     ),
     "smartAnchorSwitchFrozen": MessageLookupByLibrary.simpleMessage(
       "Auto switch frozen after 3 switches in 10 minutes",

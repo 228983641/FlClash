@@ -2,6 +2,8 @@ import 'package:fl_clash/smart_anchor/models/node_metadata.dart';
 import 'package:fl_clash/smart_anchor/models/service_anchor.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
+import 'package:fl_clash/smart_anchor/services/service_access.dart';
+import 'package:fl_clash/smart_anchor/services/sticky_monitor.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 NodeMetadataCache integrationNode(
@@ -60,6 +62,49 @@ const losAngelesAnchor = ServiceAnchor(
 );
 
 void main() {
+  test('failover evidence follows the current egress for every candidate', () {
+    final service = integrationService(ServiceRestrictionMode.strict);
+    final input = SmartAnchorInput(
+      services: [service],
+      metadataByProxy: {
+        'B': integrationNode(
+          'B',
+          country: 'US',
+          city: 'Los Angeles',
+          latitude: 34,
+          longitude: -118,
+        ),
+      },
+      accessByService: {
+        'gemini': {
+          'B': ServiceAccessResult(
+            serviceId: 'gemini',
+            proxyName: 'B',
+            egressIp: '1.1.1.1',
+            reason: ServiceAccessReason.networkFailed,
+            checkedAt: DateTime.now().millisecondsSinceEpoch,
+          ),
+        },
+      },
+    );
+    final result = candidateDecisionForService(input, service, ['B']);
+    expect(result.accessByProxy, isEmpty);
+    final guard = FailoverGuard();
+    FailoverTarget? target;
+    for (final time in [1000, 2000]) {
+      target = guard.noteResult(
+        serviceId: 'gemini',
+        currentName: 'A',
+        reason: ServiceAccessReason.networkFailed,
+        preferred: result.decision.qualified,
+        fallback: result.decision.fallback,
+        accessByProxy: result.accessByProxy,
+        nowMs: time,
+      );
+    }
+    expect(target?.name, 'B');
+  });
+
   test('profile ranking keeps route tier ahead of latency', () {
     final service = integrationService(ServiceRestrictionMode.strict);
     final input = SmartAnchorInput(

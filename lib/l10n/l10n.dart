@@ -7943,8 +7943,7 @@ class AppLocalizations {
   String customImportDroppedSubRules(num count, Object label) {
     return Intl.plural(
       count,
-      one:
-          '1 SUB-RULE rule was dropped, since custom profiles do not support sub-rules',
+      one: '1 SUB-RULE rule was dropped, since custom profiles do not support sub-rules',
       other:
           '$label SUB-RULE rules were dropped, since custom profiles do not support sub-rules',
       name: 'customImportDroppedSubRules',
@@ -8843,6 +8842,26 @@ class AppLocalizations {
     return Intl.message(
       'Auto (detected unsupported regions)',
       name: 'smartAnchorRegionAuto',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Strict country lock`
+  String get smartAnchorStrictMode {
+    return Intl.message(
+      'Strict country lock',
+      name: 'smartAnchorStrictMode',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Use only nodes with fresh, verified regions. Block this service when no eligible node remains.`
+  String get smartAnchorStrictModeDesc {
+    return Intl.message(
+      'Use only nodes with fresh, verified regions. Block this service when no eligible node remains.',
+      name: 'smartAnchorStrictModeDesc',
       desc: '',
       args: [],
     );

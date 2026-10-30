@@ -10,6 +10,7 @@ class FailoverTarget {
 class FailoverGuard {
   final Map<String, int> _failures = {};
   final Map<String, String?> _lastCurrent = {};
+  final Map<String, int> _lastProbeAt = {};
   final Map<String, List<int>> _switchTimes = {};
   int _lastCountedFailures = 0;
 
@@ -51,11 +52,19 @@ class FailoverGuard {
     required List<String> fallback,
     required Map<String, ServiceAccessResult> accessByProxy,
     required int nowMs,
+    int? probeAtMs,
   }) {
     if (_lastCurrent[serviceId] != currentName) {
       _failures[serviceId] = 0;
+      _lastProbeAt.remove(serviceId);
       _lastCurrent[serviceId] = currentName;
     }
+    final checkedAt = probeAtMs ?? nowMs;
+    final lastProbeAt = _lastProbeAt[serviceId];
+    if (lastProbeAt != null && checkedAt <= lastProbeAt) {
+      return null;
+    }
+    _lastProbeAt[serviceId] = checkedAt;
     if (reason == null ||
         reason == ServiceAccessReason.accessible ||
         reason == ServiceAccessReason.unknown ||
@@ -90,8 +99,10 @@ class FailoverGuard {
         }
         final candidateAccess = accessByProxy[name];
         if (candidateAccess != null &&
+            !candidateAccess.isExpired &&
             candidateAccess.borrowedFrom == null &&
-            candidateAccess.blocksRanking) {
+            (candidateAccess.blocksRanking ||
+                candidateAccess.reason == ServiceAccessReason.networkFailed)) {
           continue;
         }
         _switchTimes[serviceId] = [...recent, nowMs];

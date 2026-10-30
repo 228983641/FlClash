@@ -1043,5 +1043,7 @@
   "smartAnchorRegionEmpty": "No regions to list yet. Probe nodes first.",
   "smartAnchorRegionCountBlacklist": "Blacklist: {count} regions",
   "smartAnchorRegionCountWhitelist": "Whitelist: {count} regions",
-  "smartAnchorRegionAuto": "Auto (detected unsupported regions)"
+  "smartAnchorRegionAuto": "Auto (detected unsupported regions)",
+  "smartAnchorStrictMode": "엄격한 국가 고정",
+  "smartAnchorStrictModeDesc": "최신 지역 정보가 확인된 노드만 사용합니다. 적합한 노드가 없으면 이 서비스의 연결을 차단합니다."
 }

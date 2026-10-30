@@ -1015,9 +1015,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "inputRuleContent": MessageLookupByLibrary.simpleMessage(
       "Введите содержимое правила",
     ),
-    "installedAppsPermissionDeniedMessage": MessageLookupByLibrary.simpleMessage(
-      "Разрешение на список приложений отклонено, поэтому установленные приложения недоступны. Предоставьте его вручную в системных настройках.",
-    ),
+    "installedAppsPermissionDeniedMessage":
+        MessageLookupByLibrary.simpleMessage(
+          "Разрешение на список приложений отклонено, поэтому установленные приложения недоступны. Предоставьте его вручную в системных настройках.",
+        ),
     "installedAppsPermissionDesc": MessageLookupByLibrary.simpleMessage(
       "Эта система не выдаёт список установленных приложений без разрешения. Предоставьте его, чтобы настроить прокси для отдельных приложений.",
     ),
@@ -1992,6 +1993,12 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "smartAnchorSharedLockDesc": MessageLookupByLibrary.simpleMessage(
       "Services from the same company share one set of locked countries and one anchor, so the login country and city stay consistent. Turn it off and each service can be set separately.",
+    ),
+    "smartAnchorStrictMode": MessageLookupByLibrary.simpleMessage(
+      "Строгая фиксация страны",
+    ),
+    "smartAnchorStrictModeDesc": MessageLookupByLibrary.simpleMessage(
+      "Использовать только узлы с актуальными подтверждёнными регионами. Блокировать сервис, если подходящих узлов нет.",
     ),
     "smartAnchorSwitchFrozen": MessageLookupByLibrary.simpleMessage(
       "Auto switch frozen after 3 switches in 10 minutes",

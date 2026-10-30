@@ -25,11 +25,15 @@ class _SmartAnchorServiceEditViewState
   late final TextEditingController _rulesController;
   late final TextEditingController _dnsController;
   late final TextEditingController _lockController;
+  late ServiceRestrictionMode _restrictionMode;
 
   @override
   void initState() {
     super.initState();
     final service = widget.service;
+    _restrictionMode =
+        service?.restrictionMode ??
+        defaultServiceRestrictionMode(service?.lockedCountries ?? const []);
     _nameController = TextEditingController(text: service?.displayName ?? '');
     _rulesController = TextEditingController(
       text: (service?.matchRules ?? []).join('\n'),
@@ -125,9 +129,7 @@ class _SmartAnchorServiceEditViewState
             officialName: existing?.officialName ?? '',
             regionMode: existing?.regionMode ?? 'blacklist',
             regionCountries: existing?.regionCountries ?? const [],
-            restrictionMode:
-                existing?.restrictionMode ??
-                defaultServiceRestrictionMode(countries),
+            restrictionMode: _restrictionMode,
           ),
         );
     if (lockChanged) {
@@ -211,6 +213,20 @@ class _SmartAnchorServiceEditViewState
                         ? null
                         : appLocalizations.smartAnchorInvalidCountryCode,
                   ),
+                ),
+              ),
+              DecorationListItem(
+                title: Text(appLocalizations.smartAnchorStrictMode),
+                subtitle: Text(appLocalizations.smartAnchorStrictModeDesc),
+                trailing: CommonSwitch(
+                  value: _restrictionMode == ServiceRestrictionMode.strict,
+                  onChanged: (value) {
+                    setState(() {
+                      _restrictionMode = value
+                          ? ServiceRestrictionMode.strict
+                          : defaultServiceRestrictionMode(_countries());
+                    });
+                  },
                 ),
               ),
             ],

@@ -1596,21 +1596,49 @@ void main() {
       );
     });
 
-    test('the same failure measured by the service itself switches', () async {
-      final container = failoverContainer(borrowed: false);
+    test(
+      'two distinct failures measured by the service itself switch',
+      () async {
+        final container = failoverContainer(borrowed: false);
 
-      actionOf(container).smartAnchorFailoverCheck();
-      actionOf(container).smartAnchorFailoverCheck();
+        actionOf(container).smartAnchorFailoverCheck();
+        actionOf(container).smartAnchorFailoverCheck();
 
-      final events = container.read(smartAnchorProvider).switchEvents['claude'];
-      expect(events, hasLength(1));
-      expect(events!.single.reason, 'networkFailed');
-      expect(events.single.toProxy, 'US-2');
-      debouncer.cancel((FunctionTag.changeProxy, '🎯 Smart-Claude'));
-      await drainSaves(
-        (snapshot) => snapshot?.switchEvents['claude']?.isNotEmpty == true,
-      );
-    });
+        expect(
+          container.read(smartAnchorProvider).switchEvents['claude'],
+          isNull,
+        );
+        final smart = container.read(smartAnchorProvider);
+        final access = smart.accessByService['claude']!['US-1']!;
+        container
+            .read(smartAnchorProvider.notifier)
+            .update(
+              smart.copyWith(
+                accessByService: {
+                  'claude': {
+                    ...smart.accessByService['claude']!,
+                    'US-1': ServiceAccessResult.fromJson({
+                      ...access.toJson(),
+                      'checkedAt': access.checkedAt + 1,
+                    }),
+                  },
+                },
+              ),
+            );
+        actionOf(container).smartAnchorFailoverCheck();
+
+        final events = container
+            .read(smartAnchorProvider)
+            .switchEvents['claude'];
+        expect(events, hasLength(1));
+        expect(events!.single.reason, 'networkFailed');
+        expect(events.single.toProxy, 'US-2');
+        debouncer.cancel((FunctionTag.changeProxy, '🎯 Smart-Claude'));
+        await drainSaves(
+          (snapshot) => snapshot?.switchEvents['claude']?.isNotEmpty == true,
+        );
+      },
+    );
   });
 
   group('smartAnchorMonitorTick', () {

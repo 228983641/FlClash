@@ -1043,5 +1043,7 @@
   "smartAnchorRegionEmpty": "No regions to list yet. Probe nodes first.",
   "smartAnchorRegionCountBlacklist": "Blacklist: {count} regions",
   "smartAnchorRegionCountWhitelist": "Whitelist: {count} regions",
-  "smartAnchorRegionAuto": "Auto (detected unsupported regions)"
+  "smartAnchorRegionAuto": "Auto (detected unsupported regions)",
+  "smartAnchorStrictMode": "Verrouillage strict du pays",
+  "smartAnchorStrictModeDesc": "Utiliser uniquement les nœuds dont la région est vérifiée et récente. Bloquer ce service si aucun nœud admissible ne reste."
 }

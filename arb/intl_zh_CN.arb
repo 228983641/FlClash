@@ -1043,5 +1043,7 @@
   "smartAnchorRegionEmpty": "暂无可列出的地区，请先探测节点。",
   "smartAnchorRegionCountBlacklist": "黑名单：{count} 个地区",
   "smartAnchorRegionCountWhitelist": "白名单：{count} 个地区",
-  "smartAnchorRegionAuto": "自动（已探测到的不支持地区）"
+  "smartAnchorRegionAuto": "自动（已探测到的不支持地区）",
+  "smartAnchorStrictMode": "严格锁国",
+  "smartAnchorStrictModeDesc": "仅使用地区证据有效的合格节点；地区未知、证据过期或无合格节点时阻断该业务。"
 }

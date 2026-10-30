@@ -846,6 +846,37 @@ _candidateDecisionForService(
   );
 }
 
+({CandidateDecision decision, Map<String, ServiceAccessResult> accessByProxy})
+candidateDecisionForService(
+  SmartAnchorInput input,
+  ServiceToggleConfig service,
+  List<String> proxyNames, {
+  String? currentName,
+  Map<String, int> delays = const {},
+}) {
+  final result = _candidateDecisionForService(
+    input,
+    service,
+    proxyNames,
+    currentName: currentName,
+    delays: delays,
+  );
+  final effective = result.effective;
+  final access = effective.accessByService[service.serviceId] ?? const {};
+  return (
+    decision: result.decision,
+    accessByProxy: {
+      for (final entry in access.entries)
+        if (!entry.value.isExpired &&
+            entry.value.borrowedFrom == null &&
+            (entry.value.egressIp.isEmpty ||
+                effective.metadataByProxy[entry.key]?.egressIp ==
+                    entry.value.egressIp))
+          entry.key: entry.value,
+    },
+  );
+}
+
 /// The node a service group must move to when its current selection falls
 /// outside the ranking the current lock produces, or null when the
 /// selection still complies (or nothing compliant is known). Setup

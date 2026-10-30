@@ -469,37 +469,26 @@ class ProxiesAction extends _$ProxiesAction {
       // nodes elsewhere in the Core keep bare names), and the Core
       // refuses a switch to any name that is not a member of the group.
       final names = _memberNamesOf(group, groupNames);
-      final ranked = rankedProxiesForService(
+      final decision = candidateDecisionForService(
         smart,
         service,
         names,
+        currentName: currentName,
         delays: delays,
       );
-      final preferred = <String>[];
-      final fallback = <String>[];
-      for (final name in ranked) {
-        if (smart.metadataByProxy.containsKey(name)) {
-          preferred.add(name);
-        } else {
-          fallback.add(name);
-        }
-      }
       // A borrowed verdict is another service's measurement; it must
       // never count as this service's node failing.
-      final currentAccess =
-          smart.accessByService[service.serviceId]?[currentName];
-      final currentReason =
-          currentAccess != null && currentAccess.borrowedFrom == null
-          ? currentAccess.reason
-          : null;
+      final currentAccess = decision.accessByProxy[currentName];
+      final currentReason = currentAccess?.reason;
       final target = _failoverGuard.noteResult(
         serviceId: service.serviceId,
         currentName: currentName,
         reason: currentReason,
-        preferred: preferred,
-        fallback: fallback,
-        accessByProxy: smart.accessByService[service.serviceId] ?? const {},
+        preferred: decision.decision.qualified,
+        fallback: decision.decision.fallback,
+        accessByProxy: decision.accessByProxy,
         nowMs: nowMs,
+        probeAtMs: currentAccess?.checkedAt,
       );
       if (currentAccess != null &&
           (currentAccess.blocksRanking ||
