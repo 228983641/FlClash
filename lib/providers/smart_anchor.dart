@@ -441,6 +441,11 @@ class SmartAnchor extends _$SmartAnchor {
       currentProxyNames: [currentProxyName, ...currentProxyNames],
       metadataByProxy: state.metadataByProxy,
       rankByProxy: rankByProxy,
+      quotaCountries: probeQuotaCountries(
+        services: state.services,
+        proxyNames: proxyNames,
+        metadataByProxy: state.metadataByProxy,
+      ),
     );
     final serviceIds = [for (final service in enabled) service.serviceId];
     final metadata = Map.of(state.metadataByProxy);

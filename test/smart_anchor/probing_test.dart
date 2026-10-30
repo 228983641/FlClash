@@ -40,6 +40,27 @@ NodeMetadataCache metadataFor(String name, {required bool fresh}) {
   );
 }
 
+NodeMetadataCache metadataForCountry(
+  String name,
+  String country, {
+  required bool fresh,
+}) {
+  return NodeMetadataCache(
+    proxyName: name,
+    entryServer: 'entry.example',
+    egressIp: '1.2.3.4',
+    countryCode: country,
+    latitude: 34.0522,
+    longitude: -118.2437,
+    asn: 'AS20057',
+    ipType: 'residential',
+    fraudScore: 0,
+    purityScore: 90,
+    wafPass: true,
+    updatedAt: fresh ? DateTime.now().millisecondsSinceEpoch : 0,
+  );
+}
+
 void main() {
   test('core service statuses map to access reasons', () {
     expect(
@@ -147,6 +168,94 @@ void main() {
       expect(currentsOnly, ['A', 'B']);
     });
 
+    test('quota lifts a low-ranked small region into the round', () {
+      final targets = selectProbeQueue(
+        proxyNames: ['US-1', 'US-2', 'US-3', 'US-4', 'TW-1'],
+        currentProxyNames: const [],
+        metadataByProxy: {
+          'US-1': metadataForCountry('US-1', 'US', fresh: false),
+          'US-2': metadataForCountry('US-2', 'US', fresh: false),
+          'US-3': metadataForCountry('US-3', 'US', fresh: false),
+          'US-4': metadataForCountry('US-4', 'US', fresh: false),
+          'TW-1': metadataForCountry('TW-1', 'TW', fresh: false),
+        },
+        rankByProxy: const {
+          'US-1': 0,
+          'US-2': 1,
+          'US-3': 2,
+          'US-4': 3,
+          'TW-1': 99,
+        },
+        budget: 3,
+        quotaCountries: const {'US', 'TW'},
+      );
+      expect(targets, ['US-1', 'TW-1', 'US-2']);
+    });
+
+    test('quota keeps every already-covered node when budget allows', () {
+      final targets = selectProbeQueue(
+        proxyNames: ['US-1', 'US-2', 'TW-1'],
+        currentProxyNames: const [],
+        metadataByProxy: {
+          'US-1': metadataForCountry('US-1', 'US', fresh: false),
+          'US-2': metadataForCountry('US-2', 'US', fresh: false),
+          'TW-1': metadataForCountry('TW-1', 'TW', fresh: false),
+        },
+        rankByProxy: const {'US-1': 0, 'US-2': 1, 'TW-1': 2},
+        quotaCountries: const {'US', 'TW'},
+      );
+      expect(targets, hasLength(3));
+      expect(targets, containsAll(['US-1', 'US-2', 'TW-1']));
+    });
+
+    test('a region with only fresh nodes spends no quota slot', () {
+      final targets = selectProbeQueue(
+        proxyNames: ['US-1', 'US-2', 'US-3', 'TW-1'],
+        currentProxyNames: const [],
+        metadataByProxy: {
+          'US-1': metadataForCountry('US-1', 'US', fresh: false),
+          'US-2': metadataForCountry('US-2', 'US', fresh: false),
+          'US-3': metadataForCountry('US-3', 'US', fresh: false),
+          'TW-1': metadataForCountry('TW-1', 'TW', fresh: true),
+        },
+        rankByProxy: const {'US-1': 0, 'US-2': 1, 'US-3': 2},
+        budget: 2,
+        quotaCountries: const {'US', 'TW'},
+      );
+      expect(targets, ['US-1', 'US-2']);
+    });
+
+    test('a current node already covers its region for quota', () {
+      final targets = selectProbeQueue(
+        proxyNames: ['TW-cur', 'US-1', 'US-2', 'TW-2'],
+        currentProxyNames: ['TW-cur'],
+        metadataByProxy: {
+          'TW-cur': metadataForCountry('TW-cur', 'TW', fresh: true),
+          'US-1': metadataForCountry('US-1', 'US', fresh: false),
+          'US-2': metadataForCountry('US-2', 'US', fresh: false),
+          'TW-2': metadataForCountry('TW-2', 'TW', fresh: false),
+        },
+        rankByProxy: const {'US-1': 0, 'US-2': 1, 'TW-2': 50},
+        budget: 3,
+        quotaCountries: const {'US', 'TW'},
+      );
+      expect(targets, ['TW-cur', 'US-1', 'US-2']);
+    });
+
+    test('an unknown-country node is never a quota representative', () {
+      final targets = selectProbeQueue(
+        proxyNames: ['UNK-1', 'US-1'],
+        currentProxyNames: const [],
+        metadataByProxy: {
+          'US-1': metadataForCountry('US-1', 'US', fresh: false),
+        },
+        rankByProxy: const {'UNK-1': 0, 'US-1': 5},
+        budget: 2,
+        quotaCountries: const {'US'},
+      );
+      expect(targets, ['US-1', 'UNK-1']);
+    });
+
     test('repeated rounds walk the queue to full coverage', () {
       const names = ['A', 'B', 'C', 'D', 'E', 'F'];
       final metadata = <String, NodeMetadataCache>{};
@@ -176,6 +285,63 @@ void main() {
         ),
         isEmpty,
       );
+    });
+  });
+
+  group('probe quota countries', () {
+    ServiceToggleConfig svc(
+      String id, {
+      bool enabled = true,
+      String target = '',
+      ServiceRestrictionMode mode = ServiceRestrictionMode.relaxed,
+      String regionMode = 'blacklist',
+      List<String> regionCountries = const [],
+    }) {
+      return ServiceToggleConfig(
+        serviceId: id,
+        displayName: id,
+        isEnabled: enabled,
+        targetCountry: target,
+        matchRules: const [],
+        dnsDomains: const [],
+        restrictionMode: mode,
+        regionMode: regionMode,
+        regionCountries: regionCountries,
+      );
+    }
+
+    test('unions locks and whitelists of enabled restricted services, '
+        'intersected with the pool', () {
+      final countries = probeQuotaCountries(
+        services: [
+          svc('claude', target: 'US'),
+          svc('google', mode: ServiceRestrictionMode.unrestricted),
+          svc('jp-svc', enabled: false, target: 'JP'),
+          svc('sg-svc', regionMode: 'whitelist', regionCountries: const ['SG']),
+          svc('hk-svc', target: 'US', regionCountries: const ['HK']),
+          svc('fr-svc', target: 'FR'),
+        ],
+        proxyNames: ['US-1', 'JP-1', 'SG-1', 'HK-1', 'TW-1'],
+        metadataByProxy: {
+          'US-1': metadataForCountry('US-1', 'US', fresh: true),
+          'JP-1': metadataForCountry('JP-1', 'JP', fresh: true),
+          'SG-1': metadataForCountry('SG-1', 'SG', fresh: true),
+          'HK-1': metadataForCountry('HK-1', 'HK', fresh: true),
+          'TW-1': metadataForCountry('TW-1', 'TW', fresh: true),
+        },
+      );
+      expect(countries, {'US', 'SG'});
+    });
+
+    test('no restricted service means no quota countries', () {
+      final countries = probeQuotaCountries(
+        services: [svc('google', mode: ServiceRestrictionMode.unrestricted)],
+        proxyNames: ['US-1'],
+        metadataByProxy: {
+          'US-1': metadataForCountry('US-1', 'US', fresh: true),
+        },
+      );
+      expect(countries, isEmpty);
     });
   });
 

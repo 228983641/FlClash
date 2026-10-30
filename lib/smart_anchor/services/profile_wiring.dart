@@ -702,7 +702,11 @@ class DerivedRegionEvidence {
 // once blacklisted its whole country, which let one bad probe empty a
 // country's candidate pool. Derivation now needs corroboration from a
 // second node on a second ASN, anchored by at least one verdict the
-// service measured itself rather than borrowed.
+// service measured itself rather than borrowed. A node whose country is
+// disputed across geo sources still counts as a proxy, but its ASN adds
+// no diversity: the ASN was measured against a country conclusion the
+// sources themselves contest. The exclusion is derivation-only — the
+// node's own verdict still excludes the node itself.
 const _regionGateMinProxies = 2;
 const _regionGateMinAsns = 2;
 
@@ -733,7 +737,7 @@ DerivedRegionEvidence derivedRegionEvidence(
     }
     proxiesByCountry.putIfAbsent(country, () => {}).add(entry.key);
     final asn = metadata?.asn;
-    if (asn != null && asn.isNotEmpty) {
+    if (asn != null && asn.isNotEmpty && !metadata!.countryDisputed) {
       asnsByCountry.putIfAbsent(country, () => {}).add(asn);
     }
     if (verdict.borrowedFrom == null) {

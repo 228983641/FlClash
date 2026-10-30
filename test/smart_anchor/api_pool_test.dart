@@ -383,6 +383,262 @@ void main() {
     expect(aggregated.latitude, closeTo(34.05, 0.0001));
   });
 
+  test('parsers keep the city and region their payloads already carry', () {
+    final ipApi = parseIpApi({
+      'status': 'success',
+      'query': '1.2.3.4',
+      'countryCode': 'US',
+      'lat': 34.0,
+      'lon': -118.0,
+      'as': 'AS20057 Example',
+      'hosting': false,
+      'mobile': false,
+      'proxy': false,
+      'city': 'Los Angeles',
+      'regionName': 'California',
+    })!;
+    expect(ipApi.city, 'Los Angeles');
+    expect(ipApi.adminRegion, 'California');
+    final ipInfo = parseIpInfo({
+      'ip': '1.2.3.4',
+      'country': 'US',
+      'loc': '34.0522,-118.2437',
+      'org': 'AS20057 Example',
+      'city': 'Los Angeles',
+      'region': 'California',
+    })!;
+    expect(ipInfo.city, 'Los Angeles');
+    expect(ipInfo.adminRegion, 'California');
+    final ipWhoIs = parseIpWhoIs({
+      'ip': '8.8.8.8',
+      'success': true,
+      'country_code': 'US',
+      'latitude': 37.3393939,
+      'longitude': -121.8949553,
+      'connection': {'asn': 15169, 'org': 'Google LLC'},
+      'city': 'Mountain View',
+      'region': 'California',
+    })!;
+    expect(ipWhoIs.city, 'Mountain View');
+    expect(ipWhoIs.adminRegion, 'California');
+    final freeIpApi = parseFreeIpApi({
+      'ipAddress': '8.8.8.8',
+      'countryCode': 'US',
+      'latitude': 37.422,
+      'longitude': -122.085,
+      'asn': '15169',
+      'isProxy': false,
+      'cityName': 'Mountain View',
+      'regionName': 'California',
+    })!;
+    expect(freeIpApi.city, 'Mountain View');
+    expect(freeIpApi.adminRegion, 'California');
+    final bare = parseIpApi({
+      'status': 'success',
+      'query': '1.2.3.4',
+      'countryCode': 'US',
+      'lat': 34.0,
+      'lon': -118.0,
+      'as': 'AS20057 Example',
+      'hosting': false,
+      'mobile': false,
+      'proxy': false,
+    })!;
+    expect(bare.city, isNull);
+    expect(bare.adminRegion, isNull);
+  });
+
+  test('aggregation fills city, region and confidences from the winner', () {
+    final aggregated = aggregateGeoResults([
+      const GeoIpResult(
+        ip: '1.2.3.4',
+        countryCode: 'US',
+        latitude: 34.0,
+        longitude: -118.0,
+        asn: 'AS1',
+        ipType: 'isp',
+        city: 'Los Angeles',
+        adminRegion: 'California',
+      ),
+      const GeoIpResult(
+        ip: '1.2.3.4',
+        countryCode: 'US',
+        latitude: 34.1,
+        longitude: -118.1,
+        asn: 'AS1',
+        ipType: 'isp',
+        city: 'Los Angeles',
+        adminRegion: 'California',
+      ),
+      const GeoIpResult(
+        ip: '1.2.3.4',
+        countryCode: 'US',
+        latitude: 34.2,
+        longitude: -118.2,
+        asn: 'AS1',
+        ipType: 'isp',
+        city: 'San Francisco',
+        adminRegion: 'California',
+      ),
+    ])!;
+    expect(aggregated.city, 'Los Angeles');
+    expect(aggregated.adminRegion, 'California');
+    expect(aggregated.geoConfidence, 0.9);
+    expect(aggregated.asnConfidence, 0.9);
+    final metadata = aggregated.toNodeMetadata(
+      proxyName: 'US-01',
+      entryServer: 'entry.example',
+      wafPass: true,
+      updatedAt: 0,
+    );
+    expect(metadata.city, 'Los Angeles');
+    expect(metadata.adminRegion, 'California');
+    expect(metadata.geoConfidence, 0.9);
+    expect(metadata.asnConfidence, 0.9);
+  });
+
+  test('aggregation discounts confidence when the country is disputed', () {
+    final aggregated = aggregateGeoResults([
+      const GeoIpResult(
+        ip: '1.2.3.4',
+        countryCode: 'US',
+        latitude: 34.0,
+        longitude: -118.0,
+        asn: 'AS1',
+        ipType: 'isp',
+        city: 'Los Angeles',
+        adminRegion: 'California',
+      ),
+      const GeoIpResult(
+        ip: '1.2.3.4',
+        countryCode: 'US',
+        latitude: 34.1,
+        longitude: -118.1,
+        asn: 'AS1',
+        ipType: 'isp',
+        city: 'Los Angeles',
+        adminRegion: 'California',
+      ),
+      const GeoIpResult(
+        ip: '1.2.3.4',
+        countryCode: 'SG',
+        latitude: 1.35,
+        longitude: 103.82,
+        asn: 'AS2',
+        ipType: 'isp',
+        city: 'Singapore',
+        adminRegion: '',
+      ),
+    ])!;
+    expect(aggregated.countryCode, 'US');
+    expect(aggregated.countryDisputed, true);
+    expect(aggregated.city, 'Los Angeles');
+    expect(aggregated.geoConfidence, 0.55);
+    expect(aggregated.asnConfidence, 0.9);
+  });
+
+  test('a single aggregated source earns only low confidence', () {
+    final aggregated = aggregateGeoResults([
+      const GeoIpResult(
+        ip: '1.2.3.4',
+        countryCode: 'US',
+        latitude: 34.0,
+        longitude: -118.0,
+        asn: 'AS1',
+        ipType: 'isp',
+        city: 'Los Angeles',
+        adminRegion: 'California',
+      ),
+    ])!;
+    expect(aggregated.geoConfidence, 0.4);
+    expect(aggregated.asnConfidence, 0.5);
+    expect(aggregated.city, 'Los Angeles');
+  });
+
+  test('aggregation splits asn confidence when sources disagree', () {
+    final aggregated = aggregateGeoResults([
+      const GeoIpResult(
+        ip: '1.2.3.4',
+        countryCode: 'US',
+        latitude: 34.0,
+        longitude: -118.0,
+        asn: 'AS1',
+        ipType: 'isp',
+      ),
+      const GeoIpResult(
+        ip: '1.2.3.4',
+        countryCode: 'US',
+        latitude: 34.0,
+        longitude: -118.0,
+        asn: 'AS1',
+        ipType: 'isp',
+      ),
+      const GeoIpResult(
+        ip: '1.2.3.4',
+        countryCode: 'US',
+        latitude: 34.0,
+        longitude: -118.0,
+        asn: 'AS2',
+        ipType: 'isp',
+      ),
+    ])!;
+    expect(aggregated.asn, 'AS1');
+    expect(aggregated.asnConfidence, closeTo(0.4 + 0.4 * 2 / 3, 0.0001));
+  });
+
+  test('service lookup writes city and confidence into the metadata', () async {
+    final service = GeoIpService(
+      cache: GeoIpCache(),
+      keyPools: const {},
+      fetcher: (ip, key, sourceId) async {
+        return switch (sourceId) {
+          'ip-api' => {
+            'status': 'success',
+            'query': ip,
+            'countryCode': 'US',
+            'lat': 34.0,
+            'lon': -118.0,
+            'as': 'AS20057 Example',
+            'hosting': false,
+            'mobile': false,
+            'proxy': false,
+            'city': 'Los Angeles',
+            'regionName': 'California',
+          },
+          'ipinfo' => {
+            'ip': ip,
+            'country': 'US',
+            'loc': '34.0522,-118.2437',
+            'org': 'AS20057 Example',
+            'city': 'Los Angeles',
+            'region': 'California',
+          },
+          'ip.sb' => {
+            'ip': ip,
+            'country_code': 'US',
+            'latitude': 34.0,
+            'longitude': -118.0,
+            'asn': 20057,
+            'city': 'Los Angeles',
+            'region': 'California',
+          },
+          _ => null,
+        };
+      },
+    );
+    final result = await service.lookup(
+      ip: '1.2.3.4',
+      proxyName: 'US-01',
+      entryServer: 'entry.example',
+      wafPass: true,
+      nowMs: DateTime.now().millisecondsSinceEpoch,
+    );
+    expect(result?.city, 'Los Angeles');
+    expect(result?.adminRegion, 'California');
+    expect(result?.geoConfidence, 0.9);
+    expect(result?.asnConfidence, 0.9);
+  });
+
   test('service returns null when every source fails', () async {
     final service = GeoIpService(
       cache: GeoIpCache(),

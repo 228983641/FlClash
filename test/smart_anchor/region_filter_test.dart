@@ -9,6 +9,7 @@ NodeMetadataCache regionMeta(
   String country,
   double purity, {
   String asn = 'AS1234',
+  bool disputed = false,
 }) {
   return NodeMetadataCache(
     proxyName: name,
@@ -23,6 +24,7 @@ NodeMetadataCache regionMeta(
     purityScore: purity,
     wafPass: true,
     updatedAt: 0,
+    countryDisputed: disputed,
   );
 }
 
@@ -415,6 +417,59 @@ void main() {
       final evidence = derivedRegionEvidence(input, 'gemini');
       expect(evidence.blocked, {'JP'});
       expect(evidence.heldBack, {'HK': (proxies: 2, asns: 1)});
+    });
+
+    test('a disputed node adds no ASN diversity to the gate', () {
+      final input = gateInput(
+        {
+          'HK-1': regionMeta('HK-1', 'HK', 90, asn: 'AS100'),
+          'HK-2': regionMeta('HK-2', 'HK', 85, asn: 'AS200', disputed: true),
+          'HK-3': regionMeta('HK-3', 'HK', 80, asn: 'AS300'),
+          'US-1': regionMeta('US-1', 'US', 90),
+        },
+        {'HK-1': blocked('HK-1'), 'HK-2': blocked('HK-2')},
+      );
+      final evidence = derivedRegionEvidence(input, 'gemini');
+      expect(evidence.blocked, isEmpty);
+      expect(evidence.heldBack, {'HK': (proxies: 2, asns: 1)});
+      final ranked = rankedProxiesForService(input, gemini, [
+        'HK-1',
+        'HK-2',
+        'HK-3',
+        'US-1',
+      ]);
+      expect(ranked, containsAll(['HK-3', 'US-1']));
+      expect(ranked, isNot(contains('HK-1')));
+      expect(ranked, isNot(contains('HK-2')));
+    });
+
+    test('two disputed nodes alone never derive a country block', () {
+      final input = gateInput(
+        {
+          'HK-1': regionMeta('HK-1', 'HK', 90, asn: 'AS100', disputed: true),
+          'HK-2': regionMeta('HK-2', 'HK', 85, asn: 'AS200', disputed: true),
+        },
+        {'HK-1': blocked('HK-1'), 'HK-2': blocked('HK-2')},
+      );
+      final evidence = derivedRegionEvidence(input, 'gemini');
+      expect(evidence.blocked, isEmpty);
+      expect(evidence.heldBack, {'HK': (proxies: 2, asns: 0)});
+    });
+
+    test('a clean pair still derives when a disputed node also blocks', () {
+      final input = gateInput(
+        {
+          'HK-1': regionMeta('HK-1', 'HK', 90, asn: 'AS100'),
+          'HK-2': regionMeta('HK-2', 'HK', 85, asn: 'AS200'),
+          'HK-3': regionMeta('HK-3', 'HK', 80, asn: 'AS300', disputed: true),
+        },
+        {
+          'HK-1': blocked('HK-1'),
+          'HK-2': blocked('HK-2'),
+          'HK-3': blocked('HK-3'),
+        },
+      );
+      expect(detectedUnsupportedRegions(input, 'gemini'), {'HK'});
     });
 
     test('expired block records do not count toward the gate', () {

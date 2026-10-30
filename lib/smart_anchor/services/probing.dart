@@ -1,6 +1,7 @@
 import 'package:fl_clash/common/service_probe.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/smart_anchor/models/node_metadata.dart';
+import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
 import 'package:fl_clash/smart_anchor/services/api_pool.dart';
 import 'package:fl_clash/smart_anchor/services/service_access.dart';
 
@@ -118,26 +119,69 @@ const int probeRoundBudget = 32;
 bool probeMetadataStale(NodeMetadataCache? metadata) =>
     metadata == null || metadata.isExpired;
 
+/// The countries the probe queue owes a representative: the union of
+/// every enabled restricted service's locked countries and whitelist
+/// region countries, intersected with the countries the candidate pool
+/// actually contains. A blacklist's region countries are banned, not
+/// allowed, so they never enter the union; a restricted service with no
+/// lock and no whitelist restricts nothing and contributes nothing.
+Set<String> probeQuotaCountries({
+  required List<ServiceToggleConfig> services,
+  required List<String> proxyNames,
+  required Map<String, NodeMetadataCache> metadataByProxy,
+}) {
+  final poolCountries = <String>{};
+  for (final name in proxyNames) {
+    final country = metadataByProxy[name]?.countryCode.trim().toUpperCase();
+    if (country != null && country.isNotEmpty) {
+      poolCountries.add(country);
+    }
+  }
+  final allowed = <String>{};
+  for (final service in services) {
+    if (!service.isEnabled ||
+        service.restrictionMode == ServiceRestrictionMode.unrestricted) {
+      continue;
+    }
+    allowed.addAll(service.lockedCountries);
+    if (service.effectiveRegionMode == 'whitelist') {
+      allowed.addAll([
+        for (final country in service.regionCountries)
+          country.trim().toUpperCase(),
+      ]);
+    }
+  }
+  allowed.remove('');
+  return allowed.intersection(poolCountries);
+}
+
 /// One round of probe targets, best first:
 ///
 /// 1. the node each enabled service group is currently using — its access
 ///    results feed the failover check, so it is probed even when its
 ///    metadata is still fresh, and currents are never cut by the budget;
-/// 2. nodes with missing or expired metadata, best rank first —
+/// 2. one stale representative per [quotaCountries] country not already
+///    covered by a current node, best rank first — a low-ranked region
+///    is guaranteed a probe slot instead of starving behind the global
+///    ranking round after round;
+/// 3. nodes with missing or expired metadata, best rank first —
 ///    [rankByProxy] carries each node's best (lowest) rank across the
 ///    enabled services' rankings;
-/// 3. the remaining stale nodes in [proxyNames] order.
+/// 4. the remaining stale nodes in [proxyNames] order.
 ///
 /// Fresh nodes outside the current set are skipped; they re-enter the
 /// queue when their metadata expires. A node probed this round drops out
 /// of the stale set, so the next round resumes where this one stopped and
-/// repeated rounds cover every node.
+/// repeated rounds cover every node. The quota only reorders within the
+/// budget: the round still returns at most [budget] nodes (currents
+/// excepted, as before).
 List<String> selectProbeQueue({
   required List<String> proxyNames,
   required List<String> currentProxyNames,
   required Map<String, NodeMetadataCache> metadataByProxy,
   required Map<String, int> rankByProxy,
   int budget = probeRoundBudget,
+  Set<String> quotaCountries = const {},
 }) {
   final targets = <String>[];
   final seen = <String>{};
@@ -170,10 +214,32 @@ List<String> selectProbeQueue({
         final byRank = rankByProxy[a]!.compareTo(rankByProxy[b]!);
         return byRank != 0 ? byRank : order[a]!.compareTo(order[b]!);
       });
-  for (final name in ranked) {
-    add(name);
+  final rankedSet = ranked.toSet();
+  final orderedStale = [
+    ...ranked,
+    for (final name in stale)
+      if (!rankedSet.contains(name)) name,
+  ];
+  final quota = {
+    for (final country in quotaCountries) country.trim().toUpperCase(),
+  }..remove('');
+  if (quota.isNotEmpty) {
+    final represented = <String>{
+      for (final name in targets)
+        if (metadataByProxy[name] != null)
+          metadataByProxy[name]!.countryCode.trim().toUpperCase(),
+    }..remove('');
+    for (final name in orderedStale) {
+      final country = metadataByProxy[name]?.countryCode.trim().toUpperCase();
+      if (country == null || country.isEmpty) {
+        continue;
+      }
+      if (quota.contains(country) && represented.add(country)) {
+        add(name);
+      }
+    }
   }
-  for (final name in stale) {
+  for (final name in orderedStale) {
     add(name);
   }
   final limit = budget > currents ? budget : currents;

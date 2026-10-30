@@ -19,6 +19,10 @@ class GeoIpResult {
     this.isAbuse = false,
     this.sourceCount = 1,
     this.countryDisputed = false,
+    this.city,
+    this.adminRegion,
+    this.geoConfidence,
+    this.asnConfidence,
   });
 
   final String ip;
@@ -31,6 +35,10 @@ class GeoIpResult {
   final bool isAbuse;
   final int sourceCount;
   final bool countryDisputed;
+  final String? city;
+  final String? adminRegion;
+  final double? geoConfidence;
+  final double? asnConfidence;
 
   NodeMetadataCache toNodeMetadata({
     required String proxyName,
@@ -57,8 +65,57 @@ class GeoIpResult {
       updatedAt: updatedAt,
       sourceCount: sourceCount,
       countryDisputed: countryDisputed,
+      adminRegion: adminRegion,
+      city: city,
+      geoConfidence: geoConfidence,
+      asnConfidence: asnConfidence,
     );
   }
+}
+
+String? _geoText(Object? value) {
+  if (value is! String) {
+    return null;
+  }
+  final trimmed = value.trim();
+  return trimmed.isEmpty ? null : trimmed;
+}
+
+/// Geo confidence from country corroboration alone, on a documented
+/// ladder: one uncorroborated source earns 0.4; two or more sources in
+/// unanimous agreement earn 0.9; disputed results earn 0.85 when the
+/// consensus still holds at least three quarters of the votes and 0.55
+/// otherwise. Only the top two rungs clear the 0.8 the city tier asks
+/// for, so a contested or thin country conclusion degrades a node to
+/// the country tiers instead of placing it by city.
+double geoConfidenceFor({
+  required int agreeing,
+  required int total,
+  required bool disputed,
+}) {
+  if (total <= 1) {
+    return 0.4;
+  }
+  if (!disputed) {
+    return 0.9;
+  }
+  return agreeing / total >= 0.75 ? 0.85 : 0.55;
+}
+
+/// ASN confidence from the consensus-country sources that report an
+/// ASN: no report earns 0, a single report 0.5, a unanimous report 0.9,
+/// and a split report scales between 0.4 and 0.8 by the winner's share.
+double asnConfidenceFor({required int agreeing, required int reporting}) {
+  if (reporting == 0 || agreeing == 0) {
+    return 0;
+  }
+  if (reporting == 1) {
+    return 0.5;
+  }
+  if (agreeing == reporting) {
+    return 0.9;
+  }
+  return 0.4 + 0.4 * agreeing / reporting;
 }
 
 GeoIpResult? aggregateGeoResults(List<GeoIpResult> results) {
@@ -98,6 +155,39 @@ GeoIpResult? aggregateGeoResults(List<GeoIpResult> results) {
       asn = result.asn;
     }
   }
+  final cityVotes = <String, int>{};
+  final regionVotes = <String, int>{};
+  for (final result in agreeing) {
+    final city = _geoText(result.city);
+    if (city != null) {
+      cityVotes[city] = (cityVotes[city] ?? 0) + 1;
+    }
+    final region = _geoText(result.adminRegion);
+    if (region != null) {
+      regionVotes[region] = (regionVotes[region] ?? 0) + 1;
+    }
+  }
+  String? winCity;
+  String? winRegion;
+  var winCityVotes = -1;
+  var winRegionVotes = -1;
+  for (final result in agreeing) {
+    final city = _geoText(result.city);
+    final region = _geoText(result.adminRegion);
+    if (city == null && region == null) {
+      continue;
+    }
+    final cityScore = city == null ? 0 : cityVotes[city]!;
+    final regionScore = region == null ? 0 : regionVotes[region]!;
+    if (cityScore > winCityVotes ||
+        (cityScore == winCityVotes && regionScore > winRegionVotes)) {
+      winCityVotes = cityScore;
+      winRegionVotes = regionScore;
+      winCity = city;
+      winRegion = region;
+    }
+  }
+  final asnReporting = agreeing.where((result) => result.asn.isNotEmpty).length;
   const typePenalty = {
     'hosting': 30,
     'datacenter': 30,
@@ -132,6 +222,17 @@ GeoIpResult? aggregateGeoResults(List<GeoIpResult> results) {
     isAbuse: results.any((result) => result.isAbuse),
     sourceCount: results.length,
     countryDisputed: countryVotes.length > 1,
+    city: winCity,
+    adminRegion: winRegion,
+    geoConfidence: geoConfidenceFor(
+      agreeing: agreeing.length,
+      total: results.length,
+      disputed: countryVotes.length > 1,
+    ),
+    asnConfidence: asnConfidenceFor(
+      agreeing: asnVotesBest,
+      reporting: asnReporting,
+    ),
   );
 }
 
@@ -217,6 +318,8 @@ GeoIpResult? parseIpApi(Map<String, dynamic> json) {
     asn: asn,
     ipType: ipType,
     isAbuse: json['proxy'] == true,
+    city: _geoText(json['city']),
+    adminRegion: _geoText(json['regionName']),
   );
 }
 
@@ -238,6 +341,8 @@ GeoIpResult? parseIpInfo(Map<String, dynamic> json) {
     longitude: double.tryParse(parts[1]) ?? 0,
     asn: asn,
     ipType: 'isp',
+    city: _geoText(json['city']),
+    adminRegion: _geoText(json['region']),
   );
 }
 
@@ -256,6 +361,8 @@ GeoIpResult? parseIpWhoIs(Map<String, dynamic> json) {
     longitude: (json['longitude'] as num?)?.toDouble() ?? 0,
     asn: asnValue is num ? 'AS${asnValue.toInt()}' : '',
     ipType: 'isp',
+    city: _geoText(json['city']),
+    adminRegion: _geoText(json['region']),
   );
 }
 
@@ -276,6 +383,8 @@ GeoIpResult? parseFreeIpApi(Map<String, dynamic> json) {
     asn: asn,
     ipType: 'isp',
     isAbuse: json['isProxy'] == true,
+    city: _geoText(json['cityName']),
+    adminRegion: _geoText(json['regionName']),
   );
 }
 
@@ -295,6 +404,8 @@ GeoIpResult? parseIpApiCo(Map<String, dynamic> json) {
     longitude: (json['longitude'] as num?)?.toDouble() ?? 0,
     asn: asn,
     ipType: 'isp',
+    city: _geoText(json['city']),
+    adminRegion: _geoText(json['region']),
   );
 }
 
@@ -311,6 +422,8 @@ GeoIpResult? parseGeoJs(Map<String, dynamic> json) {
     longitude: double.tryParse(json['longitude']?.toString() ?? '') ?? 0,
     asn: asnValue is num ? 'AS${asnValue.toInt()}' : '',
     ipType: 'isp',
+    city: _geoText(json['city']),
+    adminRegion: _geoText(json['region']),
   );
 }
 
@@ -329,6 +442,8 @@ GeoIpResult? parseIpSb(Map<String, dynamic> json) {
     longitude: (json['longitude'] as num?)?.toDouble() ?? 0,
     asn: asnValue is num ? 'AS${asnValue.toInt()}' : '',
     ipType: 'isp',
+    city: _geoText(json['city']),
+    adminRegion: _geoText(json['region']),
   );
 }
 

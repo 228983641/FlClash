@@ -1,6 +1,7 @@
 import 'package:fl_clash/smart_anchor/models/node_metadata.dart';
 import 'package:fl_clash/smart_anchor/models/service_anchor.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
+import 'package:fl_clash/smart_anchor/services/api_pool.dart';
 import 'package:fl_clash/smart_anchor/services/candidate_decision.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:fl_clash/smart_anchor/services/scoring_engine.dart';
@@ -515,6 +516,67 @@ void main() {
       expect(decision.assessments['JP-nocity']!.tier, RouteTier.l4);
       expect(decision.target, 'JP-city');
       expect(decision.tier, RouteTier.l2);
+    });
+
+    test('aggregated geo metadata reaches the city tier end to end', () {
+      NodeMetadataCache aggregatedMeta(String name, String ip) {
+        final aggregated = aggregateGeoResults([
+          GeoIpResult(
+            ip: ip,
+            countryCode: 'JP',
+            latitude: 34.7,
+            longitude: 135.5,
+            asn: 'AS100',
+            ipType: 'residential',
+            city: 'Osaka',
+            adminRegion: 'Osaka',
+          ),
+          GeoIpResult(
+            ip: ip,
+            countryCode: 'JP',
+            latitude: 34.7,
+            longitude: 135.5,
+            asn: 'AS200',
+            ipType: 'residential',
+            city: 'Osaka',
+            adminRegion: 'Osaka',
+          ),
+          GeoIpResult(
+            ip: ip,
+            countryCode: 'JP',
+            latitude: 34.7,
+            longitude: 135.5,
+            asn: 'AS100',
+            ipType: 'residential',
+            city: 'Osaka',
+            adminRegion: 'Osaka',
+          ),
+        ])!;
+        return aggregated.toNodeMetadata(
+          proxyName: name,
+          entryServer: '',
+          wafPass: true,
+          updatedAt: 0,
+        );
+      }
+
+      final current = aggregatedMeta('JP-cur', '10.0.0.5');
+      final candidate = aggregatedMeta('JP-city', '10.9.0.1');
+      expect(current.city, 'Osaka');
+      expect(current.geoConfidence, 0.9);
+      final decision = decideCandidates(
+        buildInput(
+          lock: const ['JP'],
+          names: ['JP-cur', 'JP-city'],
+          metadata: {'JP-cur': current, 'JP-city': candidate},
+          access: {
+            'JP-cur': verdict('JP-cur', ServiceAccessReason.regionBlocked),
+          },
+          current: 'JP-cur',
+        ),
+      );
+      expect(decision.assessments['JP-city']!.tier, RouteTier.l2);
+      expect(decision.target, 'JP-city');
     });
 
     test('adjacent countries form L5 only when the table lists them', () {
