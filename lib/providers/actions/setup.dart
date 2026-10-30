@@ -531,22 +531,62 @@ class SetupAction extends _$SetupAction {
       final enabledServices = smartAnchorInput.services.where(
         (service) => service.isEnabled,
       );
+      final delays = flattenDelays(ref.read(delayDataSourceProvider));
       final built = await PerfTrace.time(
         'build-smart-config',
         () async => buildSmartConfigWithRanking(
           rawConfig,
           smartAnchorInput,
-          delays: flattenDelays(ref.read(delayDataSourceProvider)),
+          delays: delays,
         ),
         detail:
             'sources=${smartAnchorInput.aggregationSources.length} services=${enabledServices.length}',
       );
       rawConfig = built.config;
-      sanitizedSelectedMap = sanitizeSelectedMap(
-        smartAnchorInput.services,
-        built.rankedByService,
+      final sanitizeResult = sanitizeSelectedMap(
+        smartAnchorInput,
+        built.proxyNames,
         selectedMap,
+        delays: delays,
       );
+      sanitizedSelectedMap = sanitizeResult.selectedMap;
+      for (final service in enabledServices) {
+        final decision = built.decisionsByService[service.serviceId];
+        if (decision == null) {
+          continue;
+        }
+        commonPrint.log(
+          saBuildDecisionLine(
+            serviceId: service.serviceId,
+            explanation: decision.explanation,
+          ),
+        );
+        if (decision.ordered.isEmpty &&
+            service.restrictionMode != ServiceRestrictionMode.unrestricted) {
+          commonPrint.log(
+            saNoCandidateLine(
+              serviceId: service.serviceId,
+              groupName: smartGroupName(service),
+              mode: service.restrictionMode.name,
+            ),
+          );
+        }
+      }
+      for (final entry in sanitizeResult.dispositions.entries) {
+        if (entry.value == SanitizeDisposition.replaced) {
+          continue;
+        }
+        if (entry.value == SanitizeDisposition.unverifiableKept ||
+            entry.value == SanitizeDisposition.noCandidateKept) {
+          commonPrint.log(
+            saSanitizeKeepLine(
+              groupName: entry.key,
+              current: sanitizedSelectedMap[entry.key] ?? '',
+              reason: entry.value.name,
+            ),
+          );
+        }
+      }
       final mergeSummary = built.mergeSummary;
       if (mergeSummary != null) {
         commonPrint.log(

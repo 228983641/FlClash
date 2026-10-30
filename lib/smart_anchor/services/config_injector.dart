@@ -1,5 +1,12 @@
 import '../models/service_toggle_config.dart';
 
+/// The sole member of a restricted service's group when its decision
+/// produced no candidate at all. An empty member list is a config the
+/// Core rejects outright (errMissProxy), and DIRECT would silently route
+/// a restricted service over the real network, so the group fails closed
+/// on the Core's built-in reject outbound instead.
+const String smartNoCandidateProxy = 'REJECT';
+
 class SmartConfigInjector {
   static Map<String, dynamic> injectSmartRouting({
     required Map<String, dynamic> rawConfig,
@@ -22,8 +29,10 @@ class SmartConfigInjector {
       }
       final groupName = smartGroupName(service);
       final ranked = rankedProxiesByService[service.serviceId];
+      final restricted =
+          service.restrictionMode != ServiceRestrictionMode.unrestricted;
       final sortedNodes = ranked == null || ranked.isEmpty
-          ? const ['DIRECT']
+          ? (restricted ? const [smartNoCandidateProxy] : const ['DIRECT'])
           : ranked;
       injectedGroups.add({
         'name': groupName,

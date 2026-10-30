@@ -4,6 +4,7 @@ import '../models/switch_event.dart';
 import '../models/service_anchor.dart';
 import '../models/service_group.dart';
 import '../models/service_toggle_config.dart';
+import 'candidate_decision.dart';
 import 'config_injector.dart';
 import 'scoring_engine.dart';
 import 'service_access.dart';
@@ -124,14 +125,19 @@ typedef MergeSummary = ({
   int pruned,
 });
 
-/// [buildSmartConfig] plus the per-service rankings it computed, so the
-/// setup path can sanitize persisted selections against the same ranking
-/// the config was built with instead of discarding it. The merge summary
-/// and the ambiguous stripped names ride along for the caller's logging:
-/// this layer stays pure, so what the build did is reported, not printed.
+/// [buildSmartConfig] plus the per-service decisions it computed, so the
+/// setup path can sanitize persisted selections against the same
+/// decisions the config was built with instead of discarding them. The
+/// merge summary and the ambiguous stripped names ride along for the
+/// caller's logging: this layer stays pure, so what the build did is
+/// reported, not printed. [rankedByService] keeps its shape for existing
+/// consumers; its lists are the decisions' display order
+/// (qualified ++ fallback), no longer a ranking function's output.
 ({
   Map<String, dynamic> config,
   Map<String, List<String>> rankedByService,
+  Map<String, CandidateDecision> decisionsByService,
+  List<String> proxyNames,
   MergeSummary? mergeSummary,
   List<({String name, int candidates})> ambiguousStripped,
 })
@@ -144,6 +150,8 @@ buildSmartConfigWithRanking(
     return (
       config: rawConfig,
       rankedByService: const {},
+      decisionsByService: const {},
+      proxyNames: const [],
       mergeSummary: null,
       ambiguousStripped: const [],
     );
@@ -160,16 +168,18 @@ buildSmartConfigWithRanking(
     effectiveInput = _remapInputForMergedConfig(input, _proxyNames(config));
     _orderUnifiedGroup(config, effectiveInput);
   }
-  final enabled = input.services.where((service) => service.isEnabled);
+  final proxyNames = _proxyNames(config);
+  final enabled = effectiveInput.services.where((service) => service.isEnabled);
   if (enabled.isEmpty) {
     return (
       config: config,
       rankedByService: const {},
+      decisionsByService: const {},
+      proxyNames: proxyNames,
       mergeSummary: mergeSummary,
       ambiguousStripped: ambiguousStripped,
     );
   }
-  final proxyNames = _proxyNames(config);
   final remappedDelays = <String, int>{};
   for (final name in proxyNames) {
     final delay = delays[name] ?? delays[_strippedProxyName(name)];
@@ -177,14 +187,22 @@ buildSmartConfigWithRanking(
       remappedDelays[name] = delay;
     }
   }
+  final decisionsByService = <String, CandidateDecision>{};
   final rankedByService = <String, List<String>>{};
   for (final service in enabled) {
-    rankedByService[service.serviceId] = rankedProxiesForService(
-      effectiveInput,
+    final decision = decideForService(
+      _inputWithSharedAnchor(
+        effectiveInput,
+        service,
+        proxyNames,
+        remappedDelays,
+      ),
       service,
       proxyNames,
       delays: remappedDelays,
     );
+    decisionsByService[service.serviceId] = decision;
+    rankedByService[service.serviceId] = [...decision.ordered];
   }
   final injected = SmartConfigInjector.injectSmartRouting(
     rawConfig: config,
@@ -195,9 +213,55 @@ buildSmartConfigWithRanking(
   return (
     config: injected,
     rankedByService: rankedByService,
+    decisionsByService: decisionsByService,
+    proxyNames: proxyNames,
     mergeSummary: mergeSummary,
     ambiguousStripped: ambiguousStripped,
   );
+}
+
+/// The input [decideForService] should see for [service] when the service
+/// belongs to a shared lock group: the group's anchor (the first member
+/// anchor that exists, else one elected from the pool exactly as the
+/// legacy ranking elected it) stands in for the service's own, so every
+/// member of the group is judged against the same route reference.
+SmartAnchorInput _inputWithSharedAnchor(
+  SmartAnchorInput input,
+  ServiceToggleConfig service,
+  List<String> proxyNames,
+  Map<String, int> delays,
+) {
+  final group = groupForService(service.serviceId);
+  if (group == null || !input.sharedLockGroupIds.contains(group.id)) {
+    return input;
+  }
+  ServiceAnchor? shared;
+  for (final member in group.serviceIds) {
+    shared = input.anchors[member];
+    if (shared != null) {
+      break;
+    }
+  }
+  if (shared == null) {
+    final first = input.services.firstWhere(
+      (candidate) => candidate.serviceId == group.serviceIds.first,
+      orElse: () => service,
+    );
+    final tested = [
+      for (final name in proxyNames)
+        if (input.metadataByProxy[name] != null) input.metadataByProxy[name]!,
+    ];
+    shared = _electAnchor(
+      tested,
+      first.lockedCountries,
+      input.accessByService[first.serviceId] ?? const {},
+      delays: delays,
+    );
+  }
+  if (shared == null || identical(shared, input.anchors[service.serviceId])) {
+    return input;
+  }
+  return input.copyWith(anchors: {...input.anchors, service.serviceId: shared});
 }
 
 // Stripped names shared by several merged nodes while a metadata or
@@ -235,41 +299,92 @@ List<({String name, int candidates})> _ambiguousStrippedNames(
   return result;
 }
 
-/// The selection map setup should push to the Core, with [lockReselectTarget]'s
-/// rule applied at build time: a persisted smart-group selection that falls
-/// outside the ranking the current lock produces is replaced by the top
-/// ranked node, so the Core's ForceSet cannot serve a locked-out country
-/// until the runtime compliance check gets to run. Compliant selections,
-/// groups without a ranking, and non-smart entries pass through untouched;
-/// the input map is never mutated.
-Map<String, String> sanitizeSelectedMap(
-  List<ServiceToggleConfig> services,
-  Map<String, List<String>> rankedByService,
+/// How [sanitizeSelectedMap] disposed of one persisted selection. The
+/// two keep-with-no-target outcomes stay distinguishable because they
+/// mean different things for the next runtime pass: an unverifiable
+/// selection may turn out fine once probed, while a known-violating one
+/// is paused by definition until a candidate exists.
+enum SanitizeDisposition {
+  compliant,
+  hysteresis,
+  replaced,
+  unverifiableKept,
+  noCandidateKept,
+}
+
+/// The selection map setup should push to the Core, judged by the same
+/// [CandidateDecision] the config build and (from batch D) the runtime
+/// compliance check consume: a persisted selection survives only when
+/// the decision for its service — recomputed with that selection as the
+/// current node, so purity hysteresis and the L0 keep apply — places it
+/// in the qualified segment or retains it by hysteresis. An unknown
+/// selection yields to any qualified node and stays only while none is
+/// known; a known-violating selection moves to the decision's target
+/// (a relaxed fallback node included, exactly as [lockReselectDecision]
+/// falls back). When the decision has no target to offer, the selection
+/// is kept and the disposition records which no-candidate case it was.
+/// Non-smart entries pass through untouched; the input map is never
+/// mutated, and the identical map is returned when nothing is replaced.
+({
   Map<String, String> selectedMap,
-) {
-  if (rankedByService.isEmpty || selectedMap.isEmpty) {
-    return selectedMap;
+  Map<String, SanitizeDisposition> dispositions,
+})
+sanitizeSelectedMap(
+  SmartAnchorInput input,
+  List<String> proxyNames,
+  Map<String, String> selectedMap, {
+  Map<String, int> delays = const {},
+}) {
+  if (selectedMap.isEmpty || proxyNames.isEmpty) {
+    return (selectedMap: selectedMap, dispositions: const {});
   }
+  final effective = _remapInputForMergedConfig(input, proxyNames);
   var sanitized = selectedMap;
-  for (final service in services) {
+  final dispositions = <String, SanitizeDisposition>{};
+  for (final service in effective.services) {
     if (!service.isEnabled) {
-      continue;
-    }
-    final ranked = rankedByService[service.serviceId];
-    if (ranked == null || ranked.isEmpty) {
       continue;
     }
     final groupName = smartGroupName(service);
     final current = selectedMap[groupName];
-    if (current == null || ranked.contains(current)) {
+    if (current == null) {
       continue;
     }
-    if (identical(sanitized, selectedMap)) {
-      sanitized = Map.of(selectedMap);
+    final decision = decideForService(
+      _inputWithSharedAnchor(effective, service, proxyNames, delays),
+      service,
+      proxyNames,
+      currentName: current,
+      delays: delays,
+    );
+    final assessment = decision.assessments[current];
+    if (assessment?.retainedByHysteresis ?? false) {
+      dispositions[groupName] = SanitizeDisposition.hysteresis;
+      continue;
     }
-    sanitized[groupName] = ranked.first;
+    if (decision.isCompliant(current)) {
+      dispositions[groupName] = SanitizeDisposition.compliant;
+      continue;
+    }
+    // An unknown selection is only ever displaced by a qualified node:
+    // while the qualified segment is empty it stays, however many
+    // fallback peers the decision could offer instead.
+    final target = decision.currentUnknown && decision.qualified.isEmpty
+        ? null
+        : decision.target;
+    if (target != null && target != current) {
+      if (identical(sanitized, selectedMap)) {
+        sanitized = Map.of(selectedMap);
+      }
+      sanitized[groupName] = target;
+      dispositions[groupName] = SanitizeDisposition.replaced;
+      continue;
+    }
+    dispositions[groupName] = decision.currentUnknown
+        ? SanitizeDisposition.unverifiableKept
+        : SanitizeDisposition.noCandidateKept;
   }
-  return sanitized;
+  return (selectedMap: sanitized, dispositions: dispositions);
 }
 
 void _moveUnifiedGroupFirst(Map<String, dynamic> config) {
@@ -485,6 +600,10 @@ SmartAnchorInput _remapInputForMergedConfig(
       ttlHours: meta.ttlHours,
       sourceCount: meta.sourceCount,
       countryDisputed: meta.countryDisputed,
+      adminRegion: meta.adminRegion,
+      city: meta.city,
+      geoConfidence: meta.geoConfidence,
+      asnConfidence: meta.asnConfidence,
     );
   }
   final accessByService = <String, Map<String, ServiceAccessResult>>{};

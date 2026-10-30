@@ -1,6 +1,7 @@
 import 'package:fl_clash/smart_anchor/models/node_metadata.dart';
 import 'package:fl_clash/smart_anchor/models/service_anchor.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
+import 'package:fl_clash/smart_anchor/services/candidate_decision.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:fl_clash/smart_anchor/services/service_access.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -348,7 +349,320 @@ void main() {
     final smart = groups.firstWhere(
       (group) => group['name'] == '🎯 Smart-Claude',
     );
-    expect(smart['proxies'], ['[主订阅] US-near', '[主订阅] X-01', '[B] X-01']);
+    // Both X-01 nodes stay in the unknown fallback (neither inherits the
+    // stripped record); the fallback segment orders alphabetically, as
+    // the candidate decider sorts it, not by pool position.
+    expect(smart['proxies'], ['[主订阅] US-near', '[B] X-01', '[主订阅] X-01']);
+  });
+
+  group('candidate decision build', () {
+    NodeMetadataCache metaCc(
+      String name,
+      String country,
+      double purity, {
+      String asn = 'AS100',
+      String ip = '1.2.3.4',
+    }) {
+      return NodeMetadataCache(
+        proxyName: name,
+        entryServer: 'entry.example',
+        egressIp: ip,
+        countryCode: country,
+        latitude: 35.0,
+        longitude: 139.0,
+        asn: asn,
+        ipType: 'residential',
+        fraudScore: 0,
+        purityScore: purity,
+        wafPass: true,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+    }
+
+    Map<String, dynamic> configFor(List<String> names) {
+      return {
+        'proxies': [
+          for (final name in names)
+            {'name': name, 'type': 'vless', 'server': 's.example'},
+        ],
+        'proxy-groups': <dynamic>[],
+        'rules': <dynamic>[],
+      };
+    }
+
+    List<String> smartMembers(Map<String, dynamic> result, String label) {
+      final groups = result['proxy-groups'] as List;
+      final group =
+          groups.firstWhere(
+                (entry) => (entry as Map)['name'] == '🎯 Smart-$label',
+              )
+              as Map;
+      return (group['proxies'] as List).cast<String>();
+    }
+
+    test('rankedByService mirrors the decision order per service', () {
+      final built = buildSmartConfigWithRanking(
+        baseConfig(),
+        SmartAnchorInput(
+          services: [claude],
+          anchors: {'claude': anchor},
+          metadataByProxy: {
+            'US-near': meta('US-near', 34.0522, -118.2437, 90),
+            'US-far': meta('US-far', 40.7128, -74.0060, 90),
+          },
+        ),
+      );
+      final decision = built.decisionsByService['claude']!;
+      expect(built.rankedByService['claude'], decision.ordered);
+      expect(built.rankedByService['claude'], [
+        ...decision.qualified,
+        ...decision.fallback,
+      ]);
+      expect(built.proxyNames, [
+        'US-near',
+        'US-far',
+        'US-blocked',
+        'US-unknown',
+      ]);
+      expect(smartMembers(built.config, 'Claude'), decision.ordered);
+    });
+
+    test('group order follows route tiers over the legacy total score', () {
+      const jpAnchor = ServiceAnchor(
+        serviceTag: 'claude',
+        countryCode: 'JP',
+        lastProxyName: 'JP-cur',
+        egressIp: '10.0.0.5',
+        subnet24: '10.0.0',
+        asn: 'AS100',
+        isp: '',
+        latitude: 35.0,
+        longitude: 139.0,
+        city: '',
+        confirmedAt: 0,
+      );
+      const jpClaude = ServiceToggleConfig(
+        serviceId: 'claude',
+        displayName: 'Claude',
+        isEnabled: true,
+        targetCountry: 'JP',
+        matchRules: ['DOMAIN-SUFFIX,claude.ai'],
+        dnsDomains: ['claude.ai'],
+      );
+      final built = buildSmartConfigWithRanking(
+        configFor(['JP-diffasn', 'JP-sameasn']),
+        SmartAnchorInput(
+          services: [jpClaude],
+          anchors: {'claude': jpAnchor},
+          metadataByProxy: {
+            'JP-sameasn': metaCc('JP-sameasn', 'JP', 55, ip: '10.9.0.1'),
+            'JP-diffasn': metaCc(
+              'JP-diffasn',
+              'JP',
+              100,
+              asn: 'AS999',
+              ip: '10.8.0.1',
+            ),
+          },
+        ),
+        delays: {'JP-sameasn': 900, 'JP-diffasn': 10},
+      );
+      expect(smartMembers(built.config, 'Claude'), [
+        'JP-sameasn',
+        'JP-diffasn',
+      ]);
+      final decision = built.decisionsByService['claude']!;
+      expect(decision.assessments['JP-sameasn']!.tier, RouteTier.l3);
+      expect(decision.assessments['JP-diffasn']!.tier, RouteTier.l4);
+      expect(decision.explanation, contains('qualified=2'));
+    });
+
+    test('strict groups exclude unknown nodes, relaxed park them last', () {
+      final strict = claude.copyWith(
+        restrictionMode: ServiceRestrictionMode.strict,
+      );
+      final names = ['US-1', 'mystery'];
+      final metadata = {'US-1': metaCc('US-1', 'US', 90)};
+      final strictBuilt = buildSmartConfigWithRanking(
+        configFor(names),
+        SmartAnchorInput(services: [strict], metadataByProxy: metadata),
+      );
+      expect(smartMembers(strictBuilt.config, 'Claude'), ['US-1']);
+      expect(
+        strictBuilt
+            .decisionsByService['claude']!
+            .assessments['mystery']!
+            .rejection,
+        CandidateRejection.unknownCountryStrict,
+      );
+
+      final relaxedBuilt = buildSmartConfigWithRanking(
+        configFor(names),
+        SmartAnchorInput(services: [claude], metadataByProxy: metadata),
+      );
+      expect(smartMembers(relaxedBuilt.config, 'Claude'), ['US-1', 'mystery']);
+      expect(relaxedBuilt.decisionsByService['claude']!.fallback, ['mystery']);
+    });
+
+    test('a restricted service with no candidate fails closed on REJECT', () {
+      final built = buildSmartConfigWithRanking(
+        configFor(['US-1']),
+        SmartAnchorInput(
+          services: [claude],
+          metadataByProxy: {'US-1': metaCc('US-1', 'JP', 90)},
+        ),
+      );
+      final members = smartMembers(built.config, 'Claude');
+      expect(members, ['REJECT']);
+      expect(members, isNot(contains('DIRECT')));
+      expect(built.decisionsByService['claude']!.ordered, isEmpty);
+      expect(built.rankedByService['claude'], isEmpty);
+    });
+
+    test('an unrestricted service with no ranking keeps the DIRECT group', () {
+      const google = ServiceToggleConfig(
+        serviceId: 'google',
+        displayName: 'Google',
+        isEnabled: true,
+        targetCountry: '',
+        restrictionMode: ServiceRestrictionMode.unrestricted,
+        matchRules: ['GEOSITE,google'],
+        dnsDomains: ['google.com'],
+      );
+      final built = buildSmartConfigWithRanking(
+        configFor(['US-1']),
+        SmartAnchorInput(
+          services: [google],
+          metadataByProxy: {'US-1': metaCc('US-1', 'JP', 90)},
+        ),
+      );
+      // Unrestricted decisions still list known nodes; empty the pool by
+      // building with no proxies at all for the DIRECT case.
+      expect(smartMembers(built.config, 'Google'), ['US-1']);
+      final empty = buildSmartConfigWithRanking(
+        configFor(const []),
+        const SmartAnchorInput(services: [google]),
+      );
+      expect(smartMembers(empty.config, 'Google'), ['DIRECT']);
+    });
+
+    test('merged decisions are computed on the remapped names', () {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final built = buildSmartConfigWithRanking(
+        baseConfig(),
+        SmartAnchorInput(
+          services: [claude],
+          aggregationEnabled: true,
+          anchors: {'claude': anchor},
+          metadataByProxy: {
+            'US-near': meta('US-near', 34.0522, -118.2437, 90),
+            'US-far': meta('US-far', 40.7128, -74.0060, 90),
+            'US-blocked': meta('US-blocked', 34.0522, -118.2437, 95),
+          },
+          accessByService: {
+            'claude': {
+              'US-blocked': ServiceAccessResult(
+                serviceId: 'claude',
+                proxyName: 'US-blocked',
+                egressIp: '1.2.3.4',
+                reason: ServiceAccessReason.regionBlocked,
+                checkedAt: now,
+              ),
+            },
+          },
+          aggregationSources: [
+            const AggregationSourceInput(
+              sourceId: 'extra',
+              sourceLabel: 'B',
+              config: {
+                'proxies': [
+                  {'name': 'B-01', 'type': 'vless', 'server': 'e.example'},
+                ],
+                'proxy-groups': [],
+                'rules': [],
+              },
+            ),
+          ],
+        ),
+      );
+      final decision = built.decisionsByService['claude']!;
+      expect(decision.blocked, contains('[主订阅] US-blocked'));
+      expect(decision.ordered, built.rankedByService['claude']);
+      expect(decision.ordered, isNot(contains('US-near')));
+      expect(decision.ordered.first, '[主订阅] US-near');
+    });
+  });
+
+  test('merged remap keeps city and geo confidence for tiering', () {
+    NodeMetadataCache geoMeta(
+      String name, {
+      String? city,
+      double? geoConfidence,
+      required String asn,
+      required String ip,
+    }) {
+      return NodeMetadataCache(
+        proxyName: name,
+        entryServer: 'entry.example',
+        egressIp: ip,
+        countryCode: 'US',
+        latitude: 34.0522,
+        longitude: -118.2437,
+        asn: asn,
+        ipType: 'residential',
+        fraudScore: 0,
+        purityScore: 90,
+        wafPass: true,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+        city: city,
+        adminRegion: city,
+        geoConfidence: geoConfidence,
+      );
+    }
+
+    final result = buildSmartConfig(
+      {
+        'proxies': [
+          {'name': 'US-asn', 'type': 'vless', 'server': 'a.example'},
+          {'name': 'US-city', 'type': 'vless', 'server': 'b.example'},
+        ],
+        'proxy-groups': <dynamic>[],
+        'rules': <dynamic>[],
+      },
+      SmartAnchorInput(
+        services: [claude],
+        aggregationEnabled: true,
+        anchors: {'claude': anchor},
+        metadataByProxy: {
+          'US-city': geoMeta(
+            'US-city',
+            city: 'Los Angeles',
+            geoConfidence: 0.95,
+            asn: 'AS999',
+            ip: '9.9.9.9',
+          ),
+          'US-asn': geoMeta('US-asn', asn: 'AS20057', ip: '8.8.8.8'),
+        },
+        aggregationSources: [
+          const AggregationSourceInput(
+            sourceId: 'extra',
+            sourceLabel: 'B',
+            config: {
+              'proxies': [
+                {'name': 'B-01', 'type': 'vless', 'server': 'e.example'},
+              ],
+              'proxy-groups': [],
+              'rules': [],
+            },
+          ),
+        ],
+      ),
+    );
+    final groups = result['proxy-groups'] as List;
+    final smart = groups.firstWhere(
+      (group) => group['name'] == '🎯 Smart-Claude',
+    );
+    expect(smart['proxies'], ['[主订阅] US-city', '[主订阅] US-asn', '[B] B-01']);
   });
 
   test('a stripped fallback still applies when the name is unique', () {

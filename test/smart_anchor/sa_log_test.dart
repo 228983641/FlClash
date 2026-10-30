@@ -286,6 +286,44 @@ void main() {
     );
   });
 
+  test('build decision, no-candidate and sanitize-keep lines', () {
+    expect(
+      saBuildDecisionLine(
+        serviceId: 'claude',
+        explanation: 'target=US-1 tier=L1; qualified=2 fallback=1 blocked=0',
+      ),
+      '[SA] build-decision service=claude target=US-1 tier=L1; '
+      'qualified=2 fallback=1 blocked=0',
+    );
+    expect(
+      saNoCandidateLine(
+        serviceId: 'claude',
+        groupName: '🎯 Smart-Claude',
+        mode: 'strict',
+      ),
+      '[SA] no-candidate service=claude group=🎯 Smart-Claude '
+      'mode=strict fallback=REJECT',
+    );
+    expect(
+      saSanitizeKeepLine(
+        groupName: '🎯 Smart-Claude',
+        current: 'mystery',
+        reason: 'unverifiableKept',
+      ),
+      '[SA] sanitize-keep group=🎯 Smart-Claude current=mystery '
+      'reason=unverifiableKept',
+    );
+    expect(
+      saSanitizeKeepLine(
+        groupName: '🎯 Smart-Claude',
+        current: 'TW-1',
+        reason: 'noCandidateKept',
+      ),
+      '[SA] sanitize-keep group=🎯 Smart-Claude current=TW-1 '
+      'reason=noCandidateKept',
+    );
+  });
+
   test('tick and reprobe lines stay one-liners', () {
     expect(
       saTickLine(anchors: 1, compliance: 2, probeUpdated: 5, failover: 1),

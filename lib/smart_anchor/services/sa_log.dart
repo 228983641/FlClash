@@ -275,6 +275,31 @@ String saSanitizeLine({
       'reason=not-in-ranking';
 }
 
+String saSanitizeKeepLine({
+  required String groupName,
+  required String current,
+  required String reason,
+}) {
+  return '[SA] sanitize-keep group=$groupName current=$current '
+      'reason=$reason';
+}
+
+String saBuildDecisionLine({
+  required String serviceId,
+  required String explanation,
+}) {
+  return '[SA] build-decision service=$serviceId $explanation';
+}
+
+String saNoCandidateLine({
+  required String serviceId,
+  required String groupName,
+  required String mode,
+}) {
+  return '[SA] no-candidate service=$serviceId group=$groupName '
+      'mode=$mode fallback=REJECT';
+}
+
 String saStrippedAmbiguousLine({
   required String name,
   required int candidates,

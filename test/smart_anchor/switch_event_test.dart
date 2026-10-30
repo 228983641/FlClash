@@ -101,7 +101,7 @@ void main() {
     expect(serviceHasNoUsableNodes(input, disabled, ['A']), isFalse);
   });
 
-  test('an empty ranked list injects DIRECT instead of an empty group', () {
+  test('an empty ranked list injects REJECT for a restricted service', () {
     final result = SmartConfigInjector.injectSmartRouting(
       rawConfig: {},
       serviceConfigs: [service],
@@ -109,6 +109,19 @@ void main() {
     );
     final groups = result['proxy-groups'] as List;
     expect(groups.length, 1);
+    expect((groups.first as Map)['proxies'], ['REJECT']);
+  });
+
+  test('an empty ranked list still injects DIRECT when unrestricted', () {
+    final unrestricted = service.copyWith(
+      restrictionMode: ServiceRestrictionMode.unrestricted,
+    );
+    final result = SmartConfigInjector.injectSmartRouting(
+      rawConfig: {},
+      serviceConfigs: [unrestricted],
+      rankedProxiesByService: {'youtube': []},
+    );
+    final groups = result['proxy-groups'] as List;
     expect((groups.first as Map)['proxies'], ['DIRECT']);
   });
 }
