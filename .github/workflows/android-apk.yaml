@@ -94,7 +94,7 @@ jobs:
           cp pubspec.yaml "$RUNNER_TEMP/smart-anchor-pubspec.yaml"
           trap 'cp "$RUNNER_TEMP/smart-anchor-pubspec.yaml" pubspec.yaml' EXIT
           sed -i 's/build_assets: true/build_assets: false/g' pubspec.yaml
-          flutter test test/smart_anchor test/providers/proxies_action_test.dart test/providers/smart_anchor_lock_test.dart test/views/smart_anchor_edit_test.dart test/l10n test/lint/dynamic_message_key_test.dart
+          flutter test test/smart_anchor test/providers/proxies_action_test.dart test/providers/smart_anchor_lock_test.dart test/providers/smart_anchor_probe_test.dart test/views/smart_anchor_edit_test.dart test/l10n test/lint/dynamic_message_key_test.dart
 
       - name: Fetch CA certificates
         shell: bash

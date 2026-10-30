@@ -118,65 +118,90 @@ const int probeRoundBudget = 32;
 bool probeMetadataStale(NodeMetadataCache? metadata) =>
     metadata == null || metadata.isExpired;
 
-/// One round of probe targets, best first:
-///
-/// 1. the node each enabled service group is currently using — its access
-///    results feed the failover check, so it is probed even when its
-///    metadata is still fresh, and currents are never cut by the budget;
-/// 2. nodes with missing or expired metadata, best rank first —
-///    [rankByProxy] carries each node's best (lowest) rank across the
-///    enabled services' rankings;
-/// 3. the remaining stale nodes in [proxyNames] order.
-///
-/// Fresh nodes outside the current set are skipped; they re-enter the
-/// queue when their metadata expires. A node probed this round drops out
-/// of the stale set, so the next round resumes where this one stopped and
-/// repeated rounds cover every node.
+/// Current routes are always checked. Standbys share the remaining budget
+/// with discovery; attempt age prevents repeated failures starving discovery.
 List<String> selectProbeQueue({
   required List<String> proxyNames,
   required List<String> currentProxyNames,
   required Map<String, NodeMetadataCache> metadataByProxy,
   required Map<String, int> rankByProxy,
+  List<String> standbyProxyNames = const [],
+  Map<String, int> lastAttemptByProxy = const {},
   int budget = probeRoundBudget,
 }) {
   final targets = <String>[];
   final seen = <String>{};
+  bool isProbeable(String name) =>
+      name.isNotEmpty &&
+      name != 'DIRECT' &&
+      name != 'REJECT' &&
+      name != 'REJECT-DROP';
   void add(String name) {
-    if (name.isNotEmpty && seen.add(name)) {
+    if (isProbeable(name) && seen.add(name)) {
       targets.add(name);
     }
   }
 
-  var currents = 0;
   for (final name in currentProxyNames) {
-    if (name.isNotEmpty && !seen.contains(name)) {
-      currents++;
-    }
     add(name);
   }
+  final currents = targets.length;
+  final limit = budget > currents ? budget : currents;
   final order = {
     for (var index = 0; index < proxyNames.length; index++)
       proxyNames[index]: index,
   };
   final stale = [
-    for (final name in proxyNames)
-      if (probeMetadataStale(metadataByProxy[name])) name,
+    for (final name in order.keys)
+      if (isProbeable(name) &&
+          !seen.contains(name) &&
+          probeMetadataStale(metadataByProxy[name]))
+        name,
   ];
-  final ranked =
-      [
-        for (final name in stale)
-          if (rankByProxy.containsKey(name)) name,
-      ]..sort((a, b) {
-        final byRank = rankByProxy[a]!.compareTo(rankByProxy[b]!);
-        return byRank != 0 ? byRank : order[a]!.compareTo(order[b]!);
-      });
-  for (final name in ranked) {
+  int compare(String a, String b) {
+    final age = (lastAttemptByProxy[a] ?? -1).compareTo(
+      lastAttemptByProxy[b] ?? -1,
+    );
+    if (age != 0) return age;
+    final rank = (rankByProxy[a] ?? proxyNames.length).compareTo(
+      rankByProxy[b] ?? proxyNames.length,
+    );
+    return rank != 0 ? rank : order[a]!.compareTo(order[b]!);
+  }
+
+  final standby =
+      standbyProxyNames
+          .where((name) => order.containsKey(name) && isProbeable(name))
+          .toSet()
+          .toList()
+        ..sort(compare);
+  final standbyBudget = stale.isEmpty
+      ? limit - currents
+      : (limit - currents) ~/ 2;
+  for (final name in standby) {
+    if (targets.length >= currents + standbyBudget) break;
     add(name);
   }
+  stale.sort(compare);
+  final regions = <String, List<String>>{};
   for (final name in stale) {
-    add(name);
+    final metadata = metadataByProxy[name];
+    final region = metadata == null || metadata.countryDisputed
+        ? 'unknown'
+        : '${metadata.countryCode}/${metadata.adminRegion ?? ''}';
+    (regions[region] ??= []).add(name);
   }
-  final limit = budget > currents ? budget : currents;
+  for (var offset = 0; targets.length < limit; offset++) {
+    var found = false;
+    for (final region in regions.values) {
+      if (offset < region.length) {
+        found = true;
+        add(region[offset]);
+        if (targets.length >= limit) break;
+      }
+    }
+    if (!found) break;
+  }
   return targets.take(limit).toList();
 }
 

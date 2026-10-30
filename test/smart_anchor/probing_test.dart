@@ -23,12 +23,18 @@ NodeMetadataCache fakeNode() {
   );
 }
 
-NodeMetadataCache metadataFor(String name, {required bool fresh}) {
+NodeMetadataCache metadataFor(
+  String name, {
+  required bool fresh,
+  String country = 'US',
+  String? region,
+}) {
   return NodeMetadataCache(
     proxyName: name,
     entryServer: 'entry.example',
     egressIp: '1.2.3.4',
-    countryCode: 'US',
+    countryCode: country,
+    adminRegion: region,
     latitude: 34.0522,
     longitude: -118.2437,
     asn: 'AS20057',
@@ -95,6 +101,101 @@ void main() {
   });
 
   group('probe queue', () {
+    test('refreshes fresh standbys without exhausting discovery slots', () {
+      final targets = selectProbeQueue(
+        proxyNames: ['A', 'B', 'C', 'D', 'E'],
+        currentProxyNames: ['A'],
+        standbyProxyNames: ['B', 'C'],
+        metadataByProxy: {
+          for (final name in ['A', 'B', 'C'])
+            name: metadataFor(name, fresh: true),
+        },
+        rankByProxy: const {},
+        budget: 4,
+      );
+      expect(targets, ['A', 'B', 'D', 'E']);
+    });
+
+    test('failed discoveries rotate even when no metadata is obtained', () {
+      final attempts = <String, int>{};
+      final covered = <String>[];
+      for (var round = 0; round < 3; round++) {
+        final targets = selectProbeQueue(
+          proxyNames: ['A', 'B', 'C', 'D', 'E', 'F'],
+          currentProxyNames: const [],
+          metadataByProxy: const {},
+          rankByProxy: {'A': 0, 'B': 1},
+          lastAttemptByProxy: attempts,
+          budget: 2,
+        );
+        covered.addAll(targets);
+        for (final name in targets) {
+          attempts[name] = round;
+        }
+      }
+      expect(covered, ['A', 'B', 'C', 'D', 'E', 'F']);
+    });
+
+    test('rotates between known regions before revisiting a region', () {
+      final targets = selectProbeQueue(
+        proxyNames: ['US1', 'US2', 'US3', 'JP1', 'JP2', 'TW1'],
+        currentProxyNames: const [],
+        metadataByProxy: {
+          for (final name in ['US1', 'US2', 'US3', 'JP1', 'JP2', 'TW1'])
+            name: metadataFor(
+              name,
+              fresh: false,
+              country: name.substring(0, 2),
+            ),
+        },
+        rankByProxy: {'US1': 0, 'US2': 1, 'US3': 2},
+        budget: 4,
+      );
+      expect(targets, ['US1', 'JP1', 'TW1', 'US2']);
+    });
+
+    test('does not spend budget on builtins or duplicate names', () {
+      final targets = selectProbeQueue(
+        proxyNames: ['DIRECT', 'REJECT', 'REJECT-DROP', '', 'A', 'B', 'B'],
+        currentProxyNames: ['REJECT', 'A', 'A'],
+        standbyProxyNames: ['DIRECT', 'A', 'B', 'B'],
+        metadataByProxy: {'B': metadataFor('B', fresh: true)},
+        rankByProxy: const {},
+        budget: 2,
+      );
+      expect(targets, ['A', 'B']);
+    });
+
+    test('fresh standbys rotate by oldest attempt before rank', () {
+      final targets = selectProbeQueue(
+        proxyNames: ['A', 'B', 'C'],
+        currentProxyNames: const [],
+        standbyProxyNames: ['A', 'B', 'C'],
+        metadataByProxy: {
+          for (final name in ['A', 'B', 'C'])
+            name: metadataFor(name, fresh: true),
+        },
+        rankByProxy: {'A': 0, 'B': 1, 'C': 2},
+        lastAttemptByProxy: {'A': 30, 'B': 10, 'C': 20},
+        budget: 2,
+      );
+      expect(targets, ['B', 'C']);
+    });
+
+    test('zero budget keeps only the current real route', () {
+      expect(
+        selectProbeQueue(
+          proxyNames: ['A', 'B'],
+          currentProxyNames: ['A'],
+          standbyProxyNames: ['B'],
+          metadataByProxy: const {},
+          rankByProxy: const {},
+          budget: 0,
+        ),
+        ['A'],
+      );
+    });
+
     test('puts current nodes first, even when their metadata is fresh', () {
       final targets = selectProbeQueue(
         proxyNames: ['A', 'B', 'C'],
