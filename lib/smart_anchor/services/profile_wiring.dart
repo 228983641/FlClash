@@ -4,6 +4,7 @@ import '../models/switch_event.dart';
 import '../models/service_anchor.dart';
 import '../models/service_group.dart';
 import '../models/service_toggle_config.dart';
+import 'candidate_decision.dart';
 import 'config_injector.dart';
 import 'scoring_engine.dart';
 import 'service_access.dart';
@@ -485,6 +486,10 @@ SmartAnchorInput _remapInputForMergedConfig(
       ttlHours: meta.ttlHours,
       sourceCount: meta.sourceCount,
       countryDisputed: meta.countryDisputed,
+      adminRegion: meta.adminRegion,
+      city: meta.city,
+      geoConfidence: meta.geoConfidence,
+      asnConfidence: meta.asnConfidence,
     );
   }
   final accessByService = <String, Map<String, ServiceAccessResult>>{};
@@ -652,32 +657,37 @@ List<String> applyRegionFilter(
   ServiceToggleConfig service,
   List<String> proxyNames,
 ) {
-  final stored = {
-    for (final country in service.regionCountries) country.trim().toUpperCase(),
-  }..remove('');
-  Set<String>? banned;
-  Set<String>? allowed;
-  if (service.effectiveRegionMode == 'whitelist') {
-    if (stored.isNotEmpty) {
-      allowed = stored;
-    }
-  } else {
-    banned = stored.isNotEmpty
-        ? stored
-        : detectedUnsupportedRegions(input, service.serviceId);
-  }
-  if (banned == null && allowed == null) {
+  final policy = _regionPolicyForService(input, service);
+  if (policy.banned.isEmpty && policy.allowed.isEmpty) {
     return proxyNames;
   }
   return [
     for (final name in proxyNames)
       if (_regionPasses(
         input.metadataByProxy[name]?.countryCode,
-        banned,
-        allowed,
+        policy.banned.isEmpty ? null : policy.banned,
+        policy.allowed.isEmpty ? null : policy.allowed,
       ))
         name,
   ];
+}
+
+({Set<String> banned, Set<String> allowed}) _regionPolicyForService(
+  SmartAnchorInput input,
+  ServiceToggleConfig service,
+) {
+  final stored = {
+    for (final country in service.regionCountries) country.trim().toUpperCase(),
+  }..remove('');
+  if (service.effectiveRegionMode == 'whitelist') {
+    return (banned: const <String>{}, allowed: stored);
+  }
+  return (
+    banned: stored.isNotEmpty
+        ? stored
+        : detectedUnsupportedRegions(input, service.serviceId),
+    allowed: const <String>{},
+  );
 }
 
 bool _regionPasses(String? country, Set<String>? banned, Set<String>? allowed) {
@@ -718,8 +728,27 @@ List<String> rankedProxiesForService(
   List<String> proxyNames, {
   Map<String, int> delays = const {},
 }) {
+  final result = _candidateDecisionForService(
+    input,
+    service,
+    proxyNames,
+    delays: delays,
+  );
+  return (
+    ranked: result.decision.ordered,
+    qualified: result.decision.qualified,
+  );
+}
+
+({CandidateDecision decision, SmartAnchorInput effective})
+_candidateDecisionForService(
+  SmartAnchorInput input,
+  ServiceToggleConfig service,
+  List<String> proxyNames, {
+  String? currentName,
+  Map<String, int> delays = const {},
+}) {
   input = _remapInputForMergedConfig(input, proxyNames);
-  proxyNames = applyRegionFilter(input, service, proxyNames);
   final tested = <NodeMetadataCache>[];
   for (final name in proxyNames) {
     final metadata = input.metadataByProxy[name];
@@ -750,12 +779,20 @@ List<String> rankedProxiesForService(
       );
     }();
   }
-  return _rankPartsForService(
-    service,
-    proxyNames,
-    input,
-    sharedAnchor: sharedAnchor,
-    delays: delays,
+  final policy = _regionPolicyForService(input, service);
+  return (
+    decision: buildCandidateDecision(
+      service: service,
+      proxyNames: proxyNames,
+      metadataByProxy: input.metadataByProxy,
+      accessByProxy: input.accessByService[service.serviceId] ?? const {},
+      anchor: sharedAnchor ?? input.anchors[service.serviceId],
+      currentName: currentName,
+      delays: delays,
+      bannedCountries: policy.banned,
+      allowedCountries: policy.allowed,
+    ),
+    effective: input,
   );
 }
 
@@ -798,24 +835,25 @@ lockReselectDecision(
   String currentName, {
   Map<String, int> delays = const {},
 }) {
-  final parts = _rankedPartsForService(
+  final result = _candidateDecisionForService(
     input,
     service,
     proxyNames,
+    currentName: currentName,
     delays: delays,
   );
-  final ranked = parts.ranked;
-  final qualified = parts.qualified;
-  final effective = _remapInputForMergedConfig(input, proxyNames);
+  final decision = result.decision;
+  final ranked = decision.ordered;
+  final effective = result.effective;
   final currentMeta = effective.metadataByProxy[currentName];
-  final currentUnknown = currentMeta == null;
+  final currentUnknown = decision.currentUnknown;
   // Purity hysteresis: a current node whose only disqualification is a
   // purity score inside the band stays — re-probe noise around the
   // threshold must not tear a working service off its node. Every other
   // disqualification (lock, WAF, region block, region filter) still
   // forces the move.
   if (currentMeta != null &&
-      applyRegionFilter(effective, service, [currentName]).isNotEmpty &&
+      decision.blockedReasons[currentName] == CandidateBlockReason.lowPurity &&
       ScoringEngine.failsOnlyPurityWithinBand(
         currentMeta,
         service.lockedCountries,
@@ -823,67 +861,11 @@ lockReselectDecision(
       )) {
     return (target: null, ranked: ranked, currentUnknown: currentUnknown);
   }
-  if (qualified.contains(currentName)) {
-    return (target: null, ranked: ranked, currentUnknown: currentUnknown);
-  }
-  if (currentUnknown) {
-    return (
-      target: qualified.isEmpty ? null : qualified.first,
-      ranked: ranked,
-      currentUnknown: currentUnknown,
-    );
-  }
-  if (qualified.isNotEmpty) {
-    return (
-      target: qualified.first,
-      ranked: ranked,
-      currentUnknown: currentUnknown,
-    );
-  }
   return (
-    target: ranked.isEmpty ? null : ranked.first,
+    target: decision.target,
     ranked: ranked,
     currentUnknown: currentUnknown,
   );
-}
-
-({List<String> ranked, List<String> qualified}) _rankPartsForService(
-  ServiceToggleConfig service,
-  List<String> proxyNames,
-  SmartAnchorInput input, {
-  ServiceAnchor? sharedAnchor,
-  Map<String, int> delays = const {},
-}) {
-  final tested = <NodeMetadataCache>[];
-  final untested = <String>[];
-  for (final name in proxyNames) {
-    final metadata = input.metadataByProxy[name];
-    if (metadata == null) {
-      untested.add(name);
-    } else {
-      tested.add(metadata);
-    }
-  }
-  final access = input.accessByService[service.serviceId] ?? const {};
-  final lock = service.lockedCountries;
-  var anchor = sharedAnchor ?? input.anchors[service.serviceId];
-  anchor ??= _electAnchor(tested, lock, access, delays: delays);
-  if (anchor == null) {
-    // No node passes the lock, so no known node may serve this service.
-    // Only nodes without metadata stay as the emergency pool.
-    return (ranked: untested, qualified: const <String>[]);
-  }
-  final qualified = [
-    for (final node in ScoringEngine.rankForService(
-      tested,
-      anchor,
-      lock,
-      access,
-      delays: delays,
-    ))
-      node.proxyName,
-  ];
-  return (ranked: [...qualified, ...untested], qualified: qualified);
 }
 
 ServiceAnchor? _electAnchor(

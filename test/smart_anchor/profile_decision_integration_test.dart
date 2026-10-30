@@ -72,6 +72,7 @@ void main() {
           city: 'Los Angeles',
           latitude: 34.0522,
           longitude: -118.2437,
+          egressIp: '2.2.2.2',
           purity: 70,
         ),
         'far-fast': integrationNode(
@@ -80,6 +81,7 @@ void main() {
           city: 'New York',
           latitude: 40.7128,
           longitude: -74.0060,
+          egressIp: '3.3.3.3',
           purity: 100,
         ),
       },
