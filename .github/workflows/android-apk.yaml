@@ -15,7 +15,15 @@ on:
   push:
     branches:
       - smart-anchor
+      - smart-anchor-v2
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   FLUTTER_VERSION: '3.47.6'
@@ -25,6 +33,7 @@ env:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,6 +58,12 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -68,6 +83,16 @@ jobs:
           flutter --version
           flutter pub get
 
+      - name: Analyze and test smart routing
+        if: github.ref == 'refs/heads/smart-anchor-v2'
+        shell: bash
+        run: |
+          flutter analyze --no-fatal-infos
+          cp pubspec.yaml "$RUNNER_TEMP/smart-anchor-pubspec.yaml"
+          trap 'cp "$RUNNER_TEMP/smart-anchor-pubspec.yaml" pubspec.yaml' EXIT
+          sed -i 's/build_assets: true/build_assets: false/g' pubspec.yaml
+          flutter test test/smart_anchor test/providers/proxies_action_test.dart test/providers/smart_anchor_lock_test.dart
+
       - name: Fetch CA certificates
         shell: bash
         env:
@@ -81,11 +106,12 @@ jobs:
       - name: Setup
         env:
           ANDROID_NDK_HOME: ${{ steps.build-ndk.outputs.ndk-path }}
-        run: dart setup.dart android -v
+        run: dart setup.dart android --arch arm64 -v
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: artifact-android
+          name: android-arm64-${{ github.sha }}
           path: ./dist
+          if-no-files-found: error
           overwrite: true

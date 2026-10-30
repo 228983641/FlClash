@@ -54,6 +54,10 @@ Map<String, int> flattenDelays(DelayMap delayMap) {
   return delays;
 }
 
+bool _smartCandidatePoolsChangedTask(
+  (SmartAnchorInput, SmartAnchorInput, List<String>) inputs,
+) => smartCandidatePoolsChanged(inputs.$1, inputs.$2, inputs.$3);
+
 class _DelayTestJob {
   _DelayTestJob(Iterable<String> keys, this.timeout) : held = keys.toSet();
 
@@ -322,6 +326,8 @@ class ProxiesAction extends _$ProxiesAction {
       if (didDelayWork) {
         commonPrint.log(saReprobeLine(source: 'profile-refresh'));
       }
+      final beforeProbe = ref.read(smartAnchorProvider);
+      final profileId = ref.read(currentProfileIdProvider);
       await ref
           .read(smartAnchorProvider.notifier)
           .probeNodes(
@@ -331,6 +337,7 @@ class ProxiesAction extends _$ProxiesAction {
             delays: delays,
             force: hadNoDelays,
           );
+      await _refreshSmartCandidatePools(beforeProbe, profileId, names);
       smartAnchorLockComplianceCheck();
       smartAnchorFailoverCheck();
     } finally {
@@ -340,6 +347,30 @@ class ProxiesAction extends _$ProxiesAction {
 
   Timer? _smartAnchorMonitorTimer;
   bool _smartAnchorMonitorRunning = false;
+
+  Future<void> _refreshSmartCandidatePools(
+    SmartAnchorInput previous,
+    int? profileId,
+    List<String> names,
+  ) async {
+    final next = ref.read(smartAnchorProvider);
+    if (identical(previous, next)) {
+      return;
+    }
+    final changed = await compute(_smartCandidatePoolsChangedTask, (
+      previous,
+      next,
+      names,
+    ));
+    if (ref.mounted &&
+        changed &&
+        profileId == ref.read(currentProfileIdProvider)) {
+      ref
+          .read(setupActionProvider.notifier)
+          .applyProfileDebounce(silence: true);
+    }
+  }
+
   final Map<String, String> _lastObservedCurrent = {};
   final Map<String, String> _pendingAutoSwitch = {};
   final Map<String, String> _pendingAutoReason = {};
@@ -593,7 +624,6 @@ class ProxiesAction extends _$ProxiesAction {
       );
       if (decision.ranked.isEmpty) {
         noCandidate++;
-        continue;
       }
       final target = decision.target;
       if (target == null) {
@@ -822,7 +852,12 @@ class ProxiesAction extends _$ProxiesAction {
       // the lock would otherwise stay unenforced until the next apply. It
       // is not gated by the failover toggle — a lock is a hard constraint.
       final tickCompliance = smartAnchorLockComplianceCheck();
-      if (!smart.autoFailoverEnabled) {
+      final needsStrictRecovery = smart.services.any(
+        (service) =>
+            service.isEnabled &&
+            service.restrictionMode == ServiceRestrictionMode.strict,
+      );
+      if (!smart.autoFailoverEnabled && !needsStrictRecovery) {
         _logTickSummary(
           anchors: tickAnchors,
           compliance: tickCompliance,
@@ -852,6 +887,8 @@ class ProxiesAction extends _$ProxiesAction {
       // round's budget walks the stale-metadata queue toward full coverage.
       var tickProbed = 0;
       if (names.isNotEmpty) {
+        final beforeProbe = ref.read(smartAnchorProvider);
+        final profileId = ref.read(currentProfileIdProvider);
         tickProbed = await ref
             .read(smartAnchorProvider.notifier)
             .probeNodes(
@@ -862,6 +899,7 @@ class ProxiesAction extends _$ProxiesAction {
               force: true,
               updateThrottle: false,
             );
+        await _refreshSmartCandidatePools(beforeProbe, profileId, names);
       }
       final tickFailover = smartAnchorFailoverCheck();
       _logTickSummary(

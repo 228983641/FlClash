@@ -22,7 +22,10 @@ class SmartConfigInjector {
       }
       final groupName = smartGroupName(service);
       final ranked = rankedProxiesByService[service.serviceId];
-      final sortedNodes = ranked == null || ranked.isEmpty
+      final sortedNodes =
+          service.restrictionMode == ServiceRestrictionMode.strict
+          ? [...?ranked, 'REJECT']
+          : ranked == null || ranked.isEmpty
           ? const ['DIRECT']
           : ranked;
       injectedGroups.add({

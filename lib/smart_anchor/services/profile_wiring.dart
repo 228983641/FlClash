@@ -110,6 +110,25 @@ bool serviceHasNoUsableNodes(
   return rankedProxiesForService(input, service, proxyNames).isEmpty;
 }
 
+bool smartCandidatePoolsChanged(
+  SmartAnchorInput previous,
+  SmartAnchorInput next,
+  List<String> proxyNames,
+) {
+  for (final service in next.services.where((service) => service.isEnabled)) {
+    final before = rankedProxiesForService(
+      previous,
+      service,
+      proxyNames,
+    ).toSet();
+    final after = rankedProxiesForService(next, service, proxyNames).toSet();
+    if (before.length != after.length || !before.containsAll(after)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 Map<String, dynamic> buildSmartConfig(
   Map<String, dynamic> rawConfig,
   SmartAnchorInput input, {
@@ -256,7 +275,7 @@ Map<String, String> sanitizeSelectedMap(
   Map<String, String> selectedMap, {
   Map<String, List<String>> qualifiedByService = const {},
 }) {
-  if (rankedByService.isEmpty || selectedMap.isEmpty) {
+  if (rankedByService.isEmpty) {
     return selectedMap;
   }
   var sanitized = selectedMap;
@@ -265,11 +284,21 @@ Map<String, String> sanitizeSelectedMap(
       continue;
     }
     final ranked = rankedByService[service.serviceId];
-    if (ranked == null || ranked.isEmpty) {
+    if (ranked == null) {
       continue;
     }
     final groupName = smartGroupName(service);
     final current = selectedMap[groupName];
+    if (ranked.isEmpty) {
+      if (service.restrictionMode == ServiceRestrictionMode.strict &&
+          current != 'REJECT') {
+        if (identical(sanitized, selectedMap)) {
+          sanitized = Map.of(selectedMap);
+        }
+        sanitized[groupName] = 'REJECT';
+      }
+      continue;
+    }
     if (current == null) {
       continue;
     }
@@ -623,8 +652,13 @@ DerivedRegionEvidence derivedRegionEvidence(
       continue;
     }
     final metadata = input.metadataByProxy[entry.key];
-    final country = metadata?.countryCode;
-    if (country == null || country.isEmpty) {
+    if (metadata == null ||
+        metadata.isExpired ||
+        verdict.egressIp != metadata.egressIp) {
+      continue;
+    }
+    final country = metadata.countryCode;
+    if (country.isEmpty) {
       continue;
     }
     if (verdict.isAccessible) {
@@ -634,8 +668,8 @@ DerivedRegionEvidence derivedRegionEvidence(
       continue;
     }
     proxiesByCountry.putIfAbsent(country, () => {}).add(entry.key);
-    final asn = metadata?.asn;
-    if (asn != null && asn.isNotEmpty) {
+    final asn = metadata.asn;
+    if (asn.isNotEmpty) {
       asnsByCountry.putIfAbsent(country, () => {}).add(asn);
     }
     if (verdict.borrowedFrom == null) {
@@ -878,7 +912,13 @@ lockReselectDecision(
     return (target: null, ranked: ranked, currentUnknown: currentUnknown);
   }
   return (
-    target: decision.target,
+    target:
+        decision.target ??
+        (ranked.isEmpty &&
+                service.restrictionMode == ServiceRestrictionMode.strict &&
+                currentName != 'REJECT'
+            ? 'REJECT'
+            : null),
     ranked: ranked,
     currentUnknown: currentUnknown,
   );

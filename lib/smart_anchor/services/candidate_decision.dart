@@ -81,8 +81,21 @@ CandidateDecision buildCandidateDecision({
   }
 
   for (final name in proxyNames) {
+    if (name == 'DIRECT' || name == 'REJECT' || name == 'REJECT-DROP') {
+      continue;
+    }
     final metadata = metadataByProxy[name];
-    if (metadata == null || metadata.countryCode.trim().isEmpty) {
+    final access = accessByProxy[name];
+    if (access != null &&
+        !access.isExpired &&
+        access.blocksRanking &&
+        (metadata == null || access.egressIp == metadata.egressIp)) {
+      block(name, CandidateBlockReason.serviceBlocked);
+      continue;
+    }
+    if (metadata == null ||
+        metadata.countryCode.trim().isEmpty ||
+        metadata.isExpired) {
       if (service.restrictionMode == ServiceRestrictionMode.strict) {
         block(name, CandidateBlockReason.unknownCountry);
       } else {
@@ -115,11 +128,6 @@ CandidateDecision buildCandidateDecision({
     }
     if (metadata.purityScore < 50) {
       block(name, CandidateBlockReason.lowPurity);
-      continue;
-    }
-    final access = accessByProxy[name];
-    if (access != null && !access.isExpired && access.blocksRanking) {
-      block(name, CandidateBlockReason.serviceBlocked);
       continue;
     }
     qualifiedNodes.add(metadata);
@@ -173,6 +181,7 @@ CandidateDecision buildCandidateDecision({
   final currentUnknown =
       currentName != null &&
       (currentMetadata == null ||
+          currentMetadata.isExpired ||
           currentMetadata.countryCode.trim().isEmpty ||
           currentMetadata.countryDisputed);
   final currentCompliant =
