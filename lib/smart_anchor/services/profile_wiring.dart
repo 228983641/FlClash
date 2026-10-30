@@ -133,6 +133,7 @@ typedef MergeSummary = ({
 ({
   Map<String, dynamic> config,
   Map<String, List<String>> rankedByService,
+  Map<String, List<String>> qualifiedByService,
   MergeSummary? mergeSummary,
   List<({String name, int candidates})> ambiguousStripped,
 })
@@ -145,6 +146,7 @@ buildSmartConfigWithRanking(
     return (
       config: rawConfig,
       rankedByService: const {},
+      qualifiedByService: const {},
       mergeSummary: null,
       ambiguousStripped: const [],
     );
@@ -166,6 +168,7 @@ buildSmartConfigWithRanking(
     return (
       config: config,
       rankedByService: const {},
+      qualifiedByService: const {},
       mergeSummary: mergeSummary,
       ambiguousStripped: ambiguousStripped,
     );
@@ -179,13 +182,16 @@ buildSmartConfigWithRanking(
     }
   }
   final rankedByService = <String, List<String>>{};
+  final qualifiedByService = <String, List<String>>{};
   for (final service in enabled) {
-    rankedByService[service.serviceId] = rankedProxiesForService(
+    final parts = _rankedPartsForService(
       effectiveInput,
       service,
       proxyNames,
       delays: remappedDelays,
     );
+    rankedByService[service.serviceId] = parts.ranked;
+    qualifiedByService[service.serviceId] = parts.qualified;
   }
   final injected = SmartConfigInjector.injectSmartRouting(
     rawConfig: config,
@@ -196,6 +202,7 @@ buildSmartConfigWithRanking(
   return (
     config: injected,
     rankedByService: rankedByService,
+    qualifiedByService: qualifiedByService,
     mergeSummary: mergeSummary,
     ambiguousStripped: ambiguousStripped,
   );
@@ -246,8 +253,9 @@ List<({String name, int candidates})> _ambiguousStrippedNames(
 Map<String, String> sanitizeSelectedMap(
   List<ServiceToggleConfig> services,
   Map<String, List<String>> rankedByService,
-  Map<String, String> selectedMap,
-) {
+  Map<String, String> selectedMap, {
+  Map<String, List<String>> qualifiedByService = const {},
+}) {
   if (rankedByService.isEmpty || selectedMap.isEmpty) {
     return selectedMap;
   }
@@ -262,7 +270,15 @@ Map<String, String> sanitizeSelectedMap(
     }
     final groupName = smartGroupName(service);
     final current = selectedMap[groupName];
-    if (current == null || ranked.contains(current)) {
+    if (current == null) {
+      continue;
+    }
+    final qualified = qualifiedByService[service.serviceId];
+    final currentCompliant = qualified == null
+        ? ranked.contains(current)
+        : qualified.contains(current) ||
+              (qualified.isEmpty && ranked.contains(current));
+    if (currentCompliant) {
       continue;
     }
     if (identical(sanitized, selectedMap)) {

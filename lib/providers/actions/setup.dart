@@ -546,6 +546,7 @@ class SetupAction extends _$SetupAction {
         smartAnchorInput.services,
         built.rankedByService,
         selectedMap,
+        qualifiedByService: built.qualifiedByService,
       );
       final mergeSummary = built.mergeSummary;
       if (mergeSummary != null) {
