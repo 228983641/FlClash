@@ -31,6 +31,21 @@ ServiceAccessResult blocked(String proxy) {
   );
 }
 
+ServiceAccessResult verdict(
+  String proxy,
+  ServiceAccessReason reason, {
+  String? borrowedFrom,
+}) {
+  return ServiceAccessResult(
+    serviceId: 'gemini',
+    proxyName: proxy,
+    egressIp: '1.2.3.4',
+    reason: reason,
+    checkedAt: DateTime.now().millisecondsSinceEpoch,
+    borrowedFrom: borrowedFrom,
+  );
+}
+
 ServiceAccessResult staleBlocked(String proxy) {
   return ServiceAccessResult(
     serviceId: 'gemini',
@@ -170,6 +185,61 @@ void main() {
     );
     final ranked = rankedProxiesForService(input, service, ['US-1', 'SG-1']);
     expect(ranked, containsAll(['US-1', 'SG-1']));
+  });
+
+  test('split verdicts exclude their node but never blacklist its country', () {
+    for (final reason in [
+      ServiceAccessReason.ispBlocked,
+      ServiceAccessReason.restricted,
+      ServiceAccessReason.blocked,
+    ]) {
+      final input = SmartAnchorInput(
+        services: [gemini],
+        metadataByProxy: {
+          'US-1': regionMeta('US-1', 'US', 90),
+          'HK-1': regionMeta('HK-1', 'HK', 90),
+          'HK-2': regionMeta('HK-2', 'HK', 85),
+        },
+        accessByService: {
+          'gemini': {'HK-1': verdict('HK-1', reason)},
+        },
+      );
+      expect(
+        detectedUnsupportedRegions(input, 'gemini'),
+        isEmpty,
+        reason: '$reason must not become country evidence',
+      );
+      final ranked = rankedProxiesForService(input, gemini, [
+        'US-1',
+        'HK-1',
+        'HK-2',
+      ]);
+      expect(ranked, containsAll(['US-1', 'HK-2']), reason: '$reason');
+      expect(ranked, isNot(contains('HK-1')), reason: '$reason');
+    }
+  });
+
+  test('a borrowed split verdict still never derives a country', () {
+    final input = SmartAnchorInput(
+      services: [gemini],
+      metadataByProxy: {
+        'HK-1': regionMeta('HK-1', 'HK', 90),
+        'HK-2': regionMeta('HK-2', 'HK', 85),
+      },
+      accessByService: {
+        'gemini': {
+          'HK-1': verdict(
+            'HK-1',
+            ServiceAccessReason.ispBlocked,
+            borrowedFrom: 'openai',
+          ),
+        },
+      },
+    );
+    expect(detectedUnsupportedRegions(input, 'gemini'), isEmpty);
+    final ranked = rankedProxiesForService(input, gemini, ['HK-1', 'HK-2']);
+    expect(ranked, contains('HK-2'));
+    expect(ranked, isNot(contains('HK-1')));
   });
 
   test('region fields round-trip through json', () {

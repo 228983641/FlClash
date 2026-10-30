@@ -15,6 +15,10 @@ class NodeMetadataCache {
     this.ttlHours = 72,
     this.sourceCount = 1,
     this.countryDisputed = false,
+    this.adminRegion,
+    this.city,
+    this.geoConfidence,
+    this.asnConfidence,
   });
 
   final String proxyName;
@@ -32,6 +36,15 @@ class NodeMetadataCache {
   final int ttlHours;
   final int sourceCount;
   final bool countryDisputed;
+
+  /// Sub-country geography and the confidence the geo lookup earned.
+  /// All four stay null until a lookup actually reports them: records
+  /// written before these fields existed load as unknown rather than
+  /// being credited with a fabricated region, city or confidence.
+  final String? adminRegion;
+  final String? city;
+  final double? geoConfidence;
+  final double? asnConfidence;
 
   bool get isIpv6 => egressIp.contains(':');
 
@@ -62,6 +75,10 @@ class NodeMetadataCache {
     'ttlHours': ttlHours,
     'sourceCount': sourceCount,
     'countryDisputed': countryDisputed,
+    'adminRegion': adminRegion,
+    'city': city,
+    'geoConfidence': geoConfidence,
+    'asnConfidence': asnConfidence,
   };
 
   factory NodeMetadataCache.fromJson(Map<String, dynamic> json) {
@@ -81,6 +98,10 @@ class NodeMetadataCache {
       ttlHours: (json['ttlHours'] as num?)?.toInt() ?? 72,
       sourceCount: (json['sourceCount'] as num?)?.toInt() ?? 1,
       countryDisputed: json['countryDisputed'] as bool? ?? false,
+      adminRegion: json['adminRegion'] as String?,
+      city: json['city'] as String?,
+      geoConfidence: (json['geoConfidence'] as num?)?.toDouble(),
+      asnConfidence: (json['asnConfidence'] as num?)?.toDouble(),
     );
   }
 }

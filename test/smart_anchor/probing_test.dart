@@ -46,14 +46,22 @@ void main() {
       accessReasonFromStatus(ServiceProbeStatus.available),
       ServiceAccessReason.accessible,
     );
-    for (final status in [
-      ServiceProbeStatus.unsupportedRegion,
-      ServiceProbeStatus.restricted,
-      ServiceProbeStatus.disallowedIsp,
-      ServiceProbeStatus.blocked,
-    ]) {
-      expect(accessReasonFromStatus(status), ServiceAccessReason.regionBlocked);
-    }
+    expect(
+      accessReasonFromStatus(ServiceProbeStatus.unsupportedRegion),
+      ServiceAccessReason.regionBlocked,
+    );
+    expect(
+      accessReasonFromStatus(ServiceProbeStatus.restricted),
+      ServiceAccessReason.restricted,
+    );
+    expect(
+      accessReasonFromStatus(ServiceProbeStatus.disallowedIsp),
+      ServiceAccessReason.ispBlocked,
+    );
+    expect(
+      accessReasonFromStatus(ServiceProbeStatus.blocked),
+      ServiceAccessReason.blocked,
+    );
     for (final status in [
       ServiceProbeStatus.timeout,
       ServiceProbeStatus.failed,
@@ -408,7 +416,7 @@ void main() {
         expect(outcome.accessByService.containsKey('openai'), isFalse);
         expect(
           outcome.accessByService['grok']?.reason,
-          ServiceAccessReason.regionBlocked,
+          ServiceAccessReason.blocked,
         );
         expect(outcome.accessByService['grok']?.borrowedFrom, 'openai');
       },

@@ -54,10 +54,13 @@ ServiceAccessReason accessReasonFromStatus(ServiceProbeStatus status) {
     case ServiceProbeStatus.available:
       return ServiceAccessReason.accessible;
     case ServiceProbeStatus.unsupportedRegion:
-    case ServiceProbeStatus.restricted:
-    case ServiceProbeStatus.disallowedIsp:
-    case ServiceProbeStatus.blocked:
       return ServiceAccessReason.regionBlocked;
+    case ServiceProbeStatus.restricted:
+      return ServiceAccessReason.restricted;
+    case ServiceProbeStatus.disallowedIsp:
+      return ServiceAccessReason.ispBlocked;
+    case ServiceProbeStatus.blocked:
+      return ServiceAccessReason.blocked;
     case ServiceProbeStatus.timeout:
     case ServiceProbeStatus.failed:
       return ServiceAccessReason.networkFailed;

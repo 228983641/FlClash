@@ -579,7 +579,7 @@ Set<String> detectedUnsupportedRegions(
     if (country == null || country.isEmpty) {
       continue;
     }
-    if (entry.value.blocksRanking && !entry.value.isExpired) {
+    if (entry.value.derivesRegionBlock && !entry.value.isExpired) {
       blocked.add(country);
     } else if (entry.value.isAccessible && !entry.value.isExpired) {
       working.add(country);

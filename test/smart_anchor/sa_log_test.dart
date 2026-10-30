@@ -73,7 +73,8 @@ void main() {
         },
       ),
       '[SA] probe-round nodes=32 metaUpdated=5 accessible=40 '
-      'regionBlocked=3 networkFailed=0 unknown=0',
+      'regionBlocked=3 ispBlocked=0 restricted=0 blocked=0 '
+      'networkFailed=0 unknown=0',
     );
   });
 

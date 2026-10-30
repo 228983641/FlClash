@@ -82,6 +82,43 @@ void main() {
     );
   });
 
+  test('split blocking verdicts count toward failover like regionBlocked', () {
+    for (final reason in [
+      ServiceAccessReason.ispBlocked,
+      ServiceAccessReason.restricted,
+      ServiceAccessReason.blocked,
+    ]) {
+      final guard = FailoverGuard();
+      const preferred = ['A', 'B'];
+      expect(note(guard, reason: reason, preferred: preferred), isNull);
+      final target = note(
+        guard,
+        reason: reason,
+        preferred: preferred,
+        nowMs: 2000,
+      );
+      expect(target?.name, 'B', reason: '$reason');
+    }
+  });
+
+  test('never switches to a node carrying a split blocking verdict', () {
+    for (final reason in [
+      ServiceAccessReason.ispBlocked,
+      ServiceAccessReason.restricted,
+      ServiceAccessReason.blocked,
+    ]) {
+      final guard = FailoverGuard();
+      const preferred = ['A', 'B'];
+      final access = {'B': resultFor('B', reason)};
+      note(guard, preferred: preferred, accessByProxy: access);
+      expect(
+        note(guard, preferred: preferred, accessByProxy: access, nowMs: 2000),
+        isNull,
+        reason: '$reason',
+      );
+    }
+  });
+
   test('a borrowed region block does not bar a candidate', () {
     final guard = FailoverGuard();
     const preferred = ['A', 'B'];

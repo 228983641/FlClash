@@ -1,6 +1,9 @@
 enum ServiceAccessReason {
   accessible,
   regionBlocked,
+  ispBlocked,
+  restricted,
+  blocked,
   serviceDown,
   networkFailed,
   unknown,
@@ -39,7 +42,21 @@ class ServiceAccessResult {
     return ageMs > ttlHours * 3600 * 1000;
   }
 
-  bool get blocksRanking => reason == ServiceAccessReason.regionBlocked;
+  /// Whether this verdict excludes its own node from the service's
+  /// ranking. The split blocking verdicts share this node-level
+  /// consequence; they differ only in what they prove about the region.
+  bool get blocksRanking =>
+      reason == ServiceAccessReason.regionBlocked ||
+      reason == ServiceAccessReason.ispBlocked ||
+      reason == ServiceAccessReason.restricted ||
+      reason == ServiceAccessReason.blocked;
+
+  /// Whether this verdict may blacklist the node's whole country in the
+  /// derived unsupported-region set. Only a genuine region verdict is
+  /// country evidence: an ISP refusal, a service restriction or a plain
+  /// block condemns the node (or its egress), not every node sharing its
+  /// country.
+  bool get derivesRegionBlock => reason == ServiceAccessReason.regionBlocked;
 
   Map<String, dynamic> toJson() => {
     'serviceId': serviceId,

@@ -471,7 +471,7 @@ class ProxiesAction extends _$ProxiesAction {
         nowMs: nowMs,
       );
       if (currentAccess != null &&
-          (currentAccess.reason == ServiceAccessReason.regionBlocked ||
+          (currentAccess.blocksRanking ||
               currentAccess.reason == ServiceAccessReason.networkFailed)) {
         commonPrint.log(
           saFailoverCountLine(
@@ -626,7 +626,7 @@ class ProxiesAction extends _$ProxiesAction {
       if (currentAccess != null &&
           currentAccess.borrowedFrom != null &&
           !currentAccess.isExpired &&
-          currentAccess.reason == ServiceAccessReason.regionBlocked) {
+          currentAccess.blocksRanking) {
         commonPrint.log(
           saBorrowExcludeLine(
             serviceId: service.serviceId,

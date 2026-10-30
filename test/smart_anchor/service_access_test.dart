@@ -162,4 +162,87 @@ void main() {
       contains('https://api.openai.com/v1/models'),
     );
   });
+
+  test('split blocking verdicts keep the node-level ranking exclusion', () {
+    for (final reason in [
+      ServiceAccessReason.regionBlocked,
+      ServiceAccessReason.ispBlocked,
+      ServiceAccessReason.restricted,
+      ServiceAccessReason.blocked,
+    ]) {
+      expect(access('HK-01', reason).blocksRanking, isTrue, reason: '$reason');
+      final nodes = [node('HK-01', 'HK'), node('HK-02', 'HK')];
+      final verdicts = {'HK-01': access('HK-01', reason)};
+      expect(
+        ScoringEngine.filterForService(
+          nodes,
+          [],
+          verdicts,
+        ).map((n) => n.proxyName),
+        ['HK-02'],
+        reason: '$reason',
+      );
+    }
+    for (final reason in [
+      ServiceAccessReason.accessible,
+      ServiceAccessReason.serviceDown,
+      ServiceAccessReason.networkFailed,
+      ServiceAccessReason.unknown,
+    ]) {
+      expect(access('HK-01', reason).blocksRanking, isFalse, reason: '$reason');
+    }
+  });
+
+  test('only a genuine region verdict is country-level evidence', () {
+    expect(
+      access('HK-01', ServiceAccessReason.regionBlocked).derivesRegionBlock,
+      isTrue,
+    );
+    for (final reason in [
+      ServiceAccessReason.accessible,
+      ServiceAccessReason.ispBlocked,
+      ServiceAccessReason.restricted,
+      ServiceAccessReason.blocked,
+      ServiceAccessReason.serviceDown,
+      ServiceAccessReason.networkFailed,
+      ServiceAccessReason.unknown,
+    ]) {
+      expect(
+        access('HK-01', reason).derivesRegionBlock,
+        isFalse,
+        reason: '$reason',
+      );
+    }
+  });
+
+  test('access results round-trip the split reasons through json', () {
+    for (final reason in ServiceAccessReason.values) {
+      final restored = ServiceAccessResult.fromJson(
+        access('HK-01', reason).toJson(),
+      );
+      expect(restored.reason, reason, reason: '$reason');
+      expect(restored.serviceId, 'gemini');
+    }
+  });
+
+  test('legacy access json with pre-split reason names still loads', () {
+    for (final name in [
+      'accessible',
+      'regionBlocked',
+      'serviceDown',
+      'networkFailed',
+      'unknown',
+    ]) {
+      final restored = ServiceAccessResult.fromJson({
+        'serviceId': 'gemini',
+        'proxyName': 'HK-01',
+        'egressIp': '1.2.3.4',
+        'reason': name,
+        'checkedAt': 1700000000000,
+        'ttlHours': 24,
+        'borrowedFrom': null,
+      });
+      expect(restored.reason.name, name, reason: name);
+    }
+  });
 }

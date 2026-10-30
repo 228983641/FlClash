@@ -40,6 +40,22 @@ void main() {
     );
   });
 
+  test(
+    'restriction defaults follow lock participation and are never strict',
+    () {
+      for (final service in defaultServiceToggles) {
+        final expected = service.lockedCountries.isEmpty
+            ? ServiceRestrictionMode.unrestricted
+            : ServiceRestrictionMode.relaxed;
+        expect(
+          service.restrictionMode,
+          expected,
+          reason: '${service.serviceId} should default to $expected',
+        );
+      }
+    },
+  );
+
   test('provider build uses the preset defaults', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);

@@ -125,6 +125,9 @@ class _SmartAnchorServiceEditViewState
             officialName: existing?.officialName ?? '',
             regionMode: existing?.regionMode ?? 'blacklist',
             regionCountries: existing?.regionCountries ?? const [],
+            restrictionMode:
+                existing?.restrictionMode ??
+                defaultServiceRestrictionMode(countries),
           ),
         );
     if (lockChanged) {

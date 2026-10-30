@@ -79,6 +79,9 @@ String saProbeRoundLine({
   return '[SA] probe-round nodes=$nodes metaUpdated=$metaUpdated '
       'accessible=${count(ServiceAccessReason.accessible)} '
       'regionBlocked=${count(ServiceAccessReason.regionBlocked)} '
+      'ispBlocked=${count(ServiceAccessReason.ispBlocked)} '
+      'restricted=${count(ServiceAccessReason.restricted)} '
+      'blocked=${count(ServiceAccessReason.blocked)} '
       'networkFailed=${count(ServiceAccessReason.networkFailed)} '
       'unknown=${count(ServiceAccessReason.unknown)}';
 }

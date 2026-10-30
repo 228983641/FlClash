@@ -91,7 +91,7 @@ class FailoverGuard {
         final candidateAccess = accessByProxy[name];
         if (candidateAccess != null &&
             candidateAccess.borrowedFrom == null &&
-            candidateAccess.reason == ServiceAccessReason.regionBlocked) {
+            candidateAccess.blocksRanking) {
           continue;
         }
         _switchTimes[serviceId] = [...recent, nowMs];

@@ -1,3 +1,35 @@
+/// How strictly a service's country lock treats nodes whose country is
+/// not (yet) known. Recorded per service from this batch on; the decision
+/// paths that consume it land in later batches.
+enum ServiceRestrictionMode { unrestricted, strict, relaxed }
+
+/// The mode a service gets when no mode was ever recorded for it: a
+/// service taking part in the country lock defaults to relaxed — the
+/// standing product decision that an unknown-country node stays a logged
+/// last resort — and a service with no lock is unrestricted. Strict is
+/// only ever an explicit choice, never a default.
+ServiceRestrictionMode defaultServiceRestrictionMode(
+  List<String> lockedCountries,
+) {
+  return lockedCountries.isEmpty
+      ? ServiceRestrictionMode.unrestricted
+      : ServiceRestrictionMode.relaxed;
+}
+
+ServiceRestrictionMode _restrictionModeFromJson(
+  Object? raw,
+  List<String> lockedCountries,
+) {
+  if (raw is String) {
+    for (final mode in ServiceRestrictionMode.values) {
+      if (mode.name == raw) {
+        return mode;
+      }
+    }
+  }
+  return defaultServiceRestrictionMode(lockedCountries);
+}
+
 class ServiceToggleConfig {
   const ServiceToggleConfig({
     required this.serviceId,
@@ -10,6 +42,7 @@ class ServiceToggleConfig {
     this.officialName = '',
     this.regionMode = 'blacklist',
     this.regionCountries = const [],
+    this.restrictionMode = ServiceRestrictionMode.relaxed,
   });
 
   final String serviceId;
@@ -30,6 +63,10 @@ class ServiceToggleConfig {
 
   /// Regions (country codes) checked in the region filter.
   final List<String> regionCountries;
+
+  /// Region restriction strictness for this service. Stored so later
+  /// batches can route decisions on it; nothing consumes it yet.
+  final ServiceRestrictionMode restrictionMode;
 
   String get groupLabel => officialName.isEmpty ? displayName : officialName;
 
@@ -58,6 +95,7 @@ class ServiceToggleConfig {
     List<String>? targetCountries,
     String? regionMode,
     List<String>? regionCountries,
+    ServiceRestrictionMode? restrictionMode,
   }) {
     return ServiceToggleConfig(
       serviceId: serviceId,
@@ -70,6 +108,7 @@ class ServiceToggleConfig {
       officialName: officialName,
       regionMode: regionMode ?? this.regionMode,
       regionCountries: regionCountries ?? this.regionCountries,
+      restrictionMode: restrictionMode ?? this.restrictionMode,
     );
   }
 
@@ -84,6 +123,7 @@ class ServiceToggleConfig {
     'officialName': officialName,
     'regionMode': regionMode,
     'regionCountries': regionCountries,
+    'restrictionMode': restrictionMode.name,
   };
 
   factory ServiceToggleConfig.fromJson(Map<String, dynamic> json) {
@@ -95,19 +135,27 @@ class ServiceToggleConfig {
     final regionList = regionRaw is List
         ? [for (final country in regionRaw) country.toString()]
         : const <String>[];
+    final targetCountry = countryList.isNotEmpty
+        ? countryList.first
+        : (json['targetCountry'] as String? ?? '');
+    final locked = countryList.isNotEmpty
+        ? countryList
+        : [if (targetCountry.trim().isNotEmpty) targetCountry];
     return ServiceToggleConfig(
       serviceId: json['serviceId'] as String,
       displayName: json['displayName'] as String,
       isEnabled: json['isEnabled'] as bool,
-      targetCountry: countryList.isNotEmpty
-          ? countryList.first
-          : (json['targetCountry'] as String? ?? ''),
+      targetCountry: targetCountry,
       matchRules: List<String>.from(json['matchRules'] as List),
       dnsDomains: List<String>.from(json['dnsDomains'] as List),
       targetCountries: countryList,
       officialName: json['officialName'] as String? ?? '',
       regionMode: json['regionMode'] as String? ?? 'blacklist',
       regionCountries: regionList,
+      restrictionMode: _restrictionModeFromJson(
+        json['restrictionMode'],
+        locked,
+      ),
     );
   }
 }
@@ -198,6 +246,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
     officialName: 'Google',
     isEnabled: true,
     targetCountry: '',
+    restrictionMode: ServiceRestrictionMode.unrestricted,
     matchRules: ['GEOSITE,google'],
     dnsDomains: ['google.com'],
   ),
@@ -206,6 +255,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
     displayName: 'YouTube',
     isEnabled: true,
     targetCountry: '',
+    restrictionMode: ServiceRestrictionMode.unrestricted,
     matchRules: ['GEOSITE,youtube'],
     dnsDomains: ['youtube.com', 'youtu.be'],
   ),
@@ -215,6 +265,7 @@ const List<ServiceToggleConfig> defaultServiceToggles = [
     officialName: 'X',
     isEnabled: true,
     targetCountry: '',
+    restrictionMode: ServiceRestrictionMode.unrestricted,
     matchRules: ['GEOSITE,twitter'],
     dnsDomains: ['x.com', 'twitter.com'],
   ),
