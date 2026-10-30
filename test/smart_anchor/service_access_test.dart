@@ -109,20 +109,42 @@ void main() {
     },
   );
 
-  test(
-    'outage guard suppresses failover only after repeated service downs',
-    () {
-      final guard = ServiceOutageGuard();
-      expect(guard.suspectedOutage, false);
-      guard.recordFailure(ServiceAccessReason.serviceDown, 1000);
-      guard.recordFailure(ServiceAccessReason.serviceDown, 2000);
-      expect(guard.suspectedOutage, false);
-      guard.recordFailure(ServiceAccessReason.regionBlocked, 3000);
-      expect(guard.suspectedOutage, false);
-      guard.recordFailure(ServiceAccessReason.serviceDown, 4000);
-      expect(guard.suspectedOutage, true);
-    },
-  );
+  test('service outage needs three distinct fresh service-down verdicts', () {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    ServiceAccessResult down(String proxy, {int agoMs = 0, String? borrowed}) {
+      return ServiceAccessResult(
+        serviceId: 'gemini',
+        proxyName: proxy,
+        egressIp: '1.2.3.4',
+        reason: ServiceAccessReason.serviceDown,
+        checkedAt: now - agoMs,
+        borrowedFrom: borrowed,
+      );
+    }
+
+    final two = {'HK-01': down('HK-01'), 'HK-02': down('HK-02')};
+    expect(serviceOutageEvidenceCount(two, now), 2);
+    expect(serviceOutageSuspected(two, now), isFalse);
+    final three = {...two, 'HK-03': down('HK-03')};
+    expect(serviceOutageEvidenceCount(three, now), 3);
+    expect(serviceOutageSuspected(three, now), isTrue);
+    // A region verdict is not outage evidence.
+    final mixed = {
+      ...two,
+      'HK-03': access('HK-03', ServiceAccessReason.regionBlocked),
+    };
+    expect(serviceOutageSuspected(mixed, now), isFalse);
+    // A borrowed verdict is the donor's measurement, not this
+    // service's third node.
+    final borrowedThird = {...two, 'HK-03': down('HK-03', borrowed: 'x')};
+    expect(serviceOutageSuspected(borrowedThird, now), isFalse);
+    // Verdicts older than the five-minute window no longer count.
+    final staleThird = {
+      ...two,
+      'HK-03': down('HK-03', agoMs: serviceOutageWindowMs + 1000),
+    };
+    expect(serviceOutageSuspected(staleThird, now), isFalse);
+  });
 
   test('trust tiers and leak diagnostics', () {
     expect(ScoringEngine.trustTier(85), 'safe');

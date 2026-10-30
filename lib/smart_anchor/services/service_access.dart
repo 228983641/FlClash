@@ -194,34 +194,39 @@ ServiceAccessReason classifyProbeResponse({
   return ServiceAccessReason.unknown;
 }
 
-class ServiceOutageGuard {
-  ServiceOutageGuard({this.threshold = 3, this.windowMs = 5 * 60 * 1000});
+/// Distinct nodes of one service reporting [ServiceAccessReason.serviceDown]
+/// inside the window before the failures read as the service's own
+/// outage rather than its nodes' faults. The threshold and window keep
+/// the values the retired stateful guard used; counting distinct nodes
+/// in the caller's snapshot is stricter than counting repeated events,
+/// because one node re-reporting cannot manufacture an outage.
+const int serviceOutageThreshold = 3;
+const int serviceOutageWindowMs = 5 * 60 * 1000;
 
-  final int threshold;
-  final int windowMs;
-  final List<int> _serviceDownAt = [];
-  bool _officialOutage = false;
-
-  void noteOfficialOutage() {
-    _officialOutage = true;
-  }
-
-  bool get officialOutage => _officialOutage;
-
-  bool get shouldNotBlameNodes => suspectedOutage || _officialOutage;
-
-  void recordFailure(ServiceAccessReason reason, int nowMs) {
-    if (reason != ServiceAccessReason.serviceDown) {
-      return;
+int serviceOutageEvidenceCount(
+  Map<String, ServiceAccessResult> accessByProxy,
+  int nowMs,
+) {
+  var count = 0;
+  for (final verdict in accessByProxy.values) {
+    if (verdict.reason != ServiceAccessReason.serviceDown) {
+      continue;
     }
-    _serviceDownAt.add(nowMs);
-    _serviceDownAt.removeWhere((at) => nowMs - at > windowMs);
+    if (verdict.borrowedFrom != null || verdict.isExpired) {
+      continue;
+    }
+    if (nowMs - verdict.checkedAt > serviceOutageWindowMs) {
+      continue;
+    }
+    count++;
   }
+  return count;
+}
 
-  bool get suspectedOutage => _serviceDownAt.length >= threshold;
-
-  void reset() {
-    _serviceDownAt.clear();
-    _officialOutage = false;
-  }
+bool serviceOutageSuspected(
+  Map<String, ServiceAccessResult> accessByProxy,
+  int nowMs,
+) {
+  return serviceOutageEvidenceCount(accessByProxy, nowMs) >=
+      serviceOutageThreshold;
 }

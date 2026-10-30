@@ -120,6 +120,34 @@ void main() {
     expect(target, 'unprobed');
   });
 
+  test('known violator with several unknown fallbacks takes the decision '
+      'fallback head, not pool order', () {
+    final input = inputWith({'TW-1': meta('TW-1', 'TW', 100)});
+    final decision = lockReselectDecision(input, usLocked, [
+      'TW-1',
+      'zz-unknown',
+      'aa-unknown',
+    ], 'TW-1');
+    expect(decision.target, 'aa-unknown');
+    expect(decision.decision.target, 'aa-unknown');
+    expect(decision.decision.tier, isNotNull);
+    expect(decision.ranked, decision.decision.ordered);
+  });
+
+  test('decision carries the compliance verdict for a healthy current', () {
+    final input = inputWith({
+      'US-1': meta('US-1', 'US', 90),
+      'US-2': meta('US-2', 'US', 80),
+    });
+    final decision = lockReselectDecision(input, usLocked, [
+      'US-1',
+      'US-2',
+    ], 'US-2');
+    expect(decision.target, isNull);
+    expect(decision.decision.target, 'US-2');
+    expect(decision.decision.isCompliant('US-2'), isTrue);
+  });
+
   test('no compliant or unprobed node keeps the current selection', () {
     final input = inputWith({
       'TW-1': meta('TW-1', 'TW', 100),

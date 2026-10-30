@@ -277,6 +277,7 @@ class ProxiesAction extends _$ProxiesAction {
 
   final FailoverGuard _failoverGuard = FailoverGuard();
   final Set<String> _failoverFrozenLogged = {};
+  final Set<String> _serviceOutageLogged = {};
   bool _smartAnchorAutoDelayTesting = false;
 
   @visibleForTesting
@@ -438,21 +439,6 @@ class ProxiesAction extends _$ProxiesAction {
       // nodes elsewhere in the Core keep bare names), and the Core
       // refuses a switch to any name that is not a member of the group.
       final names = _memberNamesOf(group, groupNames);
-      final ranked = rankedProxiesForService(
-        smart,
-        service,
-        names,
-        delays: delays,
-      );
-      final preferred = <String>[];
-      final fallback = <String>[];
-      for (final name in ranked) {
-        if (smart.metadataByProxy.containsKey(name)) {
-          preferred.add(name);
-        } else {
-          fallback.add(name);
-        }
-      }
       // A borrowed verdict is another service's measurement; it must
       // never count as this service's node failing.
       final currentAccess =
@@ -461,13 +447,39 @@ class ProxiesAction extends _$ProxiesAction {
           currentAccess != null && currentAccess.borrowedFrom == null
           ? currentAccess.reason
           : null;
-      final target = _failoverGuard.noteResult(
+      final accessByProxy =
+          smart.accessByService[service.serviceId] ?? const {};
+      final outageCount = serviceOutageEvidenceCount(accessByProxy, nowMs);
+      final outageSuspected = outageCount >= serviceOutageThreshold;
+      if (outageSuspected) {
+        if (_serviceOutageLogged.add(service.serviceId)) {
+          commonPrint.log(
+            saServiceOutageLine(
+              serviceId: service.serviceId,
+              evidenceCount: outageCount,
+              windowMs: serviceOutageWindowMs,
+            ),
+          );
+        }
+      } else {
+        _serviceOutageLogged.remove(service.serviceId);
+      }
+      // The guard decides only when to switch; the target is the
+      // unified decision's, computed from the same inputs the build
+      // and the compliance check consume.
+      final decision = decideForRuntimeFailover(
+        smart,
+        service,
+        names,
+        currentName: currentName,
+        delays: delays,
+        serviceOutageSuspected: outageSuspected,
+      );
+      final target = _failoverGuard.noteDecisionResult(
         serviceId: service.serviceId,
         currentName: currentName,
         reason: currentReason,
-        preferred: preferred,
-        fallback: fallback,
-        accessByProxy: smart.accessByService[service.serviceId] ?? const {},
+        decision: decision,
         nowMs: nowMs,
       );
       if (currentAccess != null &&
@@ -531,6 +543,14 @@ class ProxiesAction extends _$ProxiesAction {
             to: next,
             reason: switchReason,
             isFallback: target.isFallback,
+            tier: target.tier?.label,
+            failureCount: _failoverGuard.lastCountedFailures,
+            decisionExplanation: decision.explanation,
+            cooldownUntilMs: _failoverGuard.cooldownUntilMs(service.serviceId),
+            switchesInWindow: _failoverGuard.switchesInWindow(
+              service.serviceId,
+              nowMs,
+            ),
           ),
         );
         ref
@@ -644,6 +664,7 @@ class ProxiesAction extends _$ProxiesAction {
           target: target,
           currentUnknown: decision.currentUnknown,
           rankedTop: decision.ranked.take(3).toList(),
+          decisionExplanation: decision.decision.explanation,
         ),
       );
       ref

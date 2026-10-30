@@ -900,16 +900,72 @@ String? lockReselectTarget(
   ).target;
 }
 
-/// [lockReselectTarget] plus the ranking it decided from, so the runtime
-/// compliance check can log (and membership-check) the same decision the
-/// setup-time sanitizer makes through [lockReselectTarget].
+/// One runtime decision for [service] over [proxyNames]: the merged
+/// name remap and the shared-lock anchor stand-in the build path
+/// applies, then the unified decider. The lock compliance check and
+/// the failover check both consume decisions from here, so a runtime
+/// verdict can never drift from the build-time one [sanitizeSelectedMap]
+/// makes through the same composition.
+CandidateDecision _decideForRuntime(
+  SmartAnchorInput input,
+  ServiceToggleConfig service,
+  List<String> proxyNames, {
+  String? currentName,
+  Map<String, int> delays = const {},
+  CandidateDecisionTrigger trigger = CandidateDecisionTrigger.initialSelection,
+  bool serviceOutageSuspected = false,
+}) {
+  final effective = _remapInputForMergedConfig(input, proxyNames);
+  return decideForService(
+    _inputWithSharedAnchor(effective, service, proxyNames, delays),
+    service,
+    proxyNames,
+    currentName: currentName,
+    delays: delays,
+    trigger: trigger,
+    serviceOutageSuspected: serviceOutageSuspected,
+  );
+}
+
+/// The decision the runtime failover check consumes for [service]:
+/// [_decideForRuntime] under the failure trigger, with the caller's
+/// service-outage verdict riding on the decision.
+CandidateDecision decideForRuntimeFailover(
+  SmartAnchorInput input,
+  ServiceToggleConfig service,
+  List<String> proxyNames, {
+  required String currentName,
+  Map<String, int> delays = const {},
+  bool serviceOutageSuspected = false,
+}) {
+  return _decideForRuntime(
+    input,
+    service,
+    proxyNames,
+    currentName: currentName,
+    delays: delays,
+    trigger: CandidateDecisionTrigger.failure,
+    serviceOutageSuspected: serviceOutageSuspected,
+  );
+}
+
+/// [lockReselectTarget] plus the decision it was taken from, so the
+/// runtime compliance check can log (and membership-check) the same
+/// decision the setup-time sanitizer makes.
 ///
-/// A selection complies only inside the ranking's qualified segment: an
-/// untested selection appears in the merged ranking as fallback pool,
-/// which used to count as compliance and pinned services on nodes whose
-/// country was never known. It now yields to any known qualified node
-/// and stays only while none is known.
-({String? target, List<String> ranked, bool currentUnknown})
+/// A selection complies only when the unified decision keeps it at
+/// tier L0 — qualified, or retained by the purity hysteresis band the
+/// decider applies to the current node alone. Anything else moves to
+/// the decision's target: a qualified node when one is known, else
+/// (relaxed mode) the fallback head. An unknown selection the decision
+/// itself keeps as its fallback target stays, exactly as the
+/// sanitizer keeps it.
+({
+  String? target,
+  List<String> ranked,
+  bool currentUnknown,
+  CandidateDecision decision,
+})
 lockReselectDecision(
   SmartAnchorInput input,
   ServiceToggleConfig service,
@@ -917,52 +973,23 @@ lockReselectDecision(
   String currentName, {
   Map<String, int> delays = const {},
 }) {
-  final parts = _rankedPartsForService(
+  final decision = _decideForRuntime(
     input,
     service,
     proxyNames,
+    currentName: currentName,
     delays: delays,
+    trigger: CandidateDecisionTrigger.regionRestriction,
   );
-  final ranked = parts.ranked;
-  final qualified = parts.qualified;
-  final effective = _remapInputForMergedConfig(input, proxyNames);
-  final currentMeta = effective.metadataByProxy[currentName];
-  final currentUnknown = currentMeta == null;
-  // Purity hysteresis: a current node whose only disqualification is a
-  // purity score inside the band stays — re-probe noise around the
-  // threshold must not tear a working service off its node. Every other
-  // disqualification (lock, WAF, region block, region filter) still
-  // forces the move.
-  if (currentMeta != null &&
-      applyRegionFilter(effective, service, [currentName]).isNotEmpty &&
-      ScoringEngine.failsOnlyPurityWithinBand(
-        currentMeta,
-        service.lockedCountries,
-        effective.accessByService[service.serviceId]?[currentName],
-      )) {
-    return (target: null, ranked: ranked, currentUnknown: currentUnknown);
-  }
-  if (qualified.contains(currentName)) {
-    return (target: null, ranked: ranked, currentUnknown: currentUnknown);
-  }
-  if (currentUnknown) {
-    return (
-      target: qualified.isEmpty ? null : qualified.first,
-      ranked: ranked,
-      currentUnknown: currentUnknown,
-    );
-  }
-  if (qualified.isNotEmpty) {
-    return (
-      target: qualified.first,
-      ranked: ranked,
-      currentUnknown: currentUnknown,
-    );
-  }
+  final compliant = decision.assessments[currentName]?.tier == RouteTier.l0;
+  final offered = decision.target;
   return (
-    target: ranked.isEmpty ? null : ranked.first,
-    ranked: ranked,
-    currentUnknown: currentUnknown,
+    target: compliant || offered == null || offered == currentName
+        ? null
+        : offered,
+    ranked: decision.ordered,
+    currentUnknown: decision.currentUnknown,
+    decision: decision,
   );
 }
 

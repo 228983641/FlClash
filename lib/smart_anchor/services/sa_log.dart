@@ -13,10 +13,16 @@ String saComplianceDecisionLine({
   required String target,
   required bool currentUnknown,
   required List<String> rankedTop,
+  String? decisionExplanation,
 }) {
-  return '[SA] compliance service=$serviceId group=$groupName '
+  final line =
+      '[SA] compliance service=$serviceId group=$groupName '
       'current=$currentName -> $target reason=lock-change '
       'currentUnknown=$currentUnknown rankedTop=${rankedTop.join(',')}';
+  if (decisionExplanation == null) {
+    return line;
+  }
+  return '$line decision=$decisionExplanation';
 }
 
 String saComplianceSummaryLine({
@@ -55,9 +61,41 @@ String saFailoverSwitchLine({
   required String to,
   required String reason,
   required bool isFallback,
+  String? tier,
+  int? failureCount,
+  String? decisionExplanation,
+  int? cooldownUntilMs,
+  int? switchesInWindow,
 }) {
-  return '[SA] failover-switch service=$serviceId from=$from to=$to '
-      'reason=$reason fallback=$isFallback';
+  final buffer = StringBuffer(
+    '[SA] failover-switch service=$serviceId from=$from to=$to '
+    'reason=$reason fallback=$isFallback',
+  );
+  if (tier != null) {
+    buffer.write(' tier=$tier');
+  }
+  if (failureCount != null) {
+    buffer.write(' failures=$failureCount');
+  }
+  if (switchesInWindow != null) {
+    buffer.write(' switchesInWindow=$switchesInWindow');
+  }
+  if (cooldownUntilMs != null) {
+    buffer.write(' cooldownUntil=$cooldownUntilMs');
+  }
+  if (decisionExplanation != null) {
+    buffer.write(' decision=$decisionExplanation');
+  }
+  return buffer.toString();
+}
+
+String saServiceOutageLine({
+  required String serviceId,
+  required int evidenceCount,
+  required int windowMs,
+}) {
+  return '[SA] service-outage service=$serviceId evidence=$evidenceCount '
+      'windowMs=$windowMs action=hold-current';
 }
 
 String saSwitchFailedLine({

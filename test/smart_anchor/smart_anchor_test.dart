@@ -3,7 +3,6 @@ import 'package:fl_clash/smart_anchor/models/service_anchor.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
 import 'package:fl_clash/smart_anchor/services/config_injector.dart';
 import 'package:fl_clash/smart_anchor/services/scoring_engine.dart';
-import 'package:fl_clash/smart_anchor/services/sticky_monitor.dart';
 import 'package:fl_clash/smart_anchor/services/subscription_merger.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -142,36 +141,6 @@ void main() {
       expect(ScoringEngine.purityCompressed(90), 9.6);
       expect(ScoringEngine.purityCompressed(100), 12);
       expect(ScoringEngine.purityCompressed(30), 0);
-    });
-  });
-
-  group('StickyMonitor', () {
-    test('one failure holds, two failures advance once, never back', () {
-      final monitor = StickyMonitor(ranked: ['a', 'b', 'c']);
-      expect(monitor.recordProbe(success: false, nowMs: 0), isNull);
-      expect(monitor.recordProbe(success: false, nowMs: 1000), 'b');
-      expect(monitor.current, 'b');
-      expect(monitor.recordProbe(success: true, nowMs: 2000), isNull);
-      expect(monitor.recordProbe(success: false, nowMs: 3000), isNull);
-      expect(monitor.recordProbe(success: false, nowMs: 4000), 'c');
-    });
-
-    test('three switches in ten minutes freeze anchor updates', () {
-      final monitor = StickyMonitor(ranked: ['a', 'b', 'c', 'd', 'e']);
-      for (var i = 0; i < 3; i++) {
-        monitor.recordProbe(success: false, nowMs: i * 1000);
-        monitor.recordProbe(success: false, nowMs: i * 1000 + 500);
-      }
-      expect(monitor.anchorFrozen, isTrue);
-      expect(monitor.shouldConfirmAnchor(20 * 60 * 1000), isFalse);
-    });
-
-    test('anchor confirms only after ten stable minutes', () {
-      final monitor = StickyMonitor(ranked: ['a', 'b']);
-      monitor.recordProbe(success: false, nowMs: 0);
-      monitor.recordProbe(success: false, nowMs: 1000);
-      expect(monitor.shouldConfirmAnchor(9 * 60 * 1000), isFalse);
-      expect(monitor.shouldConfirmAnchor(11 * 60 * 1000), isTrue);
     });
   });
 

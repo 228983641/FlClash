@@ -1,3 +1,6 @@
+import 'package:fl_clash/smart_anchor/models/node_metadata.dart';
+import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
+import 'package:fl_clash/smart_anchor/services/candidate_decision.dart';
 import 'package:fl_clash/smart_anchor/services/service_access.dart';
 import 'package:fl_clash/smart_anchor/services/sticky_monitor.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,6 +31,66 @@ FailoverTarget? note(
     preferred: preferred,
     fallback: fallback,
     accessByProxy: accessByProxy,
+    nowMs: nowMs,
+  );
+}
+
+NodeMetadataCache metaFor(
+  String name, {
+  String ip = '10.0.0.9',
+  String asn = 'AS200',
+  double purity = 80,
+}) {
+  return NodeMetadataCache(
+    proxyName: name,
+    entryServer: '',
+    egressIp: ip,
+    countryCode: 'US',
+    latitude: 37.0,
+    longitude: -122.0,
+    asn: asn,
+    ipType: 'residential',
+    fraudScore: 0,
+    purityScore: purity,
+    wafPass: true,
+    updatedAt: 0,
+  );
+}
+
+CandidateDecision decisionFor({
+  required List<String> names,
+  required Map<String, NodeMetadataCache> metadata,
+  Map<String, ServiceAccessResult> access = const {},
+  String? current,
+  bool outage = false,
+}) {
+  return decideCandidates(
+    CandidateDecisionInput(
+      serviceId: 'youtube',
+      restrictionMode: ServiceRestrictionMode.relaxed,
+      lockedCountries: const ['US'],
+      candidateNames: names,
+      metadataByProxy: metadata,
+      accessByProxy: access,
+      currentName: current,
+      trigger: CandidateDecisionTrigger.failure,
+      serviceOutageSuspected: outage,
+    ),
+  );
+}
+
+FailoverTarget? noteDecision(
+  FailoverGuard guard, {
+  required CandidateDecision decision,
+  String currentName = 'A',
+  ServiceAccessReason? reason = ServiceAccessReason.networkFailed,
+  int nowMs = 1000,
+}) {
+  return guard.noteDecisionResult(
+    serviceId: 'youtube',
+    currentName: currentName,
+    reason: reason,
+    decision: decision,
     nowMs: nowMs,
   );
 }
@@ -156,14 +219,16 @@ void main() {
     const preferred = ['A', 'B', 'C', 'D', 'E'];
     var current = 'A';
     var switches = 0;
-    for (var cycle = 0; cycle < 8; cycle++) {
+    // Cycles are spaced past the post-switch cooldown (2 minutes) so the
+    // limit being exercised here is the freeze, not the cooldown.
+    for (var cycle = 0; cycle < 4; cycle++) {
       FailoverTarget? target;
       for (var attempt = 0; attempt < 2; attempt++) {
         target = note(
           guard,
           currentName: current,
           preferred: preferred,
-          nowMs: 1000 + cycle * 1000,
+          nowMs: 1000 + cycle * 121000 + attempt * 1000,
         );
       }
       if (target != null) {
@@ -172,6 +237,7 @@ void main() {
       }
     }
     expect(switches, 3);
+    expect(guard.isFrozen('youtube', 1000 + 3 * 121000 + 1000), isTrue);
   });
 
   test('a service outage never counts as a node failure', () {
@@ -272,17 +338,189 @@ void main() {
           guard,
           currentName: current,
           preferred: preferred,
-          nowMs: 1000 + cycle * 1000,
+          nowMs: 1000 + cycle * 121000 + attempt * 1000,
         );
       }
       current = target!.name;
     }
-    // Switches landed at 1000, 2000, 3000 per the helper's second call.
-    expect(guard.isFrozen('youtube', 3000), isTrue);
-    expect(guard.frozenUntilMs('youtube', 3000), 1000 + 10 * 60 * 1000);
-    expect(guard.isFrozen('youtube', 1000 + 10 * 60 * 1000 + 1), isFalse);
-    expect(guard.frozenUntilMs('youtube', 1000 + 10 * 60 * 1000 + 1), isNull);
-    expect(guard.isFrozen('claude', 3000), isFalse);
+    // Switches landed at 2000, 123000, 244000 (each cycle's second call,
+    // spaced past the post-switch cooldown).
+    expect(guard.isFrozen('youtube', 244000), isTrue);
+    expect(guard.frozenUntilMs('youtube', 244000), 2000 + 10 * 60 * 1000);
+    expect(guard.isFrozen('youtube', 2000 + 10 * 60 * 1000 + 1), isFalse);
+    expect(guard.frozenUntilMs('youtube', 2000 + 10 * 60 * 1000 + 1), isNull);
+    expect(guard.isFrozen('claude', 244000), isFalse);
+  });
+
+  group('decision-driven targets', () {
+    test('the target is the decision target, tier before total score', () {
+      final guard = FailoverGuard();
+      final decision = decisionFor(
+        names: ['A', 'B', 'C'],
+        metadata: {
+          'A': metaFor('A', ip: '10.0.0.5', asn: 'AS100', purity: 90),
+          'B': metaFor('B', ip: '10.0.0.9', asn: 'AS200', purity: 55),
+          'C': metaFor('C', ip: '10.9.0.1', asn: 'AS300', purity: 100),
+        },
+        access: {'A': resultFor('A', ServiceAccessReason.regionBlocked)},
+        current: 'A',
+      );
+      expect(decision.target, 'B');
+      expect(noteDecision(guard, decision: decision), isNull);
+      final target = noteDecision(guard, decision: decision, nowMs: 2000);
+      expect(target?.name, decision.target);
+      expect(target?.name, 'B');
+      expect(target?.tier, RouteTier.l1);
+      expect(target?.isFallback, isFalse);
+    });
+
+    test('an unknown-country target is flagged as the L7 fallback', () {
+      final guard = FailoverGuard();
+      final decision = decisionFor(
+        names: ['A', 'mystery'],
+        metadata: {'A': metaFor('A', ip: '10.0.0.5', asn: 'AS100')},
+        access: {'A': resultFor('A', ServiceAccessReason.regionBlocked)},
+        current: 'A',
+      );
+      expect(decision.target, 'mystery');
+      expect(noteDecision(guard, decision: decision), isNull);
+      final target = noteDecision(guard, decision: decision, nowMs: 2000);
+      expect(target?.name, 'mystery');
+      expect(target?.isFallback, isTrue);
+      expect(target?.tier, RouteTier.l7);
+    });
+
+    test('a suspected service outage never counts as a node failure', () {
+      final guard = FailoverGuard();
+      final metadata = {
+        'A': metaFor('A', ip: '10.0.0.5', asn: 'AS100'),
+        'B': metaFor('B'),
+      };
+      final outageDecision = decisionFor(
+        names: ['A', 'B'],
+        metadata: metadata,
+        current: 'A',
+        outage: true,
+      );
+      expect(
+        noteDecision(guard, decision: outageDecision, nowMs: 1000),
+        isNull,
+      );
+      expect(
+        noteDecision(guard, decision: outageDecision, nowMs: 2000),
+        isNull,
+      );
+      expect(guard.lastCountedFailures, 0);
+      final clearDecision = decisionFor(
+        names: ['A', 'B'],
+        metadata: metadata,
+        current: 'A',
+      );
+      expect(noteDecision(guard, decision: clearDecision, nowMs: 3000), isNull);
+      expect(
+        noteDecision(guard, decision: clearDecision, nowMs: 4000)?.name,
+        'B',
+      );
+    });
+
+    test('cooldown blocks consecutive switches and any switch-back', () {
+      final guard = FailoverGuard();
+      final metadata = {
+        'A': metaFor('A', ip: '10.0.0.5', asn: 'AS100', purity: 90),
+        'B': metaFor('B', ip: '10.0.0.9', asn: 'AS200', purity: 80),
+        'C': metaFor('C', ip: '10.9.0.1', asn: 'AS300', purity: 70),
+      };
+      final fromA = decisionFor(
+        names: ['A', 'B', 'C'],
+        metadata: metadata,
+        access: {'A': resultFor('A', ServiceAccessReason.regionBlocked)},
+        current: 'A',
+      );
+      expect(noteDecision(guard, decision: fromA, nowMs: 9000), isNull);
+      final first = noteDecision(guard, decision: fromA, nowMs: 10000);
+      expect(first?.name, 'B');
+      expect(guard.isCoolingDown('youtube', 10000), isTrue);
+      expect(
+        guard.cooldownUntilMs('youtube'),
+        10000 + FailoverGuard.switchCooldownMs,
+      );
+      // B now fails with A (recovered) as the decision's best alternative:
+      // inside the cooldown the guard neither switches on nor back.
+      final fromB = decisionFor(
+        names: ['B', 'A', 'C'],
+        metadata: metadata,
+        access: {'B': resultFor('B', ServiceAccessReason.regionBlocked)},
+        current: 'B',
+      );
+      expect(
+        noteDecision(guard, decision: fromB, currentName: 'B', nowMs: 40000),
+        isNull,
+      );
+      expect(
+        noteDecision(guard, decision: fromB, currentName: 'B', nowMs: 70000),
+        isNull,
+      );
+      expect(guard.switchesInWindow('youtube', 70000), 1);
+    });
+
+    test('after the cooldown, reconfirmed failure may re-choose the '
+        'recovered node, but recovery alone never does', () {
+      final guard = FailoverGuard();
+      final metadata = {
+        'A': metaFor('A', ip: '10.0.0.5', asn: 'AS100', purity: 90),
+        'B': metaFor('B', ip: '10.0.0.9', asn: 'AS200', purity: 80),
+      };
+      final fromA = decisionFor(
+        names: ['A', 'B'],
+        metadata: metadata,
+        access: {'A': resultFor('A', ServiceAccessReason.regionBlocked)},
+        current: 'A',
+      );
+      expect(noteDecision(guard, decision: fromA, nowMs: 9000), isNull);
+      expect(noteDecision(guard, decision: fromA, nowMs: 10000)?.name, 'B');
+      const afterCooldown = 10000 + FailoverGuard.switchCooldownMs + 10000;
+      // A is healthy again and B is healthy too: no failure, no move,
+      // however much later the check runs.
+      final bothHealthy = decisionFor(
+        names: ['B', 'A'],
+        metadata: metadata,
+        current: 'B',
+      );
+      expect(
+        noteDecision(
+          guard,
+          decision: bothHealthy,
+          currentName: 'B',
+          reason: ServiceAccessReason.accessible,
+          nowMs: afterCooldown,
+        ),
+        isNull,
+      );
+      // B fails twice, independently confirmed past the cooldown: the
+      // guard may now fail over, and the decision's target is A.
+      final fromB = decisionFor(
+        names: ['B', 'A'],
+        metadata: metadata,
+        access: {'B': resultFor('B', ServiceAccessReason.regionBlocked)},
+        current: 'B',
+      );
+      expect(
+        noteDecision(
+          guard,
+          decision: fromB,
+          currentName: 'B',
+          nowMs: afterCooldown + 1000,
+        ),
+        isNull,
+      );
+      final back = noteDecision(
+        guard,
+        decision: fromB,
+        currentName: 'B',
+        nowMs: afterCooldown + 2000,
+      );
+      expect(back?.name, 'A');
+    });
   });
 
   test('failures count once per probe across both layers', () {

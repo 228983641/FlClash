@@ -84,6 +84,58 @@ class _FailoverSmartAnchor extends SmartAnchor {
   }
 }
 
+/// The current node fails on its own, while three other nodes report
+/// the service itself down: the outage must not be blamed on the node.
+class _OutageSmartAnchor extends SmartAnchor {
+  @override
+  SmartAnchorInput build() {
+    NodeMetadataCache node(String name) {
+      return NodeMetadataCache(
+        proxyName: name,
+        entryServer: 'entry.example',
+        egressIp: '1.2.3.4',
+        countryCode: 'US',
+        latitude: 34.0522,
+        longitude: -118.2437,
+        asn: 'AS20057',
+        ipType: 'residential',
+        fraudScore: 0,
+        purityScore: 90,
+        wafPass: true,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+    }
+
+    ServiceAccessResult verdict(String name, ServiceAccessReason reason) {
+      return ServiceAccessResult(
+        serviceId: 'claude',
+        proxyName: name,
+        egressIp: '1.2.3.4',
+        reason: reason,
+        checkedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+    }
+
+    return SmartAnchorInput(
+      services: [defaultServiceToggles.first],
+      metadataByProxy: {
+        'US-1': node('US-1'),
+        'US-2': node('US-2'),
+        'US-3': node('US-3'),
+        'US-4': node('US-4'),
+      },
+      accessByService: {
+        'claude': {
+          'US-1': verdict('US-1', ServiceAccessReason.networkFailed),
+          'US-2': verdict('US-2', ServiceAccessReason.serviceDown),
+          'US-3': verdict('US-3', ServiceAccessReason.serviceDown),
+          'US-4': verdict('US-4', ServiceAccessReason.serviceDown),
+        },
+      },
+    );
+  }
+}
+
 class _ComplianceSmartAnchor extends SmartAnchor {
   @override
   SmartAnchorInput build() {
@@ -1589,6 +1641,55 @@ void main() {
       );
       expect(
         container.read(currentProfileProvider)?.selectedMap['🎯 Smart-Claude'],
+        'US-1',
+      );
+      await drainSaves(
+        (snapshot) => snapshot?.paths['claude']?.isNotEmpty == true,
+      );
+    });
+
+    test('a suspected service outage suppresses the failover switch', () async {
+      const groupName = '🎯 Smart-Claude';
+      const profile = Profile(
+        id: 7,
+        autoUpdateDuration: Duration.zero,
+        selectedMap: {groupName: 'US-1'},
+      );
+      final container = buildContainer(
+        profile: profile,
+        smartAnchor: _OutageSmartAnchor.new,
+      );
+      const members = [
+        Proxy(name: 'US-1', type: 'ss'),
+        Proxy(name: 'US-2', type: 'ss'),
+        Proxy(name: 'US-3', type: 'ss'),
+        Proxy(name: 'US-4', type: 'ss'),
+      ];
+      container.read(groupsProvider.notifier).value = const [
+        Group(
+          type: GroupType.Selector,
+          name: groupName,
+          all: members,
+          now: 'US-1',
+        ),
+        Group(
+          type: GroupType.Selector,
+          name: 'Proxy',
+          all: members,
+          now: 'US-1',
+        ),
+      ];
+
+      actionOf(container).smartAnchorFailoverCheck();
+      actionOf(container).smartAnchorFailoverCheck();
+      actionOf(container).smartAnchorFailoverCheck();
+
+      expect(
+        container.read(smartAnchorProvider).switchEvents['claude'],
+        isNull,
+      );
+      expect(
+        container.read(currentProfileProvider)?.selectedMap[groupName],
         'US-1',
       );
       await drainSaves(

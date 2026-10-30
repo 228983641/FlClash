@@ -324,6 +324,68 @@ void main() {
     );
   });
 
+  test('failover switch line carries the decision context when given', () {
+    expect(
+      saFailoverSwitchLine(
+        serviceId: 'claude',
+        from: 'JP-cur',
+        to: 'JP-24',
+        reason: 'regionBlocked',
+        isFallback: false,
+        tier: 'L1',
+        failureCount: 2,
+        decisionExplanation: 'target=JP-24 tier=L1; qualified=2',
+        cooldownUntilMs: 1700000120000,
+        switchesInWindow: 1,
+      ),
+      '[SA] failover-switch service=claude from=JP-cur to=JP-24 '
+      'reason=regionBlocked fallback=false tier=L1 failures=2 '
+      'switchesInWindow=1 cooldownUntil=1700000120000 '
+      'decision=target=JP-24 tier=L1; qualified=2',
+    );
+    expect(
+      saFailoverSwitchLine(
+        serviceId: 'claude',
+        from: 'JP-cur',
+        to: 'JP-24',
+        reason: 'regionBlocked',
+        isFallback: false,
+      ),
+      '[SA] failover-switch service=claude from=JP-cur to=JP-24 '
+      'reason=regionBlocked fallback=false',
+    );
+  });
+
+  test('compliance line appends the decision explanation when given', () {
+    expect(
+      saComplianceDecisionLine(
+        serviceId: 'claude',
+        groupName: '🎯 Smart-Claude',
+        currentName: 'TW-1',
+        target: 'US-1',
+        currentUnknown: false,
+        rankedTop: const ['US-1'],
+        decisionExplanation: 'target=US-1 tier=L6; qualified=1',
+      ),
+      '[SA] compliance service=claude group=🎯 Smart-Claude '
+      'current=TW-1 -> US-1 reason=lock-change '
+      'currentUnknown=false rankedTop=US-1 '
+      'decision=target=US-1 tier=L6; qualified=1',
+    );
+  });
+
+  test('service outage line names the evidence and the hold action', () {
+    expect(
+      saServiceOutageLine(
+        serviceId: 'claude',
+        evidenceCount: 3,
+        windowMs: 300000,
+      ),
+      '[SA] service-outage service=claude evidence=3 windowMs=300000 '
+      'action=hold-current',
+    );
+  });
+
   test('tick and reprobe lines stay one-liners', () {
     expect(
       saTickLine(anchors: 1, compliance: 2, probeUpdated: 5, failover: 1),

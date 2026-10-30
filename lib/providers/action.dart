@@ -21,6 +21,7 @@ import 'package:fl_clash/smart_anchor/models/service_group.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
 import 'package:fl_clash/smart_anchor/models/service_anchor.dart';
 import 'package:fl_clash/smart_anchor/models/switch_event.dart';
+import 'package:fl_clash/smart_anchor/services/candidate_decision.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
 import 'package:fl_clash/smart_anchor/services/sa_log.dart';
 import 'package:fl_clash/smart_anchor/services/scoring_engine.dart';

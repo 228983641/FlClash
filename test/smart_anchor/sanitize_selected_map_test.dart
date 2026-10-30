@@ -239,6 +239,22 @@ void main() {
       }
     }
 
+    test('known violator with several unknown fallbacks lands identically', () {
+      checkConsistency(
+        input: inputFor([gemini], {'TW-1': meta('TW-1', 'TW', 100)}),
+        svc: gemini,
+        names: ['TW-1', 'zz-unknown', 'aa-unknown'],
+        current: 'TW-1',
+      );
+      final lockTarget = lockReselectTarget(
+        inputFor([gemini], {'TW-1': meta('TW-1', 'TW', 100)}),
+        gemini,
+        ['TW-1', 'zz-unknown', 'aa-unknown'],
+        'TW-1',
+      );
+      expect(lockTarget, 'aa-unknown');
+    });
+
     test('move and keep verdicts agree across the core scenarios', () {
       final scenarios =
           <

@@ -1,5 +1,4 @@
 import 'package:fl_clash/smart_anchor/services/cloudflare_trace.dart';
-import 'package:fl_clash/smart_anchor/services/service_access.dart';
 import 'package:fl_clash/smart_anchor/services/service_status.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -57,15 +56,5 @@ kex=X25519
       OfficialServiceStatus.outage,
     );
     expect(parseStatuspageStatus({}), OfficialServiceStatus.unknown);
-  });
-
-  test('official outage stops blaming nodes', () {
-    final guard = ServiceOutageGuard();
-    expect(guard.shouldNotBlameNodes, isFalse);
-    guard.noteOfficialOutage();
-    expect(guard.officialOutage, isTrue);
-    expect(guard.shouldNotBlameNodes, isTrue);
-    guard.reset();
-    expect(guard.shouldNotBlameNodes, isFalse);
   });
 }
