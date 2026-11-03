@@ -319,7 +319,40 @@ class ServiceStateMachineTest {
         assertFalse(machine.requestStart().await())
         assertEquals(0, host.startCalls)
         assertEquals(1, host.stoppedNotifications)
-        assertEquals(listOf(VPN_PERMISSION_MESSAGE), host.toasts)
+        assertEquals(listOf("VPN permission required."), host.toasts)
+    }
+
+    @Test
+    fun `a denied vpn permission shows the localized recovery hint`() = runTest {
+        val host = FakeHost(backgroundScope)
+        host.app = FakeApp(vpnGranted = false)
+        val machine = ServiceStateMachine(host)
+        machine.syncSharedState(configuredState().copy(vpnPermissionTip = "Check VPN settings"))
+
+        assertFalse(machine.requestStart().await())
+
+        assertEquals(listOf("Check VPN settings"), host.toasts)
+        assertEquals(0, host.startCalls)
+    }
+
+    @Test
+    fun `a superseded permission denial does not report a failure for the new start`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val app = FakeApp(vpnGranted = false)
+        host.app = app
+        val machine = ServiceStateMachine(host)
+        machine.syncSharedState(configuredState())
+        app.beforeVpnPrepared = {
+            host.app = FakeApp()
+            machine.requestStart()
+        }
+
+        assertFalse(machine.requestStart().await())
+        testScheduler.runCurrent()
+
+        assertTrue(host.toasts.isEmpty())
+        assertEquals(RunState.STARTED, machine.runState.value)
+        assertEquals(1, host.startCalls)
     }
 
     /** Flutter opened the Core's listeners before asking, and may be gone before it hears back. */
@@ -355,7 +388,7 @@ class ServiceStateMachineTest {
         machine.syncSharedState(configuredState())
 
         assertFalse(machine.requestStart().await())
-        assertTrue(host.toasts.contains(VPN_PERMISSION_MESSAGE))
+        assertTrue(host.toasts.contains("VPN permission required."))
     }
 
     @Test

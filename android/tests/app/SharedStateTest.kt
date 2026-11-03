@@ -45,6 +45,7 @@ class SharedStateTest {
             {
               "startTip": "Starting",
               "stopTip": "Stopping",
+              "vpnPermissionTip": "Check VPN settings",
               "currentProfileName": "Work",
               "stopText": "Halt",
               "onlyStatisticsProxy": true,
@@ -76,6 +77,7 @@ class SharedStateTest {
         val state = gson.fromJson(json, SharedState::class.java)
 
         assertEquals("Starting", state.startTip)
+        assertEquals("Check VPN settings", state.vpnPermissionTip)
         assertEquals("Work", state.currentProfileName)
         assertEquals(true, state.onlyStatisticsProxy)
         assertEquals(false, state.showStopAction)
@@ -110,6 +112,7 @@ class SharedStateTest {
 
         assertNotNull(state)
         assertEquals("Starting VPN...", state.startTip)
+        assertEquals("VPN permission required.", state.vpnPermissionTip)
         assertEquals("FlClash", state.currentProfileName)
         assertNull(state.vpnOptions)
         assertNull(state.setupParams)

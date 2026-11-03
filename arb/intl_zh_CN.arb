@@ -130,6 +130,7 @@
   "startVpn": "正在启动VPN…",
   "stopVpn": "正在停止VPN…",
   "localNetworkDeniedTip": "本地网络权限被拒绝：已改用 gvisor 栈，局域网无法访问。",
+  "vpnPermissionDeniedTip": "VPN 未授权。若无弹窗，请在系统设置中关闭其他应用的“始终开启 VPN”。",
   "compatible": "兼容模式",
   "notSelectedTip": "当前代理组无法选中",
   "changeProxyFailedTip": "切换代理失败，已恢复上一次的选择",

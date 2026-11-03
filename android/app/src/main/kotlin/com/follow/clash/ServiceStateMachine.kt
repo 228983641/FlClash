@@ -28,7 +28,6 @@ internal typealias RunRequest = RunIntentArbiter.Token
 
 internal const val MISSING_CONFIG_MESSAGE = "No configuration found."
 internal const val INVALID_CONFIG_MESSAGE = "Invalid configuration."
-internal const val VPN_PERMISSION_MESSAGE = "VPN permission required."
 internal const val START_FAILED_MESSAGE = "Failed to start service."
 
 private enum class StartOutcome {
@@ -241,8 +240,8 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         }
         val options = sharedState.vpnOptions ?: return false
         if (!prepareVpn(options)) {
-            if (host.app() == null && isCurrent(request)) {
-                host.showToast(VPN_PERMISSION_MESSAGE)
+            if (isCurrent(request)) {
+                host.showToast(sharedState.vpnPermissionTip)
             }
             return false
         }

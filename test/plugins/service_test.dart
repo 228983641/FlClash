@@ -157,6 +157,7 @@ void main() {
         stopTip: 'stopTip',
         startTip: 'startTip',
         localNetworkTip: 'localNetworkTip',
+        vpnPermissionTip: 'Check VPN settings',
         currentProfileName: 'profile',
         stopText: 'stop',
         onlyStatisticsProxy: true,
@@ -167,6 +168,7 @@ void main() {
       final sent = json.decode(calls.single.arguments as String);
       expect(sent['currentProfileName'], 'profile');
       expect(sent['onlyStatisticsProxy'], isTrue);
+      expect(sent['vpnPermissionTip'], 'Check VPN settings');
     });
   });
 

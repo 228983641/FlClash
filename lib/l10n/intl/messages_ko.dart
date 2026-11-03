@@ -1790,6 +1790,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "vpnEnableDesc": MessageLookupByLibrary.simpleMessage(
       "VPN은 VpnService를 통해 모든 시스템 트래픽을 자동으로 라우팅합니다.",
     ),
+    "vpnPermissionDeniedTip": MessageLookupByLibrary.simpleMessage(
+      "VPN이 승인되지 않았습니다. 요청 창이 나타나지 않으면 Android 설정에서 다른 앱의 상시 연결 VPN을 끄세요.",
+    ),
     "webDAVConfiguration": MessageLookupByLibrary.simpleMessage("WebDAV 구성"),
     "whitelistMode": MessageLookupByLibrary.simpleMessage("화이트리스트 모드"),
     "writeToSystem": MessageLookupByLibrary.simpleMessage("시스템에 기록"),

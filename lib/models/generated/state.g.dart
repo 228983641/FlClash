@@ -16,6 +16,8 @@ _SharedState _$SharedStateFromJson(Map<String, dynamic> json) => _SharedState(
   stopTip: json['stopTip'] as String,
   startTip: json['startTip'] as String,
   localNetworkTip: json['localNetworkTip'] as String,
+  vpnPermissionTip:
+      json['vpnPermissionTip'] as String? ?? 'VPN permission required.',
   currentProfileName: json['currentProfileName'] as String,
   stopText: json['stopText'] as String,
   onlyStatisticsProxy: json['onlyStatisticsProxy'] as bool,
@@ -29,6 +31,7 @@ Map<String, dynamic> _$SharedStateToJson(_SharedState instance) =>
       'stopTip': instance.stopTip,
       'startTip': instance.startTip,
       'localNetworkTip': instance.localNetworkTip,
+      'vpnPermissionTip': instance.vpnPermissionTip,
       'currentProfileName': instance.currentProfileName,
       'stopText': instance.stopText,
       'onlyStatisticsProxy': instance.onlyStatisticsProxy,

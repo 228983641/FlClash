@@ -186,6 +186,7 @@ abstract class SharedState with _$SharedState {
     required String stopTip,
     required String startTip,
     required String localNetworkTip,
+    @Default('VPN permission required.') String vpnPermissionTip,
     required String currentProfileName,
     required String stopText,
     required bool onlyStatisticsProxy,

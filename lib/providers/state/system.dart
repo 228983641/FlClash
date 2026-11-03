@@ -204,6 +204,7 @@ SharedState sharedState(Ref ref) {
     stopTip: currentAppLocalizations.stopVpn,
     startTip: currentAppLocalizations.startVpn,
     localNetworkTip: currentAppLocalizations.localNetworkDeniedTip,
+    vpnPermissionTip: currentAppLocalizations.vpnPermissionDeniedTip,
     setupParams: SetupParams(
       selectedMap: selectedMap,
       testUrl: testUrl,
