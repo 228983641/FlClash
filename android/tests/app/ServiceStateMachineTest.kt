@@ -319,6 +319,7 @@ class ServiceStateMachineTest {
         assertFalse(machine.requestStart().await())
         assertEquals(0, host.startCalls)
         assertEquals(1, host.stoppedNotifications)
+        assertEquals(listOf(VPN_PERMISSION_MESSAGE), host.toasts)
     }
 
     /** Flutter opened the Core's listeners before asking, and may be gone before it hears back. */
@@ -864,6 +865,7 @@ class ServiceStateMachineTest {
         assertEquals(0, host.startCalls)
         assertEquals(1, app.cancelledPreparations)
         assertEquals(RunState.STOPPED, machine.runState.value)
+        assertTrue(host.toasts.isEmpty())
     }
 
     @Test
