@@ -8178,10 +8178,10 @@ class AppLocalizations {
     );
   }
 
-  /// `No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; several countries allow nodes within those countries, with risk in between. Changing the locked countries clears the old anchor.`
+  /// `No lock disables country filtering. A single-country lock limits candidates to that country; several countries allow candidates within those countries. Changing the locked countries clears the old anchor.`
   String get smartAnchorLockDesc {
     return Intl.message(
-      'No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; several countries allow nodes within those countries, with risk in between. Changing the locked countries clears the old anchor.',
+      'No lock disables country filtering. A single-country lock limits candidates to that country; several countries allow candidates within those countries. Changing the locked countries clears the old anchor.',
       name: 'smartAnchorLockDesc',
       desc: '',
       args: [],
@@ -8408,10 +8408,10 @@ class AppLocalizations {
     );
   }
 
-  /// `No usable node under the current lock; falls back to DIRECT`
+  /// `No nodes currently meet the routing policy. Check the probe results.`
   String get smartAnchorNoUsableNodes {
     return Intl.message(
-      'No usable node under the current lock; falls back to DIRECT',
+      'No nodes currently meet the routing policy. Check the probe results.',
       name: 'smartAnchorNoUsableNodes',
       desc: '',
       args: [],
@@ -8428,10 +8428,10 @@ class AppLocalizations {
     );
   }
 
-  /// `Removing the lock stops country filtering and carries the highest risk-control risk. Remove it?`
+  /// `Remove the country lock and stop filtering nodes by country?`
   String get smartAnchorUnlockConfirm {
     return Intl.message(
-      'Removing the lock stops country filtering and carries the highest risk-control risk. Remove it?',
+      'Remove the country lock and stop filtering nodes by country?',
       name: 'smartAnchorUnlockConfirm',
       desc: '',
       args: [],

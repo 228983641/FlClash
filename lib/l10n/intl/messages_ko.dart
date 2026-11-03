@@ -1543,13 +1543,13 @@ class MessageLookup extends MessageLookupByLibrary {
       "Last auto switch",
     ),
     "smartAnchorLockDesc": MessageLookupByLibrary.simpleMessage(
-      "No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; several countries allow nodes within those countries, with risk in between. Changing the locked countries clears the old anchor.",
+      "잠금이 없으면 국가별로 필터링하지 않습니다. 단일 국가 잠금은 해당 국가의 후보만 허용하고, 여러 국가를 선택하면 선택한 국가의 후보를 허용합니다. 잠금 국가를 변경하면 기존 앵커가 지워집니다.",
     ),
     "smartAnchorNoAnchor": MessageLookupByLibrary.simpleMessage(
       "No anchor yet",
     ),
     "smartAnchorNoUsableNodes": MessageLookupByLibrary.simpleMessage(
-      "No usable node under the current lock; falls back to DIRECT",
+      "현재 라우팅 정책을 충족하는 노드가 없습니다. 검사 결과를 확인하세요.",
     ),
     "smartAnchorPath": MessageLookupByLibrary.simpleMessage("Node path"),
     "smartAnchorPathAnchor": MessageLookupByLibrary.simpleMessage("Anchor"),
@@ -1651,7 +1651,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorTrustWatch": MessageLookupByLibrary.simpleMessage("Watch"),
     "smartAnchorUnknown": MessageLookupByLibrary.simpleMessage("Unknown"),
     "smartAnchorUnlockConfirm": MessageLookupByLibrary.simpleMessage(
-      "Removing the lock stops country filtering and carries the highest risk-control risk. Remove it?",
+      "국가 잠금을 해제하고 국가별 노드 필터링을 중지할까요?",
     ),
     "sniffProtocols": MessageLookupByLibrary.simpleMessage("프로토콜"),
     "sniffer": MessageLookupByLibrary.simpleMessage("스니퍼"),

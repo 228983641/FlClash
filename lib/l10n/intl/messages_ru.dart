@@ -1897,13 +1897,13 @@ class MessageLookup extends MessageLookupByLibrary {
       "Last auto switch",
     ),
     "smartAnchorLockDesc": MessageLookupByLibrary.simpleMessage(
-      "No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; several countries allow nodes within those countries, with risk in between. Changing the locked countries clears the old anchor.",
+      "Без блокировки фильтрация по странам отключена. Одна страна ограничивает выбор узлами этой страны, несколько — узлами выбранных стран. Изменение стран сбрасывает прежний якорь.",
     ),
     "smartAnchorNoAnchor": MessageLookupByLibrary.simpleMessage(
       "No anchor yet",
     ),
     "smartAnchorNoUsableNodes": MessageLookupByLibrary.simpleMessage(
-      "No usable node under the current lock; falls back to DIRECT",
+      "Нет узлов, соответствующих текущей политике маршрутизации. Проверьте результаты проверок.",
     ),
     "smartAnchorPath": MessageLookupByLibrary.simpleMessage("Node path"),
     "smartAnchorPathAnchor": MessageLookupByLibrary.simpleMessage("Anchor"),
@@ -2007,7 +2007,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorTrustWatch": MessageLookupByLibrary.simpleMessage("Watch"),
     "smartAnchorUnknown": MessageLookupByLibrary.simpleMessage("Unknown"),
     "smartAnchorUnlockConfirm": MessageLookupByLibrary.simpleMessage(
-      "Removing the lock stops country filtering and carries the highest risk-control risk. Remove it?",
+      "Снять блокировку страны и отключить фильтрацию узлов по странам?",
     ),
     "sniffProtocols": MessageLookupByLibrary.simpleMessage("Протоколы"),
     "sniffer": MessageLookupByLibrary.simpleMessage("Сниффер"),

@@ -1956,13 +1956,13 @@ class MessageLookup extends MessageLookupByLibrary {
       "Last auto switch",
     ),
     "smartAnchorLockDesc": MessageLookupByLibrary.simpleMessage(
-      "No lock means no country filtering and the highest risk-control risk. A single-country lock fixes the login country and is the lowest risk; several countries allow nodes within those countries, with risk in between. Changing the locked countries clears the old anchor.",
+      "Sin bloqueo no se filtra por país. Un solo país limita los candidatos a ese país; varios países permiten candidatos de los países seleccionados. Cambiar los países borra el anclaje anterior.",
     ),
     "smartAnchorNoAnchor": MessageLookupByLibrary.simpleMessage(
       "No anchor yet",
     ),
     "smartAnchorNoUsableNodes": MessageLookupByLibrary.simpleMessage(
-      "No usable node under the current lock; falls back to DIRECT",
+      "No hay nodos que cumplan la política de enrutamiento actual. Revisa los resultados de las pruebas.",
     ),
     "smartAnchorPath": MessageLookupByLibrary.simpleMessage("Node path"),
     "smartAnchorPathAnchor": MessageLookupByLibrary.simpleMessage("Anchor"),
@@ -2066,7 +2066,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorTrustWatch": MessageLookupByLibrary.simpleMessage("Watch"),
     "smartAnchorUnknown": MessageLookupByLibrary.simpleMessage("Unknown"),
     "smartAnchorUnlockConfirm": MessageLookupByLibrary.simpleMessage(
-      "Removing the lock stops country filtering and carries the highest risk-control risk. Remove it?",
+      "¿Quitar el bloqueo de país y dejar de filtrar los nodos por país?",
     ),
     "sniffProtocols": MessageLookupByLibrary.simpleMessage("Protocolos"),
     "sniffer": MessageLookupByLibrary.simpleMessage("Sniffer"),

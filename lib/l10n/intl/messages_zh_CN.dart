@@ -1413,11 +1413,11 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "smartAnchorLastSwitch": MessageLookupByLibrary.simpleMessage("最近一次自动切换"),
     "smartAnchorLockDesc": MessageLookupByLibrary.simpleMessage(
-      "不限表示不按国家过滤，风控风险最高。单国锁固定登录国家，风险最低；多国锁允许在几个国家内选节点，风险居中；改锁国会清空旧锚点。",
+      "不限表示不按国家过滤。单国锁仅允许该国家的候选节点；多国锁允许在所选国家内选择。修改锁国会清空旧锚点。",
     ),
     "smartAnchorNoAnchor": MessageLookupByLibrary.simpleMessage("暂无锚点"),
     "smartAnchorNoUsableNodes": MessageLookupByLibrary.simpleMessage(
-      "当前锁国下暂无可用节点，将回退直连",
+      "暂无满足当前路由策略的节点，请检查探测结果。",
     ),
     "smartAnchorPath": MessageLookupByLibrary.simpleMessage("节点位置路径"),
     "smartAnchorPathAnchor": MessageLookupByLibrary.simpleMessage("锚点"),
@@ -1499,7 +1499,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "smartAnchorTrustWatch": MessageLookupByLibrary.simpleMessage("留意"),
     "smartAnchorUnknown": MessageLookupByLibrary.simpleMessage("未知"),
     "smartAnchorUnlockConfirm": MessageLookupByLibrary.simpleMessage(
-      "取消锁国后不再按国家过滤，风控风险最高。确定取消吗？",
+      "确定取消锁国，并停止按国家过滤节点吗？",
     ),
     "sniffProtocols": MessageLookupByLibrary.simpleMessage("协议"),
     "sniffer": MessageLookupByLibrary.simpleMessage("域名嗅探"),
