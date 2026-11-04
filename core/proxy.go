@@ -172,6 +172,9 @@ func handleChangeProxy(params *ChangeProxyParams) *ChangeProxyResult {
 		return &ChangeProxyResult{Message: err.Error()}
 	}
 	changed := selector.Now() != before
+	if params.CloseConnections {
+		closeGroupConnections([]string{params.GroupName})
+	}
 	refreshRouteLocked(routeUnchanged)
 	return &ChangeProxyResult{Changed: changed}
 }

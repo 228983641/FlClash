@@ -969,12 +969,21 @@ class ProxiesAction extends _$ProxiesAction {
         _pendingSelectedRollback.remove(groupName) ??
         _currentSelectedName(groupName);
     profilesAction.updateCurrentSelectedMap(groupName, proxyName);
+    final guardedSwitch = smartSwitchForcesClose(
+      groupName: groupName,
+      trigger: trigger,
+      smart: ref.read(smartAnchorProvider),
+    );
     final ChangeProxyResult result;
     try {
       result = await PerfTrace.time(
         'switch-proxy-core',
         () => _core.changeProxy(
-          ChangeProxyParams(groupName: groupName, proxyName: proxyName),
+          ChangeProxyParams(
+            groupName: groupName,
+            proxyName: proxyName,
+            closeConnections: guardedSwitch,
+          ),
         ),
         detail: '$trigger $groupName -> $proxyName',
       );
@@ -1020,20 +1029,14 @@ class ProxiesAction extends _$ProxiesAction {
       return false;
     }
     try {
-      final closeAll =
-          ref.read(appSettingProvider).closeConnections ||
-          smartSwitchForcesClose(
-            groupName: groupName,
-            trigger: trigger,
-            smart: ref.read(smartAnchorProvider),
-          );
+      final closeAll = ref.read(appSettingProvider).closeConnections;
       if (closeAll) {
         await PerfTrace.time(
           'switch-proxy-reset',
           () => _core.closeConnections(),
           detail: '$trigger $groupName -> $proxyName',
         );
-      } else {
+      } else if (!guardedSwitch) {
         await PerfTrace.time(
           'switch-proxy-reset',
           () => _core.resetConnections(),

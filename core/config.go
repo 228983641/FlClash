@@ -173,9 +173,11 @@ func applyConfig(params *SetupParams) error {
 		cfg = fallback
 	}
 
+	before := groupSelections(params.GuardedGroups)
 	currentConfig = cfg
 	hub.ApplyConfig(cfg)
 	patchSelectGroup(params.SelectedMap)
+	closeChangedGroupConnections(before)
 	bumpRouteEpoch()
 	updateListeners(cfg)
 	reconcileGeoUpdater()

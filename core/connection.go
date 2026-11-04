@@ -1,10 +1,59 @@
 package core
 
 import (
+	"slices"
+
 	"github.com/metacubex/mihomo/component/resolver"
 	"github.com/metacubex/mihomo/dns"
+	"github.com/metacubex/mihomo/log"
 	"github.com/metacubex/mihomo/tunnel/statistic"
 )
+
+func closeGroupConnections(groups []string) {
+	if len(groups) == 0 {
+		return
+	}
+	closed := 0
+	statistic.DefaultManager.Range(func(c statistic.Tracker) bool {
+		for _, group := range groups {
+			if slices.Contains(c.Info().Chain, group) {
+				_ = c.Close()
+				closed++
+				break
+			}
+		}
+		return true
+	})
+	log.Infoln("[SA] guarded-connections groups=%d closed=%d", len(groups), closed)
+}
+
+func groupSelections(groups []string) map[string]string {
+	selectMu.Lock()
+	defer selectMu.Unlock()
+	selections := make(map[string]string, len(groups))
+	for _, name := range groups {
+		selections[name] = ""
+		if selector, err := selectableGroup(name); err == nil {
+			selections[name] = selector.Now()
+		}
+	}
+	return selections
+}
+
+func closeChangedGroupConnections(before map[string]string) {
+	groups := make([]string, 0, len(before))
+	for name := range before {
+		groups = append(groups, name)
+	}
+	after := groupSelections(groups)
+	changed := groups[:0]
+	for name, current := range after {
+		if current != before[name] || current == "" || current == "REJECT" || current == "REJECT-DROP" {
+			changed = append(changed, name)
+		}
+	}
+	closeGroupConnections(changed)
+}
 
 func handleGetTraffic(onlyStatisticsProxy bool) Traffic {
 	up, down := statistic.DefaultManager.NowTraffic(onlyStatisticsProxy)

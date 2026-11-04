@@ -73,6 +73,10 @@ class SetupAction extends _$SetupAction {
       selectedMap: selectedMap,
       testUrl: ref.read(patchClashConfigProvider).testUrl,
       skipCertVerify: !appSetting.checkCertificate,
+      guardedGroups: [
+        for (final service in ref.read(smartAnchorProvider).services)
+          if (service.isEnabled) smartGroupName(service),
+      ],
     );
   }
 

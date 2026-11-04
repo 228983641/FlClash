@@ -523,8 +523,9 @@ void main() {
           container,
         ).changeProxy(groupName: '🎯 Smart-Claude', proxyName: 'HK-01');
 
-        final params = verify(() => core.changeProxy(captureAny()))
-            .captured.single as ChangeProxyParams;
+        final params =
+            verify(() => core.changeProxy(captureAny())).captured.single
+                as ChangeProxyParams;
         expect(params.toJson()['close-connections'], isTrue);
         verifyNever(core.closeConnections);
         verifyNever(core.resetConnections);
@@ -544,8 +545,9 @@ void main() {
           trigger: 'lock-change',
         );
 
-        final params = verify(() => core.changeProxy(captureAny()))
-            .captured.single as ChangeProxyParams;
+        final params =
+            verify(() => core.changeProxy(captureAny())).captured.single
+                as ChangeProxyParams;
         expect(params.toJson()['close-connections'], isTrue);
         verifyNever(core.closeConnections);
         verifyNever(core.resetConnections);
@@ -565,8 +567,9 @@ void main() {
           trigger: 'auto-failover',
         );
 
-        final params = verify(() => core.changeProxy(captureAny()))
-            .captured.single as ChangeProxyParams;
+        final params =
+            verify(() => core.changeProxy(captureAny())).captured.single
+                as ChangeProxyParams;
         expect(params.toJson()['close-connections'], isTrue);
         verifyNever(core.closeConnections);
         verifyNever(core.resetConnections);

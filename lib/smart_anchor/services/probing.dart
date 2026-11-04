@@ -85,12 +85,11 @@ ServiceAccessResult accessResultFromStatus({
     serviceId: serviceId,
     proxyName: proxyName,
     egressIp: egressIp,
-    reason: switch (failureKind) {
-      'service' => ServiceAccessReason.serviceDown,
-      'unknown' => ServiceAccessReason.unknown,
-      ''
-          when status == ServiceProbeStatus.failed ||
-              status == ServiceProbeStatus.timeout =>
+    reason: switch (status) {
+      ServiceProbeStatus.unavailable when failureKind == 'service' =>
+        ServiceAccessReason.serviceDown,
+      ServiceProbeStatus.failed || ServiceProbeStatus.timeout
+          when failureKind != null && failureKind != 'network' =>
         ServiceAccessReason.unknown,
       _ => accessReasonFromStatus(status),
     },

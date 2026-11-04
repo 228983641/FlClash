@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"io"
 	"net"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -12,6 +15,36 @@ import (
 	"github.com/metacubex/mihomo/tunnel"
 	"github.com/metacubex/mihomo/tunnel/statistic"
 )
+
+func TestGuardedApplyConfigRetiresExistingSocket(t *testing.T) {
+	home := os.Getenv("FLCLASH_GUARDED_TEST_HOME")
+	if home == "" {
+		cmd := exec.Command(os.Args[0], "-test.run=^TestGuardedApplyConfigRetiresExistingSocket$")
+		cmd.Env = append(os.Environ(), "FLCLASH_GUARDED_TEST_HOME="+t.TempDir())
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("isolated config apply: %v\n%s", err, output)
+		}
+		return
+	}
+	previousHome := constant.Path.HomeDir()
+	constant.SetHomeDir(home)
+	t.Cleanup(func() { constant.SetHomeDir(previousHome) })
+	withCurrentConfig(t, nil)
+	tunnel.UpdateProxies(map[string]constant.Proxy{"guarded": selectorGroup(t, "guarded", "old")}, nil)
+	t.Cleanup(func() { tunnel.UpdateProxies(nil, nil) })
+	_, remote := trackedGroupPipe(t, "guarded")
+	profile := "profile:\n  store-selected: false\nproxy-groups:\n  - name: guarded\n    type: select\n    proxies: [REJECT]\nrules:\n  - MATCH,REJECT\n"
+	if err := os.WriteFile(filepath.Join(home, "config.yaml"), []byte(profile), 0600); err != nil {
+		t.Fatal(err)
+	}
+	params := defaultSetupParams()
+	params.GuardedGroups = []string{"guarded"}
+	params.SelectedMap = map[string]string{"guarded": "REJECT"}
+	if err := applyConfig(params); err != nil {
+		t.Fatal(err)
+	}
+	assertPipeClosed(t, remote)
+}
 
 func trackedGroupPipe(t *testing.T, group string) (statistic.Tracker, net.Conn) {
 	t.Helper()

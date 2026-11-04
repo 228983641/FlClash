@@ -100,6 +100,7 @@ type DecryptConfigParams struct {
 }
 
 type SetupParams struct {
+	GuardedGroups  []string          `json:"guarded-groups,omitempty"`
 	SelectedMap    map[string]string `json:"selected-map"`
 	TestURL        string            `json:"test-url"`
 	SkipCertVerify bool              `json:"skip-cert-verify"`
@@ -172,8 +173,9 @@ type RuleSetInfo struct {
 }
 
 type ChangeProxyParams struct {
-	GroupName string `json:"group-name"`
-	ProxyName string `json:"proxy-name"`
+	CloseConnections bool   `json:"close-connections,omitempty"`
+	GroupName        string `json:"group-name"`
+	ProxyName        string `json:"proxy-name"`
 }
 
 type ChangeProxyResult struct {

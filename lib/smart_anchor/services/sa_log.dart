@@ -83,6 +83,7 @@ String saProbeRoundLine({
       'restricted=${count(ServiceAccessReason.restricted)} '
       'blocked=${count(ServiceAccessReason.blocked)} '
       'networkFailed=${count(ServiceAccessReason.networkFailed)} '
+      'serviceDown=${count(ServiceAccessReason.serviceDown)} '
       'unknown=${count(ServiceAccessReason.unknown)}';
 }
 
