@@ -179,7 +179,7 @@ class _RenderThemeCrossFade extends RenderProxyBox {
   /// asserts against a boundary that already needs paint.
   ui.Image? capture(double pixelRatio) {
     final layer = this.layer;
-    if (!attached || !hasSize || layer is! OffsetLayer) {
+    if (!attached || !hasSize || size.isEmpty || layer is! OffsetLayer) {
       return null;
     }
     return layer.toImageSync(Offset.zero & size, pixelRatio: pixelRatio);
