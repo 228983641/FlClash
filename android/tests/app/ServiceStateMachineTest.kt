@@ -8,11 +8,14 @@ import com.follow.clash.service.models.NotificationParams
 import com.follow.clash.service.models.VpnOptions
 import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -255,6 +258,41 @@ class ServiceStateMachineTest {
 
         machine.requestStop().await()
         assertEquals(0L, machine.awaitRunTime())
+    }
+
+    @Test
+    fun `adoption waits for quick setup and observes the same native run`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val machine = ServiceStateMachine(host)
+        val gate = CompletableDeferred<Unit>()
+        host.duringSetup = { gate.await() }
+        val start = backgroundScope.launch { machine.handleStartAction() }
+        runCurrent()
+        val adoption = async { machine.awaitRunTime() }
+        runCurrent()
+        assertFalse("adoption read a transient stopped snapshot", adoption.isCompleted)
+        gate.complete(Unit)
+        start.join()
+        assertEquals(STARTED_AT, adoption.await())
+        assertEquals(1, host.setupCalls)
+        assertEquals(1, host.startCalls)
+    }
+
+    @Test
+    fun `a stop releases adoption while quick setup is still pending`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val machine = ServiceStateMachine(host)
+        val gate = CompletableDeferred<Unit>()
+        host.duringSetup = { gate.await() }
+        val start = backgroundScope.launch { machine.handleStartAction() }
+        runCurrent()
+        val adoption = async { machine.awaitRunTime() }
+        runCurrent()
+        machine.requestStop().await()
+        assertEquals(0L, adoption.await())
+        gate.complete(Unit)
+        start.join()
+        assertEquals(0, host.startCalls)
     }
 
     @Test
