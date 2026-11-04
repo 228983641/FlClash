@@ -600,6 +600,38 @@ func TestStatusFromCode(t *testing.T) {
 	}
 }
 
+func TestHealthCheckDoesNotWaitForDiscoverySockets(t *testing.T) {
+	server := probeServer(t, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	withProbeProxies(t, "node-a")
+	withServiceCheckers(t, serviceChecker{name: "alpha", check: checkReachable(server.URL)})
+	for i := 0; i < probeConcurrency; i++ {
+		probeSlots <- struct{}{}
+	}
+	var once sync.Once
+	free := func() {
+		once.Do(func() {
+			for i := 0; i < probeConcurrency; i++ {
+				<-probeSlots
+			}
+		})
+	}
+	t.Cleanup(free)
+	done := make(chan []ServiceCheckItem, 1)
+	go func() {
+		done <- handleServiceCheck(&ServiceCheckParams{ProxyName: "node-a", Names: []string{"alpha"}, Timeout: 1000, Scope: "health"})
+	}()
+	select {
+	case items := <-done:
+		if items[0].Status != serviceAvailable {
+			t.Fatalf("health = %+v, want available", items[0])
+		}
+	case <-time.After(250 * time.Millisecond):
+		free()
+		<-done
+		t.Fatal("health socket waited behind discovery sockets")
+	}
+}
+
 func TestItemFromMapsTransportErrors(t *testing.T) {
 	timedOut := itemFrom(&ProbeResult{Error: probeErrorTimeout, Delay: 900})
 	if timedOut.Status != serviceTimeout {
