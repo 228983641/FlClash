@@ -1,3 +1,4 @@
+import '../models/switch_event.dart';
 import 'service_access.dart';
 
 class FailoverTarget {
@@ -24,6 +25,23 @@ class FailoverGuard {
 
   static const int _freezeWindowMs = 10 * 60 * 1000;
   static const int _freezeSwitchLimit = 3;
+
+  void restoreSwitches(Map<String, List<SwitchEvent>> history, int nowMs) {
+    _switchTimes.clear();
+    for (final entry in history.entries) {
+      final times = <int>[
+        for (final event in entry.value)
+          if (event.serviceId == entry.key &&
+              event.fromProxy != event.toProxy &&
+              event.switchedAt > 0 &&
+              nowMs - event.switchedAt <= _freezeWindowMs)
+            event.switchedAt > nowMs ? nowMs : event.switchedAt,
+      ]..sort();
+      if (times.isNotEmpty) {
+        _switchTimes[entry.key] = times;
+      }
+    }
+  }
 
   void confirmSwitch(String serviceId, int nowMs) {
     _switchTimes[serviceId] = [..._recentSwitches(serviceId, nowMs), nowMs];

@@ -112,6 +112,14 @@ class ProxiesAction extends _$ProxiesAction {
 
   @override
   void build() {
+    ref.listen(
+      smartAnchorProvider.select((state) => state.switchEvents),
+      (_, history) => _failoverGuard.restoreSwitches(
+        history,
+        DateTime.now().millisecondsSinceEpoch,
+      ),
+      fireImmediately: true,
+    );
     ref.onDispose(() {
       _delayFlushTimer?.cancel();
       _smartAnchorMonitorTimer?.cancel();
@@ -412,9 +420,6 @@ class ProxiesAction extends _$ProxiesAction {
                 switchedAt: nowMs,
               ),
             );
-        if (trigger == 'auto-failover') {
-          _failoverGuard.confirmSwitch(service.serviceId, nowMs);
-        }
         _pendingAutoSwitch[service.serviceId] = to;
         _pendingAutoReason[service.serviceId] = reason;
       },

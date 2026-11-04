@@ -36,7 +36,11 @@ FailoverTarget? note(
 }
 
 void main() {
-  SwitchEvent switched(int time, {String service = 'youtube', String to = 'B'}) {
+  SwitchEvent switched(
+    int time, {
+    String service = 'youtube',
+    String to = 'B',
+  }) {
     return SwitchEvent(
       serviceId: service,
       fromProxy: 'A',
