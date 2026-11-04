@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -193,6 +194,45 @@ void main() {
     });
 
     tearDown(() => Service().removeListener(listener));
+
+    test('adopting a native run sends no start and observes its stop', () async {
+      mockChannel((_) async => 1700000000000);
+      final runtime = await Service().adoptRun();
+      expect(runtime?.millisecondsSinceEpoch, 1700000000000);
+      expect(calls.single.method, 'adoptRun');
+      await reportStopped(lastRevision());
+      expect(listener.stops, 1);
+    });
+
+    test('stop report overtaking adoption keeps the runtime stopped', () async {
+      final response = Completer<Object?>();
+      mockChannel((_) => response.future);
+      final adoption = Service().adoptRun();
+      await Future<void>.delayed(Duration.zero);
+      await reportStopped(lastRevision());
+      response.complete(1700000000000);
+      expect(await adoption, isNull);
+      expect(listener.stops, 1);
+    });
+
+    test('a newer stop supersedes an in-flight adoption', () async {
+      final response = Completer<Object?>();
+      mockChannel((call) => call.method == 'adoptRun'
+          ? response.future
+          : Future.value(true));
+      final adoption = Service().adoptRun();
+      await Service().stop();
+      response.complete(1700000000000);
+      expect(await adoption, isNull);
+      expect(calls.map((call) => call.method), ['adoptRun', 'stop']);
+    });
+
+    test('adopting an absent run does not subscribe to stale stop reports', () async {
+      mockChannel((_) async => 0);
+      expect(await Service().adoptRun(), isNull);
+      await reportStopped(lastRevision());
+      expect(listener.stops, 0);
+    });
 
     test('every command carries a revision newer than the last', () async {
       await Service().start();

@@ -112,6 +112,8 @@ private class FakeHost(override val scope: CoroutineScope) : ServiceStateHost {
     var startCalls = 0
     var stopCalls = 0
     var stoppedNotifications = 0
+    var runtimeLaunches = 0
+    var runtimeLaunchFails = false
     var lastInitParams: String? = null
     var lastSetupParams: String? = null
 
@@ -141,6 +143,11 @@ private class FakeHost(override val scope: CoroutineScope) : ServiceStateHost {
         stoppedNotifications++
     }
 
+    override suspend fun ensureFlutterRuntime() {
+        runtimeLaunches++
+        if (runtimeLaunchFails) error("engine unavailable")
+    }
+
     override suspend fun quickSetup(initParams: String, setupParams: String): Result<String> {
         setupCalls++
         lastInitParams = initParams
@@ -168,6 +175,43 @@ private class FakeHost(override val scope: CoroutineScope) : ServiceStateHost {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ServiceStateMachineTest {
+
+    @Test
+    fun `native start restores the monitor after the service is established`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val machine = ServiceStateMachine(host)
+        machine.handleStartAction()
+        assertEquals(STARTED_AT, machine.awaitRunTime())
+        assertEquals(1, host.runtimeLaunches)
+        machine.handleStartAction()
+        assertEquals(1, host.runtimeLaunches)
+    }
+
+    @Test
+    fun `failed native start never launches the monitor`() = runTest {
+        val host = FakeHost(backgroundScope).apply { startSucceeds = false }
+        ServiceStateMachine(host).handleStartAction()
+        assertEquals(0, host.runtimeLaunches)
+    }
+
+    @Test
+    fun `stop during native setup prevents monitor resurrection`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val machine = ServiceStateMachine(host)
+        host.duringSetup = { machine.requestStop().await() }
+        machine.handleStartAction()
+        assertEquals(0, host.runtimeLaunches)
+        assertEquals(0L, machine.awaitRunTime())
+    }
+
+    @Test
+    fun `monitor bootstrap failure does not redefine native run intent`() = runTest {
+        val host = FakeHost(backgroundScope).apply { runtimeLaunchFails = true }
+        val machine = ServiceStateMachine(host)
+        machine.handleStartAction()
+        assertEquals(STARTED_AT, machine.awaitRunTime())
+        assertTrue(host.logs.any { it.contains("engine unavailable") })
+    }
 
     @Test
     fun `initParams spells the keys the Go wrapper expects`() {
