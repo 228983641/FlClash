@@ -17,6 +17,7 @@ import 'package:fl_clash/providers/smart_anchor.dart';
 import 'package:fl_clash/providers/state.dart';
 import 'package:fl_clash/smart_anchor/models/node_metadata.dart';
 import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
+import 'package:fl_clash/smart_anchor/models/switch_event.dart';
 import 'package:fl_clash/smart_anchor/services/persistence.dart';
 import 'package:fl_clash/smart_anchor/services/service_access.dart';
 import 'package:fl_clash/smart_anchor/services/profile_wiring.dart';
@@ -1617,6 +1618,61 @@ void main() {
         }
         await Future<void>.delayed(const Duration(milliseconds: 10));
       }
+    }
+
+    for (final switchAges in [
+      [10000],
+      [240000, 160000, 80000],
+    ]) {
+      test('restores switch protection from storage: $switchAges', () async {
+        final container = failoverContainer(borrowed: false);
+        final action = actionOf(container);
+        final smart = container.read(smartAnchorProvider);
+        final now = DateTime.now().millisecondsSinceEpoch;
+        await SmartAnchorStore.drift().save(
+          smart.copyWith(
+            switchEvents: {
+              'claude': [
+                for (final age in switchAges)
+                  SwitchEvent(
+                    serviceId: 'claude',
+                    fromProxy: 'US-2',
+                    toProxy: 'US-1',
+                    reason: 'networkFailed',
+                    switchedAt: now - age,
+                  ),
+              ],
+            },
+          ),
+        );
+        await container.read(smartAnchorProvider.notifier).restore();
+        expect(action.smartAnchorFailoverCheck(), 0);
+        final restored = container.read(smartAnchorProvider);
+        final access = restored.accessByService['claude']!['US-1']!;
+        container
+            .read(smartAnchorProvider.notifier)
+            .update(
+              restored.copyWith(
+                accessByService: {
+                  'claude': {
+                    'US-1': ServiceAccessResult.fromJson({
+                      ...access.toJson(),
+                      'checkedAt': access.checkedAt + 1,
+                    }),
+                  },
+                },
+              ),
+            );
+        final switches = action.smartAnchorFailoverCheck();
+        debouncer.cancel((FunctionTag.changeProxy, '🎯 Smart-Claude'));
+        await drainSaves(
+          (snapshot) =>
+              snapshot?.accessByService['claude']?['US-1']?.checkedAt ==
+              access.checkedAt + 1,
+        );
+        expect(switches, 0);
+        verifyNever(() => core.changeProxy(any()));
+      });
     }
 
     test('a borrowed failure never counts toward a switch', () async {
