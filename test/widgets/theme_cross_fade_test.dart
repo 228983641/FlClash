@@ -14,8 +14,8 @@ void main() {
   setUp(() => background = ValueNotifier(_red));
   tearDown(() => background.dispose());
 
-  Future<void> pumpApp(WidgetTester tester, {double opacity = 1}) async {
-    tester.view.physicalSize = const Size(40, 40);
+  Future<void> pumpApp(WidgetTester tester, {double opacity = 1, Size size = const Size(40, 40)}) async {
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -84,6 +84,16 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(await pixel(tester), isColor(Color.lerp(_red, _blue, 0.5)!));
 
+    await tester.pumpAndSettle();
+    expect(await pixel(tester), isColor(_blue));
+  });
+
+  testWidgets('attaches a visible view after a zero-sized background frame', (tester) async {
+    await pumpApp(tester, size: Size.zero);
+    tester.view.physicalSize = const Size(40, 40);
+    background.value = _blue;
+    await tester.pump();
+    expect(tester.takeException(), isNull);
     await tester.pumpAndSettle();
     expect(await pixel(tester), isColor(_blue));
   });
