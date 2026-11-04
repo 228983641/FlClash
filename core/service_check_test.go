@@ -547,6 +547,20 @@ func TestServiceCheckSlotPoolsDoNotStarveEachOther(t *testing.T) {
 	if panel[0].Status != serviceAvailable {
 		t.Errorf("panel alpha = %q, want %q while the prober pool is full", panel[0].Status, serviceAvailable)
 	}
+	health := make(chan []ServiceCheckItem, 1)
+	go func() {
+		health <- handleServiceCheck(&ServiceCheckParams{Names: []string{"alpha"}, Timeout: 5000, Scope: "health"})
+	}()
+	select {
+	case items := <-health:
+		if items[0].Status != serviceAvailable {
+			t.Errorf("health alpha = %q, want available", items[0].Status)
+		}
+	case <-time.After(250 * time.Millisecond):
+		free()
+		<-health
+		t.Fatal("health monitoring waited for the discovery pool")
+	}
 
 	queued := make(chan []ServiceCheckItem, 1)
 	go func() {

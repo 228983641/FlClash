@@ -77,6 +77,39 @@ void main() {
     verify(() => core.outboundIp(any())).called(1);
   });
 
+  test(
+    'health checks finish while discovery is blocked and survive its merge',
+    () async {
+      final pending = Completer<OutboundIpResult?>();
+      when(() => core.outboundIp(any())).thenAnswer((_) => pending.future);
+      final discovery = probe();
+      expect(await notifier.probeHealth(proxyNames: ['A']), 1);
+      final checked = container
+          .read(smartAnchorProvider)
+          .accessByService['claude']!['A']!;
+      verify(
+        () => core.serviceCheck(
+          any(
+            that: isA<ServiceCheckParams>().having(
+              (p) => p.scope,
+              'scope',
+              'health',
+            ),
+          ),
+        ),
+      ).called(1);
+      pending.complete(null);
+      await discovery;
+      expect(
+        container
+            .read(smartAnchorProvider)
+            .accessByService['claude']!['A']!
+            .checkedAt,
+        greaterThanOrEqualTo(checked.checkedAt),
+      );
+    },
+  );
+
   test('a profile change discards results and stops later chunks', () async {
     final pending = Completer<OutboundIpResult?>();
     when(() => core.outboundIp(any())).thenAnswer((_) => pending.future);
