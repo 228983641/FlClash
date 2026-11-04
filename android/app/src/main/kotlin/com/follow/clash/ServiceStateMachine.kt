@@ -153,8 +153,20 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         }
         if (!setupCore()) {
             abandon(request)
-        } else if (launchStart(request).await() == StartOutcome.FAILED) {
-            host.showToast(START_FAILED_MESSAGE)
+        } else {
+            when (launchStart(request).await()) {
+                StartOutcome.FAILED -> host.showToast(START_FAILED_MESSAGE)
+                StartOutcome.STARTED -> if (isCurrent(request)) {
+                    try {
+                        host.ensureFlutterRuntime()
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Exception) {
+                        host.log("Unable to restore Flutter runtime: $error")
+                    }
+                }
+                StartOutcome.SUPERSEDED -> Unit
+            }
         }
     }
 

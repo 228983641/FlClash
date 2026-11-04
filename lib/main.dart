@@ -38,14 +38,16 @@ void main(List<String> args) {
       try {
         await RustLib.init();
         final version = await system.init();
-        final container = await bootstrap.init(version);
+        final background =
+            Platform.isAndroid && args.contains('--background-service');
+        final container = await bootstrap.init(version, background: background);
         await FlClashHttpOverrides.trustCoreRoots();
         HttpOverrides.global = FlClashHttpOverrides(container);
         request.attach(container.read);
         runApp(
           UncontrolledProviderScope(
             container: container,
-            child: const Application(),
+            child: Application(backgroundLaunch: background),
           ),
         );
       } catch (e, s) {

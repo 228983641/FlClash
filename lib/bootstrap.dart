@@ -13,6 +13,7 @@ import 'package:fl_clash/database/database.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/plugins/service.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/providers/smart_anchor.dart';
 import 'package:fl_clash/state.dart';
@@ -36,7 +37,7 @@ class Bootstrap {
 
   BootDecision _bootDecision = const BootDecision();
 
-  Future<ProviderContainer> init(int version) async {
+  Future<ProviderContainer> init(int version, {bool background = false}) async {
     globalState.appEnv = const String.fromEnvironment(
       'APP_ENV',
       defaultValue: 'pre',
@@ -45,7 +46,7 @@ class Bootstrap {
     trayPort = appTray;
     navigationPort = navigation;
     final dynamicColor = await _initDynamicColor();
-    return _initData(version, dynamicColor);
+    return _initData(version, dynamicColor, background: background);
   }
 
   Future<DynamicColorSeeds> _initDynamicColor() async {
@@ -98,8 +99,9 @@ class Bootstrap {
 
   Future<ProviderContainer> _initData(
     int version,
-    DynamicColorSeeds dynamicColor,
-  ) async {
+    DynamicColorSeeds dynamicColor, {
+    required bool background,
+  }) async {
     await _claimDataDirectory();
     globalState.packageInfo = await PackageInfo.fromPlatform();
     var config = await migration.run();
@@ -145,50 +147,92 @@ class Bootstrap {
           WidgetsBinding.instance.platformDispatcher.locale,
     );
     await window?.init(version, config.windowProps);
-    if (system.isAndroid) {
+    if (system.isAndroid && !background) {
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
     return container;
   }
 
-  Future<void> attach() async {
+  Future<void>? _attachOperation;
+
+  Future<void> attach({bool background = false}) async {
+    if (_attachOperation case final active?) {
+      await active;
+      if (!background && !globalState.isAttach) await attach();
+      return;
+    }
     if (globalState.isAttach == true) {
       return;
     }
-    await _initApp();
-    globalState.isAttach = true;
+    final operation = _attach(background);
+    _attachOperation = operation;
+    try {
+      await operation;
+    } finally {
+      _attachOperation = null;
+    }
+  }
+
+  Future<void> _attach(bool background) async {
+    globalState.isAttach = await _initApp(background: background);
+    if (globalState.isAttach) await service?.runtimeReady();
   }
 
   ProviderContainer get _container => globalState.container;
 
-  Future<void> _initApp() async {
-    unawaited(_container.read(systemActionProvider.notifier).updateTray());
-    unawaited(
-      _container.read(profilesActionProvider.notifier).autoUpdateProfiles(),
-    );
-    unawaited(_container.read(commonActionProvider.notifier).autoCheckUpdate());
-    unawaited(
-      autoLaunch?.updateStatus(_container.read(appSettingProvider).autoLaunch),
-    );
-    if (!_container.read(appSettingProvider).silentLaunch) {
-      unawaited(window?.show());
+  Future<bool> _initApp({required bool background}) async {
+    if (background) {
+      if (!await preferences.isInit ||
+          _bootDecision.isDegraded ||
+          _container.read(appSettingProvider).acceptedDisclaimerVersion <
+              disclaimerVersion) {
+        commonPrint.log('[SA] background-runtime-needs-foreground');
+        return false;
+      }
     } else {
-      unawaited(window?.hide());
+      unawaited(_container.read(systemActionProvider.notifier).updateTray());
+      unawaited(
+        _container.read(profilesActionProvider.notifier).autoUpdateProfiles(),
+      );
+      unawaited(
+        _container.read(commonActionProvider.notifier).autoCheckUpdate(),
+      );
+      unawaited(
+        autoLaunch?.updateStatus(
+          _container.read(appSettingProvider).autoLaunch,
+        ),
+      );
+      if (!_container.read(appSettingProvider).silentLaunch) {
+        unawaited(window?.show());
+      } else {
+        unawaited(window?.hide());
+      }
+      await _handleFailedPreference();
+      if (!await _handlerDisclaimer()) {
+        return false;
+      }
+      await _showCrashRecoveryTip();
     }
-    await _handleFailedPreference();
-    if (!await _handlerDisclaimer()) {
-      return;
-    }
-    await _showCrashRecoveryTip();
-    await _container.read(coreActionProvider.notifier).startCore();
     await _container.read(smartAnchorProvider.notifier).restore();
+    await _container.read(coreActionProvider.notifier).startCore();
     if (!_bootDecision.isDegraded) {
-      await _container.read(setupActionProvider.notifier).initStatus();
+      await _container
+          .read(setupActionProvider.notifier)
+          .initStatus(resumeOnly: background);
     }
     _container.read(initProvider.notifier).value = true;
     unawaited(_container.read(resourcesActionProvider.notifier).autoUpdate());
     await bootGuard.markRunning();
-    unawaited(_container.read(locationPermissionsProvider.notifier).refresh());
+    if (!background) {
+      unawaited(
+        _container.read(locationPermissionsProvider.notifier).refresh(),
+      );
+    } else {
+      commonPrint.log(
+        '[SA] background-runtime-ready running=${_container.read(isStartProvider)}',
+      );
+    }
+    return true;
   }
 
   Future<void> _showCrashRecoveryTip() async {

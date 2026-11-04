@@ -151,8 +151,26 @@ class SetupAction extends _$SetupAction {
   @protected
   Future<DateTime?> serviceStartTime() async => service?.getRunTime();
 
-  Future<void> initStatus() async {
+  @protected
+  Future<DateTime?> adoptServiceRun() async => service?.adoptRun();
+
+  Future<void> initStatus({bool resumeOnly = false}) async {
     if (!globalState.needInitStatus) {
+      return;
+    }
+    if (resumeOnly) {
+      final request = _latestRunRequest;
+      final options = await ref.read(vpnOptionsProvider.future);
+      final md5 = await preferences.getAppliedConfigMd5();
+      final startedAt = await adoptServiceRun();
+      if (!ref.mounted || !identical(request, _latestRunRequest)) return;
+      _startTime = startedAt;
+      _setLocalRunning(startedAt != null);
+      ref.read(runningVpnOptionsProvider.notifier).value = startedAt == null
+          ? null
+          : options;
+      globalState.lastConfigMd5 = md5;
+      globalState.needInitStatus = false;
       return;
     }
     _startTime = await serviceStartTime();

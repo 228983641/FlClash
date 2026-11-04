@@ -149,6 +149,23 @@ class Service {
     return DateTime.fromMillisecondsSinceEpoch(ms);
   }
 
+  Future<DateTime?> adoptRun() async {
+    _startRequested = true;
+    final revision = ++_commandRevision;
+    final ms = await methodChannel.invokeMethod<int>('adoptRun', revision) ?? 0;
+    if (revision != _commandRevision || !_startRequested) {
+      return null;
+    }
+    if (ms == 0) {
+      _startRequested = false;
+      return null;
+    }
+    return DateTime.fromMillisecondsSinceEpoch(ms);
+  }
+
+  Future<void> runtimeReady() =>
+      methodChannel.invokeMethod<void>('runtimeReady');
+
   bool get hasListeners {
     return _listeners.isNotEmpty;
   }

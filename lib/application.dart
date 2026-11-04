@@ -54,14 +54,19 @@ Widget buildManagerStack({
 }
 
 class Application extends ConsumerStatefulWidget {
-  const Application({super.key});
+  const Application({super.key, this.backgroundLaunch = false});
+
+  final bool backgroundLaunch;
 
   @override
   ConsumerState<Application> createState() => ApplicationState();
 }
 
-class ApplicationState extends ConsumerState<Application> {
+class ApplicationState extends ConsumerState<Application>
+    with WidgetsBindingObserver {
   Timer? _autoUpdateProfilesTaskTimer;
+  late bool _backgroundLaunch;
+  bool _linksInitialized = false;
   bool _preHasVpn = false;
   // Windows can only watch SIGINT and SIGHUP.
   final _terminateSignals = system.isDesktop && !system.isWindows
@@ -71,18 +76,45 @@ class ApplicationState extends ConsumerState<Application> {
   @override
   void initState() {
     super.initState();
-    SystemNavigator.setFrameworkHandlesBack(true);
+    _backgroundLaunch =
+        widget.backgroundLaunch &&
+        WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed;
+    WidgetsBinding.instance.addObserver(this);
+    if (!_backgroundLaunch) unawaited(_prepareUi());
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) async {
       if (globalState.navigatorKey.currentContext != null) {
-        await bootstrap.attach();
+        await bootstrap.attach(background: _backgroundLaunch);
       } else {
         exit(0);
       }
       _autoUpdateProfilesTask();
-      _initLink();
-      if (!safeModeBuild) {
-        unawaited(app?.initShortcuts());
-      }
+      if (!_backgroundLaunch) _initUiLinks();
+    });
+  }
+
+  Future<void> _prepareUi() async {
+    await SystemNavigator.setFrameworkHandlesBack(true);
+    if (system.isAndroid) {
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
+  }
+
+  void _initUiLinks() {
+    if (_linksInitialized) return;
+    _linksInitialized = true;
+    _initLink();
+    if (!safeModeBuild) unawaited(app?.initShortcuts());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_backgroundLaunch || state != AppLifecycleState.resumed) return;
+    setState(() => _backgroundLaunch = false);
+    unawaited(_prepareUi());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await bootstrap.attach();
+      if (mounted) _initUiLinks();
     });
   }
 
@@ -189,12 +221,13 @@ class ApplicationState extends ConsumerState<Application> {
           home: KeyboardInsetHold(child: child!),
         );
       },
-      child: const HomePage(),
+      child: _backgroundLaunch ? const SizedBox.shrink() : const HomePage(),
     );
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     linkManager.destroy();
     _autoUpdateProfilesTaskTimer?.cancel();
     super.dispose();

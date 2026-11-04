@@ -15,6 +15,8 @@ import com.follow.clash.service.models.NotificationParams
 import com.follow.clash.service.models.VpnOptions
 import io.flutter.embedding.engine.FlutterEngine
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 internal data class ServiceRuntime(
     val vpn: Boolean,
@@ -48,6 +50,8 @@ internal interface ServiceStateHost {
     fun app(): AppGateway?
 
     fun notifyStopped()
+
+    suspend fun ensureFlutterRuntime()
 
     suspend fun quickSetup(initParams: String, setupParams: String): Result<String>
 
@@ -115,7 +119,9 @@ internal object AndroidServiceStateHost : ServiceStateHost {
                 Manifest.permission.ACCESS_LOCAL_NETWORK,
             ) == PackageManager.PERMISSION_GRANTED
 
-    override fun tile(): TileGateway? = flutterEngine?.plugin<TilePlugin>()?.let { plugin ->
+    override fun tile(): TileGateway? = flutterEngine
+        ?.takeIf { it.plugin<ServicePlugin>()?.runtimeReady == true }
+        ?.plugin<TilePlugin>()?.let { plugin ->
         TileGateway(plugin::handleStart)
     }
 
@@ -140,6 +146,12 @@ internal object AndroidServiceStateHost : ServiceStateHost {
 
     override fun notifyStopped() {
         flutterEngine?.plugin<ServicePlugin>()?.notifyStopped()
+    }
+
+    override suspend fun ensureFlutterRuntime() = withContext(Dispatchers.Main) {
+        if (ServiceState.isRunRequested && ServiceController.runtime != null) {
+            FlutterEngineHost.ensureRunning()
+        }
     }
 
     override suspend fun quickSetup(initParams: String, setupParams: String): Result<String> =
