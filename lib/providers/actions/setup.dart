@@ -529,7 +529,12 @@ class SetupAction extends _$SetupAction {
         ? await setupState.script?.content
         : null;
     final hasScript = scriptContent?.isNotEmpty == true;
-    final profileBase = !isCustom && !hasScript
+    final smartAnchorInput = await ref
+        .read(smartAnchorProvider.notifier)
+        .refreshAggregationSources();
+    // Compact bases omit proxies and groups. Ranking must see the primary
+    // subscription too, including when no aggregation source is selected.
+    final profileBase = !isCustom && !hasScript && !smartAnchorInput.hasWork
         ? await _core.getProfileBase(profileId)
         : null;
     Map<String, dynamic> rawConfig = isCustom
@@ -546,9 +551,6 @@ class SetupAction extends _$SetupAction {
     if (hasScript) {
       rawConfig = await handleEvaluate(scriptContent!, rawConfig);
     }
-    final smartAnchorInput = await ref
-        .read(smartAnchorProvider.notifier)
-        .refreshAggregationSources();
     if (!isCustom && smartAnchorInput.hasWork) {
       final enabledServices = smartAnchorInput.services.where(
         (service) => service.isEnabled,
