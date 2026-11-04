@@ -1187,6 +1187,7 @@ void main() {
         var preloadRan = false;
         final scoped = ProviderContainer(
           overrides: [
+            smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
             profilesProvider.overrideWith(() => TestProfiles([profile])),
             currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
             setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
@@ -1227,6 +1228,7 @@ void main() {
         });
         final scoped = ProviderContainer(
           overrides: [
+            smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
             profilesProvider.overrideWith(() => TestProfiles([profile])),
             currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
             setupStateProvider.overrideWith(
@@ -1264,6 +1266,7 @@ void main() {
         when(() => core.setupConfig(any())).thenAnswer((_) async => '');
         final scoped = ProviderContainer(
           overrides: [
+            smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
             currentProfileProvider.overrideWithValue(null),
             setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
@@ -1301,6 +1304,7 @@ void main() {
         });
         final scoped = ProviderContainer(
           overrides: [
+            smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
             profilesProvider.overrideWith(() => TestProfiles([profile])),
             currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
             setupStateProvider.overrideWith(
@@ -1342,6 +1346,7 @@ void main() {
       var setupState = nullProfileSetupState.copyWith(profileId: profile.id);
       final scoped = ProviderContainer(
         overrides: [
+          smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
           profilesProvider.overrideWith(() => TestProfiles([profile])),
           currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
           setupStateProvider.overrideWith((_, _) => setupState),
@@ -1387,6 +1392,7 @@ void main() {
       });
       final scoped = ProviderContainer(
         overrides: [
+          smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
           profilesProvider.overrideWith(() => TestProfiles([profile])),
           currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
           setupStateProvider.overrideWith(
@@ -1426,6 +1432,7 @@ void main() {
       });
       final scoped = ProviderContainer(
         overrides: [
+          smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
           profilesProvider.overrideWith(() => TestProfiles([profile])),
           currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
           setupStateProvider.overrideWith(
@@ -1457,6 +1464,7 @@ void main() {
       when(() => core.setupConfig(any())).thenAnswer((_) async => '');
       final scoped = ProviderContainer(
         overrides: [
+          smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
           profilesProvider.overrideWith(() => TestProfiles([profile])),
           currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
           setupStateProvider.overrideWith(
@@ -1652,6 +1660,7 @@ void main() {
       });
       final scoped = ProviderContainer(
         overrides: [
+          smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
           profilesProvider.overrideWith(() => TestProfiles([profile])),
           setupStateProvider.overrideWith(
             (_, profileId) =>
@@ -1689,6 +1698,7 @@ void main() {
         );
         final scoped = ProviderContainer(
           overrides: [
+            smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
             profilesProvider.overrideWith(() => TestProfiles([profile])),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
           ],
@@ -1723,6 +1733,7 @@ void main() {
         when(() => core.stopListener()).thenAnswer((_) async => true);
         final scoped = ProviderContainer(
           overrides: [
+            smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
             profilesProvider.overrideWith(() => TestProfiles([profile])),
             currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
             setupStateProvider.overrideWith(
@@ -1879,6 +1890,7 @@ void main() {
       );
       final scoped = ProviderContainer(
         overrides: [
+          smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
           setupActionProvider.overrideWith(SetupAction.new),
         ],
@@ -1949,6 +1961,7 @@ void main() {
       );
       final scoped = ProviderContainer(
         overrides: [
+          smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
           setupActionProvider.overrideWith(SetupAction.new),
         ],
@@ -2006,6 +2019,7 @@ void main() {
       );
       final scoped = ProviderContainer(
         overrides: [
+          smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
           setupActionProvider.overrideWith(SetupAction.new),
         ],
@@ -2045,6 +2059,7 @@ void main() {
       when(() => core.getConfig(any())).thenAnswer((_) async => {});
       final scoped = ProviderContainer(
         overrides: [
+          smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
           setupActionProvider.overrideWith(SetupAction.new),
         ],
@@ -2078,6 +2093,7 @@ void main() {
         when(() => core.setupConfig(any())).thenThrow(StateError('rejected'));
         final scoped = ProviderContainer(
           overrides: [
+            smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
             currentProfileProvider.overrideWithValue(null),
             setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
@@ -2102,6 +2118,7 @@ void main() {
         when(() => core.setupConfig(any())).thenAnswer((_) async => '');
         final scoped = ProviderContainer(
           overrides: [
+            smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
             currentProfileProvider.overrideWithValue(null),
             setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
@@ -2132,6 +2149,7 @@ void main() {
         ).thenAnswer((_) async => 'config rejected');
         final scoped = ProviderContainer(
           overrides: [
+            smartAnchorProvider.overrideWith(_DisabledSmartAnchor.new),
             currentProfileProvider.overrideWithValue(null),
             setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),

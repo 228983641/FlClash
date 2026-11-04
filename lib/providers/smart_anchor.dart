@@ -414,6 +414,7 @@ class SmartAnchor extends _$SmartAnchor {
           proxyName: name,
           targets: targets,
           scope: serviceCheckScopeHealth,
+          timeout: const Duration(seconds: 5),
         ),
       );
       final names = proxyNames

@@ -222,6 +222,8 @@ void main() {
     );
     registerFallbackValue(Duration.zero);
     registerFallbackValue(<String>[]);
+    registerFallbackValue(const ServiceCheckParams(timeout: 1));
+    registerFallbackValue(const OutboundIpParams(timeout: 1));
     core = MockCoreHandlerInterface();
     await AppLocalizations.load(const Locale('en'));
   });
@@ -1772,6 +1774,74 @@ void main() {
     });
 
     tearDown(() => testDatabase.close());
+
+    test('two health ticks switch with discovery still blocked', () async {
+      const groupName = '🎯 Smart-Claude';
+      const profile = Profile(
+        id: 7,
+        autoUpdateDuration: Duration.zero,
+        selectedMap: {groupName: 'US-1'},
+      );
+      final container = buildContainer(
+        profile: profile,
+        smartAnchor: () => _FailoverSmartAnchor(borrowed: false),
+      );
+      container.read(initProvider.notifier).value = true;
+      container.read(runTimeProvider.notifier).value = 1;
+      container.read(groupsProvider.notifier).value = const [
+        Group(
+          type: GroupType.Selector,
+          name: groupName,
+          now: 'US-1',
+          all: [
+            Proxy(name: 'US-1', type: 'ss'),
+            Proxy(name: 'US-2', type: 'ss'),
+          ],
+        ),
+      ];
+      final discovery = Completer<OutboundIpResult?>();
+      when(() => core.outboundIp(any())).thenAnswer((_) => discovery.future);
+      final routes = <String>[];
+      when(() => core.serviceCheck(any())).thenAnswer((invocation) async {
+        final params =
+            invocation.positionalArguments.single as ServiceCheckParams;
+        routes.add('${params.scope}:${params.proxyName}');
+        await Future<void>.delayed(const Duration(milliseconds: 2));
+        return [
+          ServiceCheckItem(
+            name: 'claude',
+            status: params.proxyName == 'US-1' ? 'failed' : 'available',
+            failureKind: params.proxyName == 'US-1' ? 'network' : '',
+            checkedAt: DateTime.now().millisecondsSinceEpoch,
+          ),
+        ];
+      });
+      when(
+        () => core.changeProxy(any()),
+      ).thenAnswer((_) async => const ChangeProxyResult(changed: true));
+      when(core.closeConnections).thenAnswer((_) async => true);
+      final action = actionOf(container);
+      await action.smartAnchorMonitorTick();
+      expect(
+        container.read(currentProfileProvider)!.selectedMap[groupName],
+        'US-1',
+      );
+      await action.smartAnchorMonitorTick();
+      expect(routes.take(4), [
+        'health:US-1',
+        'health:US-2',
+        'health:US-1',
+        'health:US-2',
+      ]);
+      expect(discovery.isCompleted, isFalse);
+      expect(
+        container.read(currentProfileProvider)!.selectedMap[groupName],
+        'US-2',
+      );
+      await applySmartSwitch();
+      discovery.complete(null);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
 
     test(
       'runs the lock compliance check even with auto failover off',

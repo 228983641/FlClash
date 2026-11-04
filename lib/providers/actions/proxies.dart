@@ -907,20 +907,23 @@ class ProxiesAction extends _$ProxiesAction {
         }
       }
       final delays = flattenDelays(ref.read(delayDataSourceProvider));
-      final healthServices = <String, List<String>>{};
+      final currentServices = <String, List<String>>{};
+      final standbyServices = <String, List<String>>{};
       for (final service in smart.services.where((s) => s.isEnabled)) {
-        final current = groups.getGroup(smartGroupName(service))?.now;
+        final group = groups.getGroup(smartGroupName(service));
+        if (group == null) continue;
+        final current = group.now;
         final ranked = rankedProxiesForService(
           smart,
           service,
-          names,
+          _memberNamesOf(group, groupNames),
           delays: delays,
         );
-        for (final name in {
-          if (current != null) current,
-          ...ranked.where((name) => name != current).take(2),
-        }) {
-          (healthServices[name] ??= []).add(service.serviceId);
+        if (current != null) {
+          (currentServices[current] ??= []).add(service.serviceId);
+        }
+        for (final name in ranked.where((name) => name != current).take(2)) {
+          (standbyServices[name] ??= []).add(service.serviceId);
         }
       }
       var tickProbed = 0;
@@ -928,8 +931,17 @@ class ProxiesAction extends _$ProxiesAction {
         tickProbed = await ref
             .read(smartAnchorProvider.notifier)
             .probeHealth(
-              proxyNames: healthServices.keys.toList(),
-              servicesByProxy: healthServices,
+              proxyNames: currentServices.keys.toList(),
+              servicesByProxy: currentServices,
+            );
+        // Corroboration must finish after the current route's verdict: a
+        // fast standby answer before a slow failed dial cannot prove the
+        // network still works at the time that failure was observed.
+        tickProbed += await ref
+            .read(smartAnchorProvider.notifier)
+            .probeHealth(
+              proxyNames: standbyServices.keys.toList(),
+              servicesByProxy: standbyServices,
             );
       }
       final tickFailover = smartAnchorFailoverCheck();

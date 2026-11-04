@@ -1,0 +1,62 @@
+name: Windows acceptance
+
+on:
+  push:
+    branches: [smart-anchor-v2]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.1'
+          cache-dependency-path: core/go.sum
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            services/helper
+            plugins/rust_api/rust
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.6'
+          cache: true
+      - name: Enable long paths
+        run: git config --global core.longpaths true
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Windows service tests
+        run: cargo test --manifest-path services/helper/Cargo.toml --features windows-service
+      - name: Windows lifecycle and smart routing tests
+        run: flutter test test/core/desktop test/core/service_test.dart test/providers/smart_anchor_probe_test.dart test/smart_anchor
+      - name: Build safe Windows bundle
+        run: flutter build windows --debug --dart-define=SAFE_MODE=true
+      - name: Record build identity
+        shell: pwsh
+        run: |
+          $bundle = 'build/windows/x64/runner/Debug'
+          $identity = @{
+            commit = '${{ github.sha }}'
+            safeMode = $true
+            files = @(Get-ChildItem $bundle -File -Recurse | ForEach-Object {
+              @{ path = [IO.Path]::GetRelativePath($bundle, $_.FullName); sha256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
+            })
+          }
+          $identity | ConvertTo-Json -Depth 5 | Set-Content "$bundle/build-verification.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-safe-${{ github.sha }}
+          path: build/windows/x64/runner/Debug

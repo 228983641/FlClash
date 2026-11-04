@@ -82,6 +82,20 @@ void main() {
     () async {
       final pending = Completer<OutboundIpResult?>();
       when(() => core.outboundIp(any())).thenAnswer((_) => pending.future);
+      final healthTime = DateTime.now().millisecondsSinceEpoch;
+      when(() => core.serviceCheck(any())).thenAnswer((invocation) async {
+        final params =
+            invocation.positionalArguments.single as ServiceCheckParams;
+        return [
+          ServiceCheckItem(
+            name: 'claude',
+            status: params.scope == 'health' ? 'available' : 'timeout',
+            checkedAt: params.scope == 'health'
+                ? healthTime
+                : healthTime - 1000,
+          ),
+        ];
+      });
       final discovery = probe();
       expect(await notifier.probeHealth(proxyNames: ['A']), 1);
       final checked = container
@@ -105,7 +119,7 @@ void main() {
             .read(smartAnchorProvider)
             .accessByService['claude']!['A']!
             .checkedAt,
-        greaterThanOrEqualTo(checked.checkedAt),
+        checked.checkedAt,
       );
     },
   );
