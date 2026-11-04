@@ -35,6 +35,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
+      - name: Free disk space for Android packaging
+        shell: bash
+        run: |
+          set -euo pipefail
+          df -h /
+          for unused_sdk in /usr/share/dotnet /usr/local/lib/ghc /usr/local/share/boost /opt/ghc; do
+            if [ -d "$unused_sdk" ] && [ "$(realpath "$unused_sdk")" = "$unused_sdk" ]; then
+              du -sh "$unused_sdk"
+              sudo rm -rf -- "$unused_sdk"
+            fi
+          done
+          df -h /
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
