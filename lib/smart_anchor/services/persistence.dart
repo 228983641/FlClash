@@ -425,7 +425,8 @@ class SmartAnchorStore {
         anchors[key.substring('anchor:'.length)] = ServiceAnchor.fromJson(map);
       } else if (key.startsWith('node:')) {
         final node = NodeMetadataCache.fromJson(map);
-        if (!node.isExpired && node.proxyName == key.substring('node:'.length)) {
+        if (!node.isExpired &&
+            node.proxyName == key.substring('node:'.length)) {
           metadata[key.substring('node:'.length)] = node;
         }
       } else if (key.startsWith('access:')) {
