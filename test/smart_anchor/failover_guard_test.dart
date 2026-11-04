@@ -1,3 +1,4 @@
+import 'package:fl_clash/smart_anchor/models/switch_event.dart';
 import 'package:fl_clash/smart_anchor/services/service_access.dart';
 import 'package:fl_clash/smart_anchor/services/sticky_monitor.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -35,6 +36,64 @@ FailoverTarget? note(
 }
 
 void main() {
+  SwitchEvent switched(int time, {String service = 'youtube', String to = 'B'}) {
+    return SwitchEvent(
+      serviceId: service,
+      fromProxy: 'A',
+      toProxy: to,
+      reason: 'networkFailed',
+      switchedAt: time,
+    );
+  }
+
+  test('restored history is sorted, idempotent and service-specific', () {
+    final guard = FailoverGuard();
+    final history = {
+      'youtube': [switched(180000), switched(1000), switched(90000)],
+      'claude': [switched(200000, service: 'claude')],
+    };
+    guard.restoreSwitches(history, 210000);
+    guard.restoreSwitches(history, 210000);
+    expect(guard.isFrozen('youtube', 210000), isTrue);
+    expect(guard.isFrozen('claude', 210000), isFalse);
+    expect(guard.frozenUntilMs('youtube', 210000), 601000);
+    expect(guard.isFrozen('youtube', 601001), isFalse);
+  });
+
+  test('old, mismatched and unchanged events do not consume the budget', () {
+    final guard = FailoverGuard();
+    guard.restoreSwitches({
+      'youtube': [
+        switched(1),
+        switched(650000, service: 'claude'),
+        switched(650000, to: 'A'),
+        switched(0),
+      ],
+    }, 700000);
+    note(guard, preferred: ['B'], nowMs: 700001);
+    expect(note(guard, preferred: ['B'], nowMs: 700002)?.name, 'B');
+  });
+
+  test('restored latest switch determines cooldown regardless of order', () {
+    final guard = FailoverGuard();
+    guard.restoreSwitches({
+      'youtube': [switched(150000), switched(1000)],
+    }, 160000);
+    note(guard, preferred: ['B'], nowMs: 160001);
+    expect(note(guard, preferred: ['B'], nowMs: 160002), isNull);
+    note(guard, preferred: ['B'], nowMs: 210000);
+    expect(note(guard, preferred: ['B'], nowMs: 210001)?.name, 'B');
+  });
+
+  test('clock rollback keeps distinct switches but bounds the freeze', () {
+    final guard = FailoverGuard();
+    guard.restoreSwitches({
+      'youtube': [switched(200000), switched(300000), switched(400000)],
+    }, 100000);
+    expect(guard.isFrozen('youtube', 100000), isTrue);
+    expect(guard.isFrozen('youtube', 700001), isFalse);
+  });
+
   test('unconfirmed proposals do not consume the freeze budget', () {
     final guard = FailoverGuard();
     for (var i = 0; i < 8; i++) {
