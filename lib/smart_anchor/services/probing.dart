@@ -320,7 +320,7 @@ class SmartAnchorProber {
             egressIp: egress?.ip ?? '',
             status: entry.value.status,
             failureKind: entry.value.failureKind,
-            checkedAt: nowMs,
+            checkedAt: entry.value.checkedAt?.millisecondsSinceEpoch ?? nowMs,
           );
         }
         final borrowers =
@@ -332,7 +332,7 @@ class SmartAnchorProber {
             egressIp: egress?.ip ?? '',
             status: entry.value.status,
             failureKind: entry.value.failureKind,
-            checkedAt: nowMs,
+            checkedAt: entry.value.checkedAt?.millisecondsSinceEpoch ?? nowMs,
             borrowedFrom: borrower.value,
           );
         }
