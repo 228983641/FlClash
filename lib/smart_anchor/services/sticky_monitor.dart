@@ -123,6 +123,16 @@ class FailoverGuard {
           continue;
         }
         final candidateAccess = accessByProxy[name];
+        if (reason == ServiceAccessReason.networkFailed &&
+            (candidateAccess == null ||
+                !candidateAccess.isAccessible ||
+                candidateAccess.borrowedFrom != null ||
+                candidateAccess.serviceId != serviceId ||
+                candidateAccess.checkedAt < checkedAt ||
+                candidateAccess.checkedAt > nowMs ||
+                nowMs - candidateAccess.checkedAt > 2 * 60 * 1000)) {
+          continue;
+        }
         if (candidateAccess != null &&
             !candidateAccess.isExpired &&
             candidateAccess.borrowedFrom == null &&

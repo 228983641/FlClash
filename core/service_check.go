@@ -58,6 +58,7 @@ type ServiceCheckParams struct {
 type ServiceCheckItem struct {
 	Name         string     `json:"name"`
 	Status       string     `json:"status"`
+	FailureKind  string     `json:"failure-kind,omitempty"`
 	Region       string     `json:"region,omitempty"`
 	Delay        int64      `json:"delay,omitempty"`
 	Chains       []string   `json:"chains,omitempty"`
@@ -196,6 +197,9 @@ func runServiceCheck(ctx context.Context, checker serviceChecker, proxyName stri
 			item.Status = serviceCancelled
 			item.Delay = 0
 		}
+		if (item.Status == serviceFailed || item.Status == serviceTimeout) && item.FailureKind == "" {
+			item.FailureKind = "unknown"
+		}
 		item.Name = checker.name
 		item.CheckedAt = time.Now().UnixMilli()
 		item.CoreEpoch = epoch
@@ -308,17 +312,23 @@ func checkReachable(url string) func(serviceEnv) ServiceCheckItem {
 
 func itemFrom(result *ProbeResult) ServiceCheckItem {
 	if result == nil {
-		return ServiceCheckItem{Status: serviceFailed}
+		return ServiceCheckItem{Status: serviceFailed, FailureKind: "unknown"}
 	}
 	item := ServiceCheckItem{Delay: result.Delay, Chains: result.Chains}
 	switch result.Error {
 	case "":
 	case probeErrorTimeout:
 		item.Status = serviceTimeout
+		item.FailureKind = "network"
 		item.Delay = 0
 	default:
 		item.Status = serviceFailed
+		item.FailureKind = "network"
 		item.Delay = 0
+	}
+	if result.Error == "" && (result.StatusCode == http.StatusTooManyRequests || result.StatusCode >= 500) {
+		item.Status = serviceUnavailable
+		item.FailureKind = "service"
 	}
 	return item
 }
@@ -329,7 +339,6 @@ func statusFromCode(code int) string {
 		return serviceAvailable
 	case code == http.StatusUnauthorized,
 		code == http.StatusForbidden,
-		code == http.StatusTooManyRequests,
 		code == http.StatusUnavailableForLegalReasons:
 		return serviceRestricted
 	default:

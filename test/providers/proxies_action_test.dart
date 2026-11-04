@@ -76,7 +76,7 @@ class _FailoverSmartAnchor extends SmartAnchor {
             proxyName: 'US-1',
             egressIp: '1.2.3.4',
             reason: ServiceAccessReason.networkFailed,
-            checkedAt: DateTime.now().millisecondsSinceEpoch,
+            checkedAt: DateTime.now().millisecondsSinceEpoch - 1000,
             borrowedFrom: borrowed ? 'openai' : null,
           ),
         },
@@ -1715,6 +1715,13 @@ void main() {
                 accessByService: {
                   'claude': {
                     ...smart.accessByService['claude']!,
+                    'US-2': ServiceAccessResult(
+                      serviceId: 'claude',
+                      proxyName: 'US-2',
+                      egressIp: '1.2.3.4',
+                      reason: ServiceAccessReason.accessible,
+                      checkedAt: access.checkedAt + 1,
+                    ),
                     'US-1': ServiceAccessResult.fromJson({
                       ...access.toJson(),
                       'checkedAt': access.checkedAt + 1,

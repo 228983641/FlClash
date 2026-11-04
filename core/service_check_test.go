@@ -574,7 +574,7 @@ func TestStatusFromCode(t *testing.T) {
 		http.StatusNoContent:                  serviceAvailable,
 		http.StatusUnauthorized:               serviceRestricted,
 		http.StatusForbidden:                  serviceRestricted,
-		http.StatusTooManyRequests:            serviceRestricted,
+		http.StatusTooManyRequests:            serviceUnavailable,
 		http.StatusUnavailableForLegalReasons: serviceRestricted,
 		http.StatusNotFound:                   serviceUnavailable,
 		http.StatusInternalServerError:        serviceUnavailable,

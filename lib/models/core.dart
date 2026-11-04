@@ -300,6 +300,7 @@ abstract class ServiceCheckItem with _$ServiceCheckItem {
   const factory ServiceCheckItem({
     @Default('') String name,
     @Default('') String status,
+    @JsonKey(name: 'failure-kind') @Default('') String failureKind,
     @Default('') String region,
     @Default(0) int delay,
     @Default([]) List<String> chains,

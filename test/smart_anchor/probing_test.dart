@@ -321,7 +321,10 @@ void main() {
       egressLookup: (_) async => null,
       serviceCheckLookup: (_, _) async {
         return {
-          ServiceTarget.claude: const ServiceCheck(ServiceProbeStatus.timeout),
+          ServiceTarget.claude: const ServiceCheck(
+            ServiceProbeStatus.timeout,
+            failureKind: 'network',
+          ),
         };
       },
       geoLookup:

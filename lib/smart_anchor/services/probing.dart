@@ -78,13 +78,22 @@ ServiceAccessResult accessResultFromStatus({
   required String egressIp,
   required ServiceProbeStatus status,
   required int checkedAt,
+  String? failureKind,
   String? borrowedFrom,
 }) {
   return ServiceAccessResult(
     serviceId: serviceId,
     proxyName: proxyName,
     egressIp: egressIp,
-    reason: accessReasonFromStatus(status),
+    reason: switch (failureKind) {
+      'service' => ServiceAccessReason.serviceDown,
+      'unknown' => ServiceAccessReason.unknown,
+      ''
+          when status == ServiceProbeStatus.failed ||
+              status == ServiceProbeStatus.timeout =>
+        ServiceAccessReason.unknown,
+      _ => accessReasonFromStatus(status),
+    },
     checkedAt: checkedAt,
     borrowedFrom: borrowedFrom,
   );
@@ -311,6 +320,7 @@ class SmartAnchorProber {
             proxyName: proxyName,
             egressIp: egress?.ip ?? '',
             status: entry.value.status,
+            failureKind: entry.value.failureKind,
             checkedAt: nowMs,
           );
         }
@@ -322,6 +332,7 @@ class SmartAnchorProber {
             proxyName: proxyName,
             egressIp: egress?.ip ?? '',
             status: entry.value.status,
+            failureKind: entry.value.failureKind,
             checkedAt: nowMs,
             borrowedFrom: borrower.value,
           );

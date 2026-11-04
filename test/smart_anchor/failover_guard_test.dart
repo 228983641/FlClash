@@ -16,7 +16,7 @@ ServiceAccessResult resultFor(String name, ServiceAccessReason reason) {
 FailoverTarget? note(
   FailoverGuard guard, {
   String currentName = 'A',
-  ServiceAccessReason? reason = ServiceAccessReason.networkFailed,
+  ServiceAccessReason? reason = ServiceAccessReason.blocked,
   List<String> preferred = const [],
   List<String> fallback = const [],
   Map<String, ServiceAccessResult> accessByProxy = const {},

@@ -73,6 +73,7 @@ List<ServiceTarget> orderServiceTargets(List<String> order) {
 class ServiceCheck {
   const ServiceCheck(
     this.status, {
+    this.failureKind = '',
     this.delay,
     this.chains = const [],
     this.region,
@@ -85,6 +86,7 @@ class ServiceCheck {
   factory ServiceCheck.of(ServiceCheckItem item) {
     return ServiceCheck(
       ServiceProbeStatus.byId(item.status),
+      failureKind: item.failureKind,
       delay: item.delay > 0 ? item.delay : null,
       chains: item.chains,
       region: item.region.isEmpty ? null : item.region,
@@ -98,6 +100,7 @@ class ServiceCheck {
   }
 
   final ServiceProbeStatus status;
+  final String failureKind;
   final int? delay;
   final List<String> chains;
   final String? region;
@@ -112,6 +115,7 @@ class ServiceCheck {
   bool operator ==(Object other) =>
       other is ServiceCheck &&
       other.status == status &&
+      other.failureKind == failureKind &&
       other.delay == delay &&
       listEquals(other.chains, chains) &&
       other.region == region &&
@@ -123,6 +127,7 @@ class ServiceCheck {
   @override
   int get hashCode => Object.hash(
     status,
+    failureKind,
     delay,
     Object.hashAll(chains),
     region,
