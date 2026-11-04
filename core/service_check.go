@@ -68,15 +68,14 @@ type ServiceCheckItem struct {
 	Hits         []RouteHit `json:"hits,omitempty"`
 }
 
-// The panel scope value the host sends; every other scope shares the
-// prober pool below.
+// Explicit caller scopes have bounded, independent pools. Unknown callers
+// share discovery's pool.
 const scopePanel = "panel"
 const scopeHealth = "health"
 
 var (
-	// One slot pool per caller scope, so a panel sweep cannot starve the
-	// prober and the prober cannot starve the panel. Each pool keeps the
-	// old sweep bound; together they cap service checks at twice that.
+	// Each caller gets four checker slots. Health also reserves four HTTP
+	// slots, so discovery cannot block monitoring inside a checker.
 	servicePanelCheckSlots  = make(slots, serviceCheckConcurrency)
 	serviceProbeCheckSlots  = make(slots, serviceCheckConcurrency)
 	serviceHealthCheckSlots = make(slots, serviceCheckConcurrency)
@@ -163,6 +162,9 @@ func handleServiceCheck(params *ServiceCheckParams) []ServiceCheckItem {
 	timeout := timeoutFromMillis(params.Timeout, defaultProbeTimeout)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout*serviceSweepBudgetFactor)
 	defer cancel()
+	if params.Scope == scopeHealth {
+		ctx = context.WithValue(ctx, healthProbeContextKey{}, true)
+	}
 
 	// Claimed before queueing, so a check waiting for a slot is cancelled the
 	// moment its service is asked again.

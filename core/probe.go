@@ -32,10 +32,13 @@ const (
 )
 
 var (
-	probeSlots = make(slots, probeConcurrency)
+	probeSlots       = make(slots, probeConcurrency)
+	healthProbeSlots = make(slots, serviceCheckConcurrency)
 
 	pendingProbeRoutes sync.Map
 )
+
+type healthProbeContextKey struct{}
 
 type probeRoute struct {
 	chains      []string
@@ -295,10 +298,14 @@ func runProbe(parent context.Context, req probeRequest) *ProbeResult {
 	if timeout <= 0 {
 		timeout = defaultProbeTimeout
 	}
-	if !probeSlots.acquireWithin(parent, timeout) {
+	pool := probeSlots
+	if parent.Value(healthProbeContextKey{}) == true {
+		pool = healthProbeSlots
+	}
+	if !pool.acquireWithin(parent, timeout) {
 		return nil
 	}
-	defer probeSlots.release()
+	defer pool.release()
 
 	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
