@@ -43,7 +43,11 @@ jobs:
       - name: Windows lifecycle and smart routing tests
         run: flutter test test/core/desktop test/core/service_test.dart test/providers/smart_anchor_probe_test.dart test/smart_anchor
       - name: Build safe Windows bundle
-        run: flutter build windows --debug --dart-define=SAFE_MODE=true
+        shell: pwsh
+        run: |
+          $resource = 'windows/runner/Runner.rc'
+          (Get-Content $resource -Raw).Replace('VALUE "ProductName", "clash"', 'VALUE "ProductName", "FlClashAcceptance"') | Set-Content $resource -NoNewline
+          flutter build windows --debug --dart-define=SAFE_MODE=true
       - name: Record build identity
         shell: pwsh
         run: |

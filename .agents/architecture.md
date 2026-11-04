@@ -308,6 +308,10 @@ Android deliberately keeps Flutter requests optimistic and the native layer auth
   `ServiceState.requestStart()`/`requestStop()` or the explicit system-action handlers instead of inferring intent from a
   callback.
 
+Runtime adoption waits for the pending native start, including quick setup and permission preparation before
+`transitionLock`. A newer stop releases adoption with zero. `ServicePlugin.adoptRun` uses this observation
+instead of a transient stopped snapshot.
+
 Quick Settings, notification, revoke, and Always-on VPN paths converge on the same owner:
 
 - With a Flutter engine attached, `ServiceState.handleStartAction()` forwards through `TilePlugin` to `TileManager`,
@@ -355,7 +359,8 @@ puts the profile's bulk sections into the overlay, appends the profile's rules a
 for the Android service and the controller's reload, and parses it. `config.yaml` is encoded a slice at a time, because on a
 profile of 100k proxies and 2M rules one `Encode` call doubles the peak heap. The preview reads the YAML `buildProfile`
 merges into the spill directory, and the extend page only the names
-and types `getProfileOutbounds` lists; a script extension still needs the whole config from `getConfig`.
+and types `getProfileOutbounds` lists. Scripts and smart-anchor configuration use the whole config from
+`getConfig`: ranking needs primary subscription outbounds even without aggregation.
 
 Go event delivery is intentionally non-blocking:
 
