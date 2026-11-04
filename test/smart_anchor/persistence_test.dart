@@ -38,6 +38,31 @@ NodeMetadataCache node(String name, int updatedAt) {
 }
 
 void main() {
+  test(
+    'restore discards cross-node metadata while preserving healthy records',
+    () async {
+      final store = SmartAnchorStore(InMemorySmartAnchorRecordStore());
+      final now = DateTime.now().millisecondsSinceEpoch;
+      await store.save(
+        SmartAnchorInput(
+          metadataByProxy: {'A': node('A', now), 'B': node('A', now)},
+          anchors: {'claude': anchor},
+        ),
+      );
+      final restored = (await store.load())!;
+      expect(restored.metadataByProxy.keys, ['A']);
+      expect(restored.anchors['claude']?.lastProxyName, 'US-01');
+    },
+  );
+
+  test('JSON import discards cached identity mismatches', () {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final restored = SmartAnchorSnapshot.fromJson({
+      'metadata': {'A': node('A', now).toJson(), 'B': node('A', now).toJson()},
+    });
+    expect(restored.metadataByProxy.keys, ['A']);
+  });
+
   test('save and load round-trips anchors, nodes and access', () async {
     final store = SmartAnchorStore(InMemorySmartAnchorRecordStore());
     final now = DateTime.now().millisecondsSinceEpoch;
