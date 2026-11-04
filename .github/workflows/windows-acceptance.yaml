@@ -47,14 +47,15 @@ jobs:
         run: |
           $resource = 'windows/runner/Runner.rc'
           (Get-Content $resource -Raw).Replace('VALUE "ProductName", "clash"', 'VALUE "ProductName", "FlClashAcceptance"') | Set-Content $resource -NoNewline
-          flutter build windows --debug --dart-define=SAFE_MODE=true
+          flutter build windows --release --dart-define=SAFE_MODE=true
       - name: Record build identity
         shell: pwsh
         run: |
-          $bundle = 'build/windows/x64/runner/Debug'
+          $bundle = 'build/windows/x64/runner/Release'
           $identity = @{
             commit = '${{ github.sha }}'
             safeMode = $true
+            buildMode = 'release'
             files = @(Get-ChildItem $bundle -File -Recurse | ForEach-Object {
               @{ path = [IO.Path]::GetRelativePath($bundle, $_.FullName); sha256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
             })
@@ -63,4 +64,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: windows-safe-${{ github.sha }}
-          path: build/windows/x64/runner/Debug
+          path: build/windows/x64/runner/Release
