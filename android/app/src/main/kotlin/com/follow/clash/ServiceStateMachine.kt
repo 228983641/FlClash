@@ -11,6 +11,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
@@ -46,6 +47,12 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
     private val startPreparationLock = Mutex()
     private val mutableRunState = MutableStateFlow(RunState.STOPPED)
     private val arbiter = RunIntentArbiter()
+    private data class Observation(
+        val request: RunRequest,
+        val runtime: ServiceRuntime?,
+        val transition: RunState?,
+    )
+    private val observation = MutableStateFlow(Observation(arbiter.current(), host.runtime, null))
 
     @Volatile
     private var sharedState = SharedState()
@@ -69,8 +76,17 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         }
     }
 
-    suspend fun awaitRunTime(): Long = transitionLock.withLock {
-        host.runtime?.startedAtMillis?.takeIf { isRunRequested } ?: 0L
+    suspend fun awaitRunTime(): Long {
+        val request = arbiter.current()
+        if (!request.running) return 0L
+        // Quick setup and permission preparation precede transitionLock. A
+        // reattaching UI must observe their outcome rather than adopt STOPPED.
+        observation.first {
+            !isCurrent(request) || (it.runtime != null && it.transition == null)
+        }
+        return transitionLock.withLock {
+            host.runtime?.startedAtMillis?.takeIf { isCurrent(request) } ?: 0L
+        }
     }
 
     fun captureRequestToken(): RunRequest = arbiter.current()
@@ -333,6 +349,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
             isRunRequested -> RunState.STARTED
             else -> RunState.STOPPING
         }
+        observation.value = Observation(arbiter.current(), host.runtime, transition)
     }
 
     private suspend fun prepareVpn(options: VpnOptions): Boolean {

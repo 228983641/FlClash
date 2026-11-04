@@ -2,7 +2,6 @@ package com.follow.clash.plugins
 
 import com.follow.clash.ServiceController
 import com.follow.clash.ServiceState
-import com.follow.clash.RunState
 import com.follow.clash.common.Components
 import com.follow.clash.models.SharedState
 import com.follow.clash.service.NetworkObserver
@@ -58,11 +57,7 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             "getRunTime" -> getRunTime(result)
             "adoptRun" -> {
                 commandRevision = call.arguments as? Int ?: commandRevision
-                val runtime = ServiceController.runtime
-                result.success(
-                    if (ServiceState.isRunRequested && ServiceState.runState.value == RunState.STARTED)
-                        runtime?.startedAtMillis ?: 0L else 0L,
-                )
+                getRunTime(result)
             }
             "runtimeReady" -> {
                 runtimeReady = true
