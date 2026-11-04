@@ -141,6 +141,9 @@ class TestSetupAction extends SetupAction {
   Future<DateTime?> serviceStartTime() async => serviceStart;
 
   @override
+  Future<DateTime?> adoptServiceRun() async => serviceStart;
+
+  @override
   Duration get minApplyDebounce => const Duration(milliseconds: 100);
 
   @override
@@ -701,6 +704,25 @@ void main() {
   });
 
   group('initStatus', () {
+    test('background adoption restores runtime without starting or applying', () async {
+      await mockPreferences({appliedConfigMd5Key: 'native'});
+      action.serviceStart = DateTime.now().subtract(const Duration(minutes: 1));
+      await action.initStatus(resumeOnly: true);
+      expect(container.read(isStartProvider), isTrue);
+      expect(action.coreRunningCalls, isEmpty);
+      expect(action.applyProfileCalls, 0);
+      expect(globalState.needInitStatus, isFalse);
+    });
+
+    test('background adoption never auto-starts a stopped run', () async {
+      await mockPreferences({});
+      container.read(appSettingProvider.notifier).value = const AppSettingProps(autoRun: true);
+      await action.initStatus(resumeOnly: true);
+      expect(container.read(isStartProvider), isFalse);
+      expect(action.coreRunningCalls, isEmpty);
+      expect(action.applyProfileCalls, 0);
+    });
+
     test('is a no-op once the status has already been initialized', () async {
       globalState.needInitStatus = false;
 
