@@ -1,4 +1,6 @@
 import 'package:fl_clash/smart_anchor/services/api_pool.dart';
+import 'package:fl_clash/smart_anchor/models/service_toggle_config.dart';
+import 'package:fl_clash/smart_anchor/services/candidate_decision.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -133,9 +135,75 @@ void main() {
       wafPass: true,
       nowMs: now,
     );
-    expect(second, first);
+    expect(second?.toJson(), first?.toJson());
     expect(calls, 2);
   });
+
+  test(
+    'shared exit cache keeps each candidate identity and current WAF',
+    () async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final first =
+          const GeoIpResult(
+            ip: '192.0.2.1',
+            countryCode: 'US',
+            latitude: 34,
+            longitude: -118,
+            asn: 'AS123',
+            ipType: 'residential',
+            isAbuse: false,
+          ).toNodeMetadata(
+            proxyName: 'A',
+            entryServer: 'a.example',
+            wafPass: false,
+            updatedAt: now - 1000,
+          );
+      final cache = GeoIpCache()..put(first);
+      final service = GeoIpService(
+        cache: cache,
+        keyPools: const {},
+        fetcher: (_, _, _) async =>
+            throw StateError('must reuse fresh geography'),
+      );
+      final second = (await service.lookup(
+        ip: first.egressIp,
+        proxyName: 'B',
+        entryServer: 'b.example',
+        wafPass: true,
+        nowMs: now,
+      ))!;
+      expect(second.proxyName, 'B');
+      expect(second.entryServer, 'b.example');
+      expect(second.wafPass, isTrue);
+      expect(second.updatedAt, first.updatedAt);
+      expect(first.proxyName, 'A');
+      expect(first.wafPass, isFalse);
+      final decision = buildCandidateDecision(
+        service: const ServiceToggleConfig(
+          serviceId: 'claude',
+          displayName: 'Claude',
+          isEnabled: true,
+          targetCountry: 'US',
+          matchRules: [],
+          dnsDomains: [],
+        ),
+        proxyNames: const ['A', 'B'],
+        metadataByProxy: {'A': first, 'B': second},
+        accessByProxy: const {},
+      );
+      expect(decision.qualified, ['B']);
+      expect(decision.blockedReasons['A'], CandidateBlockReason.wafBlocked);
+      final blockedAgain = (await service.lookup(
+        ip: first.egressIp,
+        proxyName: 'B',
+        entryServer: 'b.example',
+        wafPass: false,
+        nowMs: now,
+      ))!;
+      expect(blockedAgain.wafPass, isFalse);
+      expect(blockedAgain.updatedAt, first.updatedAt);
+    },
+  );
 
   test('new free source parsers produce geo and asn', () {
     final ipWhoIs = parseIpWhoIs({
