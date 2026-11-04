@@ -2173,7 +2173,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "VPN автоматически направляет весь системный трафик через VpnService.",
     ),
     "vpnPermissionDeniedTip": MessageLookupByLibrary.simpleMessage(
-      "VPN не разрешён. Если запрос не появляется, отключите постоянный VPN других приложений в настройках Android.",
+      "VPN не разрешён. Проверьте настройки постоянного VPN.",
     ),
     "webDAVConfiguration": MessageLookupByLibrary.simpleMessage(
       "Настройка WebDAV",

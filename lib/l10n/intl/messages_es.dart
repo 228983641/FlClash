@@ -2230,7 +2230,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "La VPN enruta automáticamente todo el tráfico del sistema a través de VpnService.",
     ),
     "vpnPermissionDeniedTip": MessageLookupByLibrary.simpleMessage(
-      "VPN no autorizada. Si no aparece la solicitud, desactiva la VPN siempre activa de otras apps en los ajustes de Android.",
+      "VPN no autorizada. Revisa el ajuste VPN siempre activa.",
     ),
     "webDAVConfiguration": MessageLookupByLibrary.simpleMessage(
       "Configuración de WebDAV",

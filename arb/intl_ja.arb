@@ -130,7 +130,7 @@
   "startVpn": "VPNを起動しています…",
   "stopVpn": "VPNを停止しています…",
   "localNetworkDeniedTip": "ローカルネットワークの権限が拒否されたため gvisor スタックを使用します。LAN にはアクセスできません。",
-  "vpnPermissionDeniedTip": "VPN が許可されていません。確認画面が出ない場合は、Android の設定で他のアプリの「常時接続 VPN」をオフにしてください。",
+  "vpnPermissionDeniedTip": "VPN 未許可。設定の「常時接続 VPN」を確認してください。",
   "compatible": "互換モード",
   "notSelectedTip": "現在のプロキシグループは選択できません",
   "changeProxyFailedTip": "プロキシの切り替えに失敗したため、前回の選択に戻しました",

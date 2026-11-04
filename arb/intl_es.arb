@@ -130,7 +130,7 @@
   "startVpn": "Iniciando VPN…",
   "stopVpn": "Deteniendo VPN…",
   "localNetworkDeniedTip": "Permiso de red local denegado: con la pila gvisor, la LAN no es accesible.",
-  "vpnPermissionDeniedTip": "VPN no autorizada. Si no aparece la solicitud, desactiva la VPN siempre activa de otras apps en los ajustes de Android.",
+  "vpnPermissionDeniedTip": "VPN no autorizada. Revisa el ajuste VPN siempre activa.",
   "compatible": "Modo de compatibilidad",
   "notSelectedTip": "No se puede seleccionar el grupo de proxies actual",
   "changeProxyFailedTip": "No se pudo cambiar de proxy; se ha restaurado la selección anterior",

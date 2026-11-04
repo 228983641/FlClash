@@ -1816,7 +1816,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "VPN は VpnService でシステムの全トラフィックを自動的にルーティングします。",
     ),
     "vpnPermissionDeniedTip": MessageLookupByLibrary.simpleMessage(
-      "VPN が許可されていません。確認画面が出ない場合は、Android の設定で他のアプリの「常時接続 VPN」をオフにしてください。",
+      "VPN 未許可。設定の「常時接続 VPN」を確認してください。",
     ),
     "webDAVConfiguration": MessageLookupByLibrary.simpleMessage("WebDAV設定"),
     "whitelistMode": MessageLookupByLibrary.simpleMessage("ホワイトリストモード"),

@@ -1031,10 +1031,10 @@ class AppLocalizations {
     );
   }
 
-  /// `VPN not authorized. If no prompt appears, disable other apps’ Always-on VPN in Android settings.`
+  /// `VPN not authorized. Check Always-on VPN in Android settings.`
   String get vpnPermissionDeniedTip {
     return Intl.message(
-      'VPN not authorized. If no prompt appears, disable other apps’ Always-on VPN in Android settings.',
+      'VPN not authorized. Check Always-on VPN in Android settings.',
       name: 'vpnPermissionDeniedTip',
       desc: '',
       args: [],

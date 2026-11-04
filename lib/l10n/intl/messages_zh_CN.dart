@@ -1627,7 +1627,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "VPN 通过 VpnService 自动路由系统所有流量。",
     ),
     "vpnPermissionDeniedTip": MessageLookupByLibrary.simpleMessage(
-      "VPN 未授权。若无弹窗，请在系统设置中关闭其他应用的“始终开启 VPN”。",
+      "VPN 未授权。请检查系统的“始终开启 VPN”设置。",
     ),
     "webDAVConfiguration": MessageLookupByLibrary.simpleMessage("WebDAV配置"),
     "whitelistMode": MessageLookupByLibrary.simpleMessage("白名单模式"),
