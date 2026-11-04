@@ -155,7 +155,7 @@ class SmartAnchorSnapshot {
         final node = NodeMetadataCache.fromJson(
           Map<String, dynamic>.from(entry.value as Map),
         );
-        if (!node.isExpired) {
+        if (!node.isExpired && node.proxyName == entry.key.toString()) {
           metadata[entry.key.toString()] = node;
         }
       }
@@ -425,7 +425,7 @@ class SmartAnchorStore {
         anchors[key.substring('anchor:'.length)] = ServiceAnchor.fromJson(map);
       } else if (key.startsWith('node:')) {
         final node = NodeMetadataCache.fromJson(map);
-        if (!node.isExpired) {
+        if (!node.isExpired && node.proxyName == key.substring('node:'.length)) {
           metadata[key.substring('node:'.length)] = node;
         }
       } else if (key.startsWith('access:')) {
