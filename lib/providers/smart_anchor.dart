@@ -38,6 +38,7 @@ class SmartAnchor extends _$SmartAnchor {
   int? _lastProbeProfileId;
   final Map<String, int> _lastProbeAttempt = {};
   bool _probeRunning = false;
+  bool _healthProbeRunning = false;
 
   @override
   SmartAnchorInput build() {
@@ -364,6 +365,104 @@ class SmartAnchor extends _$SmartAnchor {
     update(state.copyWith(paths: paths));
   }
 
+  Map<String, Map<String, ServiceAccessResult>> _mergeAccess(
+    Map<String, Map<String, ServiceAccessResult>> results,
+  ) {
+    final merged = {
+      for (final entry in state.accessByService.entries)
+        entry.key: Map<String, ServiceAccessResult>.of(entry.value),
+    };
+    for (final service in results.entries) {
+      final nodes = merged[service.key] ??= {};
+      for (final node in service.value.entries) {
+        if (node.value.checkedAt >= (nodes[node.key]?.checkedAt ?? 0)) {
+          nodes[node.key] = node.value;
+        }
+      }
+    }
+    return merged;
+  }
+
+  Future<int> probeHealth({
+    required List<String> proxyNames,
+    Map<String, List<String>> servicesByProxy = const {},
+  }) async {
+    if (_healthProbeRunning || !ref.mounted) return 0;
+    _healthProbeRunning = true;
+    var profileChanged = false;
+    final subscription = ref.listen(currentProfileIdProvider, (_, _) {
+      profileChanged = true;
+    });
+    try {
+      final serviceIds = [
+        for (final service in state.services)
+          if (service.isEnabled) service.serviceId,
+      ];
+      if (serviceIds.isEmpty) return 0;
+      final core = ref.read(coreHandlerProvider);
+      final prober = SmartAnchorProber(
+        egressLookup: (_) async => null,
+        geoLookup:
+            ({
+              required ip,
+              required proxyName,
+              required entryServer,
+              required wafPass,
+            }) async => null,
+        serviceCheckLookup: (name, targets) => checkServices(
+          core,
+          proxyName: name,
+          targets: targets,
+          scope: serviceCheckScopeHealth,
+        ),
+      );
+      final names = proxyNames
+          .where(
+            (name) =>
+                name.isNotEmpty &&
+                name != 'DIRECT' &&
+                name != 'REJECT' &&
+                name != 'REJECT-DROP',
+          )
+          .toSet()
+          .toList();
+      var checked = 0;
+      for (var i = 0; i < names.length; i += 4) {
+        if (!ref.mounted || profileChanged) return 0;
+        final outcomes = await Future.wait(
+          names
+              .skip(i)
+              .take(4)
+              .map(
+                (name) async => MapEntry(
+                  name,
+                  await prober.probeAccess(
+                    proxyName: name,
+                    serviceIds: servicesByProxy[name] ?? serviceIds,
+                    egressIp: state.metadataByProxy[name]?.egressIp ?? '',
+                    nowMs: DateTime.now().millisecondsSinceEpoch,
+                  ),
+                ),
+              ),
+        );
+        if (!ref.mounted || profileChanged) return 0;
+        final access = <String, Map<String, ServiceAccessResult>>{};
+        for (final outcome in outcomes) {
+          for (final entry in outcome.value.entries) {
+            (access[entry.key] ??= {})[outcome.key] = entry.value;
+          }
+          checked++;
+        }
+        update(state.copyWith(accessByService: _mergeAccess(access)));
+      }
+      commonPrint.log('[SA] health nodes=$checked');
+      return checked;
+    } finally {
+      subscription.close();
+      _healthProbeRunning = false;
+    }
+  }
+
   Future<int> probeNodes({
     required List<String> proxyNames,
     required String currentProxyName,
@@ -626,7 +725,7 @@ class SmartAnchor extends _$SmartAnchor {
       if (changed) {
         final nextInput = state.copyWith(
           metadataByProxy: metadata,
-          accessByService: access,
+          accessByService: _mergeAccess(access),
         );
         for (final service in enabled) {
           final before = derivedRegionEvidence(state, service.serviceId);

@@ -148,6 +148,7 @@ class ServiceCheck {
 /// no scope share the Core's empty scope.
 const serviceCheckScopePanel = 'panel';
 const serviceCheckScopeProbe = 'probe';
+const serviceCheckScopeHealth = 'health';
 
 /// An empty [proxyName] lets the Core route by its rules; an empty [targets]
 /// checks every service.

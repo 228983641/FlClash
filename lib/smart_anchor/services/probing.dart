@@ -284,6 +284,24 @@ class SmartAnchorProber {
         metadataFailure = 'geo-failed';
       }
     }
+    return ProbeOutcome(
+      metadata: metadata,
+      accessByService: await probeAccess(
+        proxyName: proxyName,
+        serviceIds: serviceIds,
+        egressIp: egress?.ip ?? '',
+        nowMs: nowMs,
+      ),
+      metadataFailure: metadataFailure,
+    );
+  }
+
+  Future<Map<String, ServiceAccessResult>> probeAccess({
+    required String proxyName,
+    required List<String> serviceIds,
+    required int nowMs,
+    String egressIp = '',
+  }) async {
     // Services without a core checker borrow their donor's target; the
     // donor is probed once and its verdict fans out to every borrower.
     final nativeByTarget = <ServiceTarget, List<String>>{};
@@ -317,7 +335,7 @@ class SmartAnchorProber {
           access[serviceId] = accessResultFromStatus(
             serviceId: serviceId,
             proxyName: proxyName,
-            egressIp: egress?.ip ?? '',
+            egressIp: egressIp,
             status: entry.value.status,
             failureKind: entry.value.failureKind,
             checkedAt: entry.value.checkedAt?.millisecondsSinceEpoch ?? nowMs,
@@ -329,7 +347,7 @@ class SmartAnchorProber {
           access[borrower.key] = accessResultFromStatus(
             serviceId: borrower.key,
             proxyName: proxyName,
-            egressIp: egress?.ip ?? '',
+            egressIp: egressIp,
             status: entry.value.status,
             failureKind: entry.value.failureKind,
             checkedAt: entry.value.checkedAt?.millisecondsSinceEpoch ?? nowMs,
@@ -338,11 +356,7 @@ class SmartAnchorProber {
         }
       }
     }
-    return ProbeOutcome(
-      metadata: metadata,
-      accessByService: access,
-      metadataFailure: metadataFailure,
-    );
+    return access;
   }
 }
 

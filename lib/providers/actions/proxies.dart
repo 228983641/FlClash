@@ -906,24 +906,31 @@ class ProxiesAction extends _$ProxiesAction {
           currents.add(current);
         }
       }
-      // One queued round per tick: the in-use nodes are always probed so
-      // the failover check sees fresh access results, and the rest of the
-      // round's budget walks the stale-metadata queue toward full coverage.
+      final delays = flattenDelays(ref.read(delayDataSourceProvider));
+      final healthServices = <String, List<String>>{};
+      for (final service in smart.services.where((s) => s.isEnabled)) {
+        final current = groups.getGroup(smartGroupName(service))?.now;
+        final ranked = rankedProxiesForService(
+          smart,
+          service,
+          names,
+          delays: delays,
+        );
+        for (final name in {
+          if (current != null) current,
+          ...ranked.where((name) => name != current).take(2),
+        }) {
+          (healthServices[name] ??= []).add(service.serviceId);
+        }
+      }
       var tickProbed = 0;
       if (names.isNotEmpty) {
-        final beforeProbe = ref.read(smartAnchorProvider);
-        final profileId = ref.read(currentProfileIdProvider);
         tickProbed = await ref
             .read(smartAnchorProvider.notifier)
-            .probeNodes(
-              proxyNames: names,
-              currentProxyName: currents.isEmpty ? '' : currents.first,
-              currentProxyNames: currents,
-              delays: flattenDelays(ref.read(delayDataSourceProvider)),
-              force: true,
-              updateThrottle: false,
+            .probeHealth(
+              proxyNames: healthServices.keys.toList(),
+              servicesByProxy: healthServices,
             );
-        await _refreshSmartCandidatePools(beforeProbe, profileId, names);
       }
       final tickFailover = smartAnchorFailoverCheck();
       _logTickSummary(
@@ -932,6 +939,29 @@ class ProxiesAction extends _$ProxiesAction {
         probeUpdated: tickProbed,
         failover: tickFailover,
       );
+      if (names.isNotEmpty) {
+        final beforeProbe = ref.read(smartAnchorProvider);
+        final profileId = ref.read(currentProfileIdProvider);
+        unawaited(
+          ref
+              .read(smartAnchorProvider.notifier)
+              .probeNodes(
+                proxyNames: names,
+                currentProxyName: currents.isEmpty ? '' : currents.first,
+                currentProxyNames: currents,
+                delays: delays,
+                force: true,
+                updateThrottle: false,
+              )
+              .then(
+                (_) =>
+                    _refreshSmartCandidatePools(beforeProbe, profileId, names),
+              )
+              .catchError((Object error) {
+                commonPrint.log('Smart discovery failed: $error');
+              }),
+        );
+      }
     } catch (_) {
     } finally {
       _smartAnchorMonitorRunning = false;

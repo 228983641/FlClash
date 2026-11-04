@@ -71,13 +71,15 @@ type ServiceCheckItem struct {
 // The panel scope value the host sends; every other scope shares the
 // prober pool below.
 const scopePanel = "panel"
+const scopeHealth = "health"
 
 var (
 	// One slot pool per caller scope, so a panel sweep cannot starve the
 	// prober and the prober cannot starve the panel. Each pool keeps the
 	// old sweep bound; together they cap service checks at twice that.
-	servicePanelCheckSlots = make(slots, serviceCheckConcurrency)
-	serviceProbeCheckSlots = make(slots, serviceCheckConcurrency)
+	servicePanelCheckSlots  = make(slots, serviceCheckConcurrency)
+	serviceProbeCheckSlots  = make(slots, serviceCheckConcurrency)
+	serviceHealthCheckSlots = make(slots, serviceCheckConcurrency)
 
 	serviceClaimsMu sync.Mutex
 	serviceClaims   = map[string]*serviceClaim{}
@@ -88,6 +90,9 @@ type serviceClaim struct {
 }
 
 func slotsForScope(scope string) slots {
+	if scope == scopeHealth {
+		return serviceHealthCheckSlots
+	}
 	if scope == scopePanel {
 		return servicePanelCheckSlots
 	}
