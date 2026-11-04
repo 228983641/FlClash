@@ -13,6 +13,9 @@ void main() {
     ('failed', 'network', ServiceAccessReason.networkFailed),
     ('timeout', 'unknown', ServiceAccessReason.unknown),
     ('timeout', 'network', ServiceAccessReason.networkFailed),
+    ('available', 'service', ServiceAccessReason.accessible),
+    ('unsupported-region', 'service', ServiceAccessReason.regionBlocked),
+    ('failed', 'future-kind', ServiceAccessReason.unknown),
   ]) {
     test('real check envelope preserves $status/$kind evidence', () async {
       final prober = SmartAnchorProber(

@@ -1803,6 +1803,7 @@ void main() {
         expect(pushed, hasLength(1));
         expect(pushed.single.selectedMap['🎯 Smart-Claude'], 'US-1');
         expect(pushed.single.selectedMap['Proxy'], 'TW-1');
+        expect(pushed.single.toJson()['guarded-groups'], ['🎯 Smart-Claude']);
         expect(profile.selectedMap['🎯 Smart-Claude'], 'TW-1');
 
         await setupAction.applyProfile();
