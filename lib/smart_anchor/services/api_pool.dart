@@ -365,7 +365,12 @@ class GeoIpService {
   }) async {
     final cached = cache.lookup(ip);
     if (cached != null) {
-      return cached;
+      return NodeMetadataCache.fromJson({
+        ...cached.toJson(),
+        'proxyName': proxyName,
+        'entryServer': entryServer,
+        'wafPass': wafPass,
+      });
     }
     final perLookup = sourceOrder.isEmpty
         ? 0
