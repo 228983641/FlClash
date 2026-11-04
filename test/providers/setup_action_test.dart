@@ -1765,18 +1765,20 @@ void main() {
           selectedMap: {'🎯 Smart-Claude': 'TW-1', 'Proxy': 'TW-1'},
         );
         final core = _MockCoreHandlerInterface();
-        when(() => core.getProfileBase(any())).thenAnswer(
-          (_) async => const ProfileBase(
-            config: {
-              'proxies': [
-                {'name': 'TW-1', 'type': 'ss', 'server': 'tw.example'},
-                {'name': 'US-1', 'type': 'ss', 'server': 'us.example'},
-              ],
-              'proxy-groups': <dynamic>[],
-              'rules': <dynamic>[],
-            },
-            digest: 'd',
-          ),
+        when(
+          () => core.getProfileBase(any()),
+        ).thenAnswer((_) async => const ProfileBase(config: {}, digest: 'd'));
+        // The Core's compact base omits outbounds; smart ranking needs the
+        // primary subscription's actual nodes even without aggregation.
+        when(() => core.getConfig(any())).thenAnswer(
+          (_) async => {
+            'proxies': [
+              {'name': 'TW-1', 'type': 'ss', 'server': 'tw.example'},
+              {'name': 'US-1', 'type': 'ss', 'server': 'us.example'},
+            ],
+            'proxy-groups': <dynamic>[],
+            'rules': <dynamic>[],
+          },
         );
         final pushed = <SetupParams>[];
         when(() => core.setupConfig(any())).thenAnswer((invocation) async {
