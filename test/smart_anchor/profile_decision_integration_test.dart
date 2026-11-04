@@ -102,7 +102,8 @@ void main() {
         nowMs: time,
       );
     }
-    expect(target?.name, 'B');
+    expect(result.decision.qualified, contains('B'));
+    expect(target, isNull);
   });
 
   test('profile ranking keeps route tier ahead of latency', () {

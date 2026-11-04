@@ -42,9 +42,10 @@ void main() {
         proxyName: 'A',
         entryServer: '',
         serviceIds: ['claude'],
-        nowMs: 1000,
+        nowMs: 900,
       );
       expect(result.accessByService['claude']?.reason, expected);
+      expect(result.accessByService['claude']?.checkedAt, 1000);
     });
   }
 
