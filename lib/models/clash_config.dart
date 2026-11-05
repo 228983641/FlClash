@@ -1488,12 +1488,20 @@ Map<String, dynamic> mergeDnsOverride(
   for (final entry in override.entries) {
     final current = merged[entry.key];
     final value = entry.value;
-    merged[entry.key] =
-        entry.key == DnsOverrideKey.fallbackFilterSection &&
-            current is Map &&
-            value is Map
-        ? {...Map<String, dynamic>.from(current), ...value}
-        : value;
+    if (entry.key == DnsOverrideKey.fallbackFilterSection &&
+        current is Map &&
+        value is Map) {
+      merged[entry.key] = {
+        ...Map<String, dynamic>.from(current),
+        ...Map<String, dynamic>.from(value),
+      };
+    } else if (entry.key == DnsOverrideKey.fakeIpFilter.path &&
+        current is List &&
+        value is List) {
+      merged[entry.key] = {...current, ...value}.toList();
+    } else {
+      merged[entry.key] = value;
+    }
   }
   return merged;
 }

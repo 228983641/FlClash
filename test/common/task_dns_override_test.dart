@@ -65,6 +65,25 @@ void main() {
     });
   });
 
+  test('keeps subscription hosts out of fake-ip in the Core YAML', () async {
+    final dns = await _dnsOf(
+      rawConfig: {
+        'dns': {
+          ..._profileDns,
+          'enhanced-mode': 'fake-ip',
+          'fake-ip-filter': ['existing.test'],
+        },
+      },
+      dns: const Dns(fakeIpFilter: ['app.test', 'subscription.example.test']),
+      keys: {DnsOverrideKey.fakeIpFilter},
+    );
+
+    expect(
+      dns['fake-ip-filter'],
+      containsAll(['existing.test', 'app.test', 'subscription.example.test']),
+    );
+  });
+
   test('leaves an enabled profile alone without picked keys', () async {
     final dns = await _dnsOf(rawConfig: {'dns': _profileDns}, keys: {});
 
