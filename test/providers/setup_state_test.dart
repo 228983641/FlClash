@@ -196,9 +196,7 @@ void main() {
         id: 4,
         type: ProfileType.custom,
         autoUpdateDuration: Duration.zero,
-        overrides: ProfileOverrides(
-          dns: Dns(fakeIpFilter: ['custom.test']),
-        ),
+        overrides: ProfileOverrides(dns: Dns(fakeIpFilter: ['custom.test'])),
       ),
       Profile(
         id: 5,

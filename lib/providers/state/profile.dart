@@ -60,24 +60,21 @@ Future<SetupState> setupState(Ref ref, int? profileId) async {
   }..removeWhere((host) => host.isEmpty);
   final overrides = profileType == ProfileType.custom
       ? ref.watch(
-          patchClashConfigProvider.select(
-            (state) {
-              final own = (profile?.overrides ?? const ProfileOverrides())
-                  .overAppTun(state.tunOverride, state.tunOverrideKeys);
-              final fakeIpFilter = {
-                ...own.dns.fakeIpFilter,
-                ...subscriptionHosts,
-              }.toList();
-              return own.copyWith(
-                dns: own.dns.copyWith(fakeIpFilter: fakeIpFilter),
-                dnsOverrideKeys: {
-                  ...own.dnsOverrideKeys,
-                  if (subscriptionHosts.isNotEmpty)
-                    DnsOverrideKey.fakeIpFilter,
-                },
-              );
-            },
-          ),
+          patchClashConfigProvider.select((state) {
+            final own = (profile?.overrides ?? const ProfileOverrides())
+                .overAppTun(state.tunOverride, state.tunOverrideKeys);
+            final fakeIpFilter = {
+              ...own.dns.fakeIpFilter,
+              ...subscriptionHosts,
+            }.toList();
+            return own.copyWith(
+              dns: own.dns.copyWith(fakeIpFilter: fakeIpFilter),
+              dnsOverrideKeys: {
+                ...own.dnsOverrideKeys,
+                if (subscriptionHosts.isNotEmpty) DnsOverrideKey.fakeIpFilter,
+              },
+            );
+          }),
         )
       : ref.watch(
           patchClashConfigProvider.select((state) {
@@ -92,8 +89,7 @@ Future<SetupState> setupState(Ref ref, int? profileId) async {
               dns: state.dns.copyWith(fakeIpFilter: fakeIpFilter),
               dnsOverrideKeys: {
                 ...dnsOverrideKeys,
-                if (subscriptionHosts.isNotEmpty)
-                  DnsOverrideKey.fakeIpFilter,
+                if (subscriptionHosts.isNotEmpty) DnsOverrideKey.fakeIpFilter,
               },
               tun: state.tunOverride,
               tunOverrideKeys: state.tunOverrideKeys,
