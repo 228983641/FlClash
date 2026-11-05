@@ -27,6 +27,15 @@ Map<String, String> _bindgenEnvironment(BuildInput input) {
   if (compiler == null) {
     return const {};
   }
+
+  final configured = Platform.environment['LIBCLANG_PATH'];
+  if (configured != null && configured.isNotEmpty) {
+    final directory = Directory(configured);
+    if (directory.existsSync() && directory.listSync().any(_isLibclang)) {
+      return {'LIBCLANG_PATH': directory.path};
+    }
+  }
+
   final llvmRoot = File.fromUri(compiler).parent.parent;
   for (final name in const ['lib', 'lib64']) {
     final directory = Directory(

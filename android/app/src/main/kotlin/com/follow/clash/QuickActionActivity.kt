@@ -8,6 +8,8 @@ import com.follow.clash.common.GlobalState
 import com.follow.clash.common.QuickAction
 import com.follow.clash.common.action
 import com.follow.clash.common.shortcutId
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 
 class QuickActionActivity : Activity() {
@@ -26,11 +28,18 @@ class QuickActionActivity : Activity() {
     private fun handle(intent: Intent) {
         val action = QuickAction.entries.firstOrNull { it.action == intent.action } ?: return
         ShortcutManagerCompat.reportShortcutUsed(this, action.shortcutId)
-        GlobalState.launch {
-            when (action) {
-                QuickAction.START -> ServiceState.handleStartAction()
-                QuickAction.STOP -> ServiceState.handleStopAction()
-                QuickAction.TOGGLE -> ServiceState.handleToggleAction()
+        GlobalState.launch(start = CoroutineStart.UNDISPATCHED) {
+            GlobalState.log("Quick action received: $action")
+            try {
+                when (action) {
+                    QuickAction.START -> ServiceState.handleStartAction()
+                    QuickAction.STOP -> ServiceState.handleStopAction()
+                    QuickAction.TOGGLE -> ServiceState.handleToggleAction()
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                GlobalState.log("Quick action failed: $action: $error")
             }
         }
     }

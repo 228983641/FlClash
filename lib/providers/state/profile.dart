@@ -50,24 +50,55 @@ Future<SetupState> setupState(Ref ref, int? profileId) async {
   final profileLastUpdateDate = profile?.lastUpdateDate?.millisecondsSinceEpoch;
   final profileType = profile?.type ?? ProfileType.file;
   final extendType = profile?.extendType ?? ExtendType.standard;
+  // Every URL profile can be a proxy/provider source for the running config.
+  // Keep all of their hosts out of fake-ip so subscription fetches do not
+  // resolve through the reserved fake address range.
+  final subscriptionHosts = {
+    for (final item in ref.watch(profilesProvider))
+      if (item.type == ProfileType.url)
+        ?item.url.webUri?.host.trim().toLowerCase(),
+  }..removeWhere((host) => host.isEmpty);
   final overrides = profileType == ProfileType.custom
       ? ref.watch(
           patchClashConfigProvider.select(
-            (state) => (profile?.overrides ?? const ProfileOverrides())
-                .overAppTun(state.tunOverride, state.tunOverrideKeys),
+            (state) {
+              final own = (profile?.overrides ?? const ProfileOverrides())
+                  .overAppTun(state.tunOverride, state.tunOverrideKeys);
+              final fakeIpFilter = {
+                ...own.dns.fakeIpFilter,
+                ...subscriptionHosts,
+              }.toList();
+              return own.copyWith(
+                dns: own.dns.copyWith(fakeIpFilter: fakeIpFilter),
+                dnsOverrideKeys: {
+                  ...own.dnsOverrideKeys,
+                  if (subscriptionHosts.isNotEmpty)
+                    DnsOverrideKey.fakeIpFilter,
+                },
+              );
+            },
           ),
         )
       : ref.watch(
-          patchClashConfigProvider.select(
-            (state) => ProfileOverrides(
-              dns: state.dns,
-              dnsOverrideKeys: state.dnsOverrideKeys.intersection(
-                DnsOverrideKey.normalProfileKeys,
-              ),
+          patchClashConfigProvider.select((state) {
+            final dnsOverrideKeys = state.dnsOverrideKeys.intersection(
+              DnsOverrideKey.normalProfileKeys,
+            );
+            final fakeIpFilter = <String>{
+              ...state.dns.fakeIpFilter,
+              ...subscriptionHosts,
+            }.toList();
+            return ProfileOverrides(
+              dns: state.dns.copyWith(fakeIpFilter: fakeIpFilter),
+              dnsOverrideKeys: {
+                ...dnsOverrideKeys,
+                if (subscriptionHosts.isNotEmpty)
+                  DnsOverrideKey.fakeIpFilter,
+              },
               tun: state.tunOverride,
               tunOverrideKeys: state.tunOverrideKeys,
-            ),
-          ),
+            );
+          }),
         );
   final allProfileProviders = ref.watch(profileProvidersProvider);
   List<ProxyGroup> proxyGroups = [];

@@ -104,11 +104,9 @@ void main() {
       verify(
         () => core.serviceCheck(
           any(
-            that: isA<ServiceCheckParams>().having(
-              (p) => p.scope,
-              'scope',
-              'health',
-            ),
+            that: isA<ServiceCheckParams>()
+                .having((p) => p.scope, 'scope', 'health')
+                .having((p) => p.timeout, 'timeout', 3000),
           ),
         ),
       ).called(1);

@@ -3,6 +3,7 @@ import 'package:fl_clash/database/database.dart' as db;
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/database.dart';
+import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/state.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -145,5 +146,98 @@ void main() {
     final state = await container.read(setupStateProvider(profile.id).future);
 
     expect(state.proxyDialers, {30: 'Relay'});
+  });
+
+  testWidgets('a URL profile excludes its subscription host from fake-ip', (
+    tester,
+  ) async {
+    const profile = Profile(
+      id: 3,
+      type: ProfileType.url,
+      url: 'https://sub.example.test/path',
+      autoUpdateDuration: Duration.zero,
+    );
+    final container = ProviderContainer(
+      overrides: [
+        profilesProvider.overrideWith(() => TestProfiles([profile])),
+        patchClashConfigProvider.overrideWithBuild(
+          (_, _) => const PatchClashConfig(
+            dns: Dns(fakeIpFilter: ['existing.test']),
+            dnsOverrideKeys: {DnsOverrideKey.fakeIpFilter},
+          ),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const SizedBox.shrink(),
+      ),
+    );
+
+    final state = await container.read(setupStateProvider(profile.id).future);
+
+    expect(
+      state.overrides.dns.fakeIpFilter,
+      containsAll(['existing.test', 'sub.example.test']),
+    );
+    expect(
+      state.overrides.dnsOverrideKeys,
+      contains(DnsOverrideKey.fakeIpFilter),
+    );
+  });
+
+  testWidgets('all URL profile hosts are excluded, including custom profiles', (
+    tester,
+  ) async {
+    const profiles = [
+      Profile(
+        id: 4,
+        type: ProfileType.custom,
+        autoUpdateDuration: Duration.zero,
+        overrides: ProfileOverrides(
+          dns: Dns(fakeIpFilter: ['custom.test']),
+        ),
+      ),
+      Profile(
+        id: 5,
+        type: ProfileType.url,
+        url: 'https://One.Example.test/sub',
+        autoUpdateDuration: Duration.zero,
+      ),
+      Profile(
+        id: 6,
+        type: ProfileType.url,
+        url: 'https://two.example.test/sub',
+        autoUpdateDuration: Duration.zero,
+      ),
+    ];
+    final container = ProviderContainer(
+      overrides: [
+        profilesProvider.overrideWith(() => TestProfiles(profiles)),
+        patchClashConfigProvider.overrideWithBuild(
+          (_, _) => const PatchClashConfig(),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const SizedBox.shrink(),
+      ),
+    );
+
+    final state = await container.read(setupStateProvider(4).future);
+
+    expect(
+      state.overrides.dns.fakeIpFilter,
+      containsAll(['custom.test', 'one.example.test', 'two.example.test']),
+    );
+    expect(
+      state.overrides.dnsOverrideKeys,
+      contains(DnsOverrideKey.fakeIpFilter),
+    );
   });
 }

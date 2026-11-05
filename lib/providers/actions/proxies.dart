@@ -127,9 +127,10 @@ class ProxiesAction extends _$ProxiesAction {
     ref.listen(isStartProvider, (_, started) {
       if (started) {
         _smartAnchorMonitorTimer ??= Timer.periodic(
-          const Duration(seconds: 30),
+          smartAnchorMonitorInterval,
           (_) => unawaited(smartAnchorMonitorTick()),
         );
+        unawaited(Future<void>.microtask(smartAnchorMonitorTick));
       } else {
         _smartAnchorMonitorTimer?.cancel();
         _smartAnchorMonitorTimer = null;
@@ -974,7 +975,11 @@ class ProxiesAction extends _$ProxiesAction {
               }),
         );
       }
-    } catch (_) {
+    } catch (error) {
+      commonPrint.log(
+        'Smart anchor monitor failed (${error.runtimeType})',
+        logLevel: coreFailureLogLevel(error),
+      );
     } finally {
       _smartAnchorMonitorRunning = false;
     }

@@ -97,6 +97,16 @@ Duration probeGuardDuration(ProbeParams params) => coreGuardFor(params.timeout);
 /// Kept in step with serviceSweepBudgetFactor in core/service_check.go.
 const serviceSweepBudgetFactor = 6;
 
+/// Smart failover needs two fresh route verdicts. Ten seconds keeps the
+/// confirmation window bounded without making a transient route flap switch
+/// immediately.
+const smartAnchorMonitorInterval = Duration(seconds: 10);
+
+/// Health checks only corroborate the current route and its top standbys.
+/// Discovery keeps the longer probe budget, while this path must recover a
+/// failed route promptly.
+const smartAnchorHealthTimeout = Duration(seconds: 3);
+
 const coreConnectionWaitDuration = Duration(seconds: 10);
 
 /// Keep at or below the Core's delay-test concurrency (`delayTestConcurrency`

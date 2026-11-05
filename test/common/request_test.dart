@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:fl_clash/common/constant.dart';
+import 'package:fl_clash/common/print.dart';
 import 'package:fl_clash/common/request.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -40,6 +41,20 @@ class _HostAdapter implements HttpClientAdapter {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('compact Dio errors include cause type without request details', () {
+    final error = DioException(
+      requestOptions: RequestOptions(path: '/private/token'),
+      type: DioExceptionType.unknown,
+      error: const SocketException('Connection refused'),
+    );
+
+    expect(
+      compactError(error),
+      'DioException(unknown, cause: SocketException)',
+    );
+    expect(compactError(error), isNot(contains('/private/token')));
+  });
 
   test('getTextResponseForUrl propagates the typed DioException', () async {
     // flutter_test's mocked HttpClient answers every request with HTTP 400,
