@@ -14,6 +14,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.runCurrent
 import org.junit.Assert.assertEquals
@@ -258,6 +259,29 @@ class ServiceStateMachineTest {
 
         machine.requestStop().await()
         assertEquals(0L, machine.awaitRunTime())
+    }
+
+    @Test
+    fun `adoption observes a start intent that arrives during the idle window`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val machine = ServiceStateMachine(host)
+        val adoption = async { machine.awaitRunTime() }
+        runCurrent()
+        assertFalse(adoption.isCompleted)
+
+        machine.syncSharedState(configuredState())
+        assertTrue(machine.requestStart().await())
+        assertEquals(STARTED_AT, adoption.await())
+    }
+
+    @Test
+    fun `idle adoption returns stopped after the bounded window`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val machine = ServiceStateMachine(host)
+        val adoption = async { machine.awaitRunTime() }
+        runCurrent()
+        advanceTimeBy(START_ADOPTION_WINDOW_MS)
+        assertEquals(0L, adoption.await())
     }
 
     @Test

@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 
 enum class RunState {
@@ -30,6 +31,7 @@ internal typealias RunRequest = RunIntentArbiter.Token
 internal const val MISSING_CONFIG_MESSAGE = "No configuration found."
 internal const val INVALID_CONFIG_MESSAGE = "Invalid configuration."
 internal const val START_FAILED_MESSAGE = "Failed to start service."
+internal const val START_ADOPTION_WINDOW_MS = 350L
 
 private enum class StartOutcome {
     STARTED,
@@ -77,7 +79,16 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
     }
 
     suspend fun awaitRunTime(): Long {
-        val request = arbiter.current()
+        var request = arbiter.current()
+        if (!request.running && host.runtime == null) {
+            // MainActivity can attach just before QuickAction registers its start intent.
+            // Give that concurrently dispatched action a bounded chance to publish first.
+            val start = withTimeoutOrNull(START_ADOPTION_WINDOW_MS) {
+                observation.first { it.request.running || it.runtime != null }
+            }
+            if (start == null) return 0L
+            request = start.request
+        }
         if (!request.running) return 0L
         // Quick setup and permission preparation precede transitionLock. A
         // reattaching UI must observe their outcome rather than adopt STOPPED.
