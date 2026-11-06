@@ -117,10 +117,8 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             result.success("Invalid shared state")
             return
         }
-        scope.launch {
-            ServiceState.syncSharedState(state)
-            result.success("")
-        }
+        ServiceState.syncSharedState(state)
+        result.success("")
     }
 
     private fun start(call: MethodCall, result: MethodChannel.Result) {

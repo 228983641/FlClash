@@ -116,6 +116,19 @@ class CoreLib extends CoreHandlerInterface {
   // that ends, so once it takes the command the Core's own answer is moot.
   @override
   Future<bool> startListener() async {
+    final vpnOptions = await globalState.container.read(
+      vpnOptionsProvider.future,
+    );
+    final syncError =
+        await _service?.syncState(
+          globalState.container
+              .read(sharedStateProvider)
+              .copyWith(setupParams: null, vpnOptions: vpnOptions),
+        ) ??
+        '';
+    if (syncError.isNotEmpty) {
+      throw StateError(syncError);
+    }
     await super.startListener();
     return await _service?.start() ?? false;
   }

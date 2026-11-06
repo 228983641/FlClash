@@ -25,6 +25,7 @@ class _FakeService implements Service {
   CoreMethodResponse? Function(CoreMethodCall call)? onInvokeMethod;
 
   final invokedCalls = <CoreMethodCall>[];
+  final syncedStates = <SharedState>[];
 
   @override
   Future<String> init() async {
@@ -35,6 +36,7 @@ class _FakeService implements Service {
   @override
   Future<String> syncState(SharedState state) async {
     calls.add('syncState');
+    syncedStates.add(state);
     return syncError;
   }
 
@@ -232,6 +234,39 @@ void main() {
       service.onInvokeMethod = (_) => null;
       expect(await lib.startListener(), isTrue);
       expect(service.calls.last, 'start');
+    });
+
+    test('syncs the latest shared state before starting the service', () async {
+      await lib.start();
+      final previousOptions = await container.read(vpnOptionsProvider.future);
+      container
+          .read(vpnSettingProvider.notifier)
+          .update((state) => state.copyWith(enable: !previousOptions.enable));
+      service.calls.clear();
+      service.onInvokeMethod = (_) =>
+          const CoreMethodResponse(id: '1', result: true);
+
+      expect(await lib.startListener(), isTrue);
+
+      expect(service.calls, [
+        'syncState',
+        'invokeMethod:startListener',
+        'start',
+      ]);
+      expect(
+        service.syncedStates.last.vpnOptions?.enable,
+        !previousOptions.enable,
+      );
+    });
+
+    test('does not start the service when shared state sync fails', () async {
+      await lib.start();
+      service.calls.clear();
+      service.syncError = 'sync boom';
+
+      await expectLater(lib.startListener(), throwsA(isA<StateError>()));
+
+      expect(service.calls, ['syncState']);
     });
 
     test('a listener stop is answered by the service', () async {

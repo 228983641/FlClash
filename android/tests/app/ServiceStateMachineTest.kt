@@ -346,6 +346,19 @@ class ServiceStateMachineTest {
     }
 
     @Test
+    fun `the latest synced vpn mode is used by the start request`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val machine = ServiceStateMachine(host)
+        machine.syncSharedState(configuredState(enable = false))
+        machine.syncSharedState(configuredState(enable = true))
+
+        assertTrue(machine.requestStart().await())
+
+        assertEquals(true, host.lastStartOptions?.enable)
+        assertEquals(true, host.runtime?.vpn)
+    }
+
+    @Test
     fun `a start that the service refuses settles back to STOPPED`() = runTest {
         val host = FakeHost(backgroundScope)
         host.startSucceeds = false
