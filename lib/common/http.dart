@@ -85,6 +85,20 @@ class FlClashHttpOverrides extends HttpOverrides {
     return !checkCertificate;
   }
 
+  /// Applies the app certificate policy when a client is created outside the
+  /// global [HttpOverrides] instance. A missing provider reader must remain
+  /// fail-closed.
+  static bool allowBadCertificateForOptionalReader(
+    ProviderReader? read,
+    X509Certificate certificate,
+    String host,
+    int port,
+  ) {
+    final reader = read;
+    if (reader == null) return false;
+    return allowBadCertificateForReader(reader, certificate, host, port);
+  }
+
   @override
   HttpClient createHttpClient(SecurityContext? context) {
     final client = super.createHttpClient(context);

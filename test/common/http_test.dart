@@ -161,4 +161,30 @@ void main() {
       isTrue,
     );
   });
+
+  test('a client without an attached provider reader rejects certificates', () {
+    expect(
+      FlClashHttpOverrides.allowBadCertificateForOptionalReader(
+        null,
+        _FakeCertificate(),
+        'example.com',
+        443,
+      ),
+      isFalse,
+    );
+  });
+
+  test('an attached client uses the same certificate policy', () {
+    final container = buildContainer(checkCertificate: false);
+
+    expect(
+      FlClashHttpOverrides.allowBadCertificateForOptionalReader(
+        container.read,
+        _FakeCertificate(),
+        'example.com',
+        443,
+      ),
+      isTrue,
+    );
+  });
 }

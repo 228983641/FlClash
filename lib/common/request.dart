@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/http.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
@@ -35,6 +36,13 @@ class Request {
           }
           return FlClashHttpOverrides.findProxyForReader(read, uri);
         };
+        client.badCertificateCallback = (certificate, host, port) =>
+            FlClashHttpOverrides.allowBadCertificateForOptionalReader(
+              _read,
+              certificate,
+              host,
+              port,
+            );
         return client;
       },
     );
