@@ -7,9 +7,20 @@ import 'package:dio/dio.dart';
 import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/common/print.dart';
 import 'package:fl_clash/common/request.dart';
+import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/providers/app.dart';
+import 'package:fl_clash/providers/config.dart';
+import 'package:fl_clash/state.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:riverpod/riverpod.dart';
 
 class _StalledHttpClient extends Fake implements HttpClient {
+  final routes = <String>[];
+
+  @override
+  String? userAgent;
+
   @override
   Duration? connectionTimeout;
 
@@ -21,8 +32,10 @@ class _StalledHttpClient extends Fake implements HttpClient {
   badCertificateCallback;
 
   @override
-  Future<HttpClientRequest> openUrl(String method, Uri url) =>
-      Completer<HttpClientRequest>().future;
+  Future<HttpClientRequest> openUrl(String method, Uri url) {
+    routes.add(findProxy?.call(url) ?? 'DIRECT');
+    return Completer<HttpClientRequest>().future;
+  }
 }
 
 class _HostAdapter implements HttpClientAdapter {
@@ -45,6 +58,48 @@ class _HostAdapter implements HttpClientAdapter {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final running in [true, false]) {
+    testWidgets('subscription uses configured route, running=$running', (
+      tester,
+    ) async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      container.listen(patchClashConfigProvider, (_, _) {});
+      container.listen(runTimeProvider, (_, _) {});
+      container.read(runTimeProvider.notifier).value = running ? 1 : null;
+      container.read(patchClashConfigProvider.notifier).value =
+          const PatchClashConfig(mixedPort: 7891);
+      globalState.container = container;
+      globalState.packageInfo = PackageInfo(
+        appName: 'FlClash',
+        packageName: 'com.follow.clash.test',
+        version: '0.9.3',
+        buildNumber: '1',
+      );
+      final clients = <_StalledHttpClient>[];
+      late Future<Response<String>> pending;
+      HttpOverrides.runZoned(
+        () {
+          pending = (Request()..attach(container.read)).getTextResponseForUrl(
+            'https://subscription.example/config',
+          );
+        },
+        createHttpClient: (_) {
+          final client = _StalledHttpClient();
+          clients.add(client);
+          return client;
+        },
+      );
+      final outcome = expectLater(pending, throwsA(isA<DioException>()));
+      await tester.pump(downloadTimeoutDuration);
+      await outcome;
+      expect(clients.expand((client) => client.routes), [
+        running ? 'PROXY localhost:7891' : 'DIRECT',
+      ]);
+      expect(clients, hasLength(1));
+    });
+  }
 
   test('compact Dio errors include cause type without request details', () {
     final error = DioException(
