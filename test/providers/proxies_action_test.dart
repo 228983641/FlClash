@@ -43,9 +43,10 @@ class _EnabledSmartAnchor extends SmartAnchor {
 }
 
 class _FailoverSmartAnchor extends SmartAnchor {
-  _FailoverSmartAnchor({required this.borrowed});
+  _FailoverSmartAnchor({required this.borrowed, this.extraNodes = const []});
 
   final bool borrowed;
+  final List<String> extraNodes;
 
   @override
   SmartAnchorInput build() {
@@ -68,7 +69,11 @@ class _FailoverSmartAnchor extends SmartAnchor {
 
     return SmartAnchorInput(
       services: [defaultServiceToggles.first],
-      metadataByProxy: {'US-1': node('US-1'), 'US-2': node('US-2')},
+      metadataByProxy: {
+        'US-1': node('US-1'),
+        'US-2': node('US-2'),
+        for (final name in extraNodes) name: node(name),
+      },
       accessByService: {
         'claude': {
           'US-1': ServiceAccessResult(
@@ -1774,6 +1779,78 @@ void main() {
     });
 
     tearDown(() => testDatabase.close());
+
+    test(
+      'failed standby heads do not starve a working later candidate',
+      () async {
+        const groupName = '🎯 Smart-Claude';
+        const profile = Profile(
+          id: 7,
+          autoUpdateDuration: Duration.zero,
+          selectedMap: {groupName: 'US-1'},
+        );
+        final container = buildContainer(
+          profile: profile,
+          smartAnchor: () => _FailoverSmartAnchor(
+            borrowed: false,
+            extraNodes: ['US-3', 'US-4'],
+          ),
+        );
+        container.read(initProvider.notifier).value = true;
+        container.read(runTimeProvider.notifier).value = 1;
+        container.read(groupsProvider.notifier).value = const [
+          Group(
+            type: GroupType.Selector,
+            name: groupName,
+            now: 'US-1',
+            all: [
+              Proxy(name: 'US-1', type: 'ss'),
+              Proxy(name: 'US-2', type: 'ss'),
+              Proxy(name: 'US-3', type: 'ss'),
+              Proxy(name: 'US-4', type: 'ss'),
+            ],
+          ),
+        ];
+        final discovery = Completer<OutboundIpResult?>();
+        when(() => core.outboundIp(any())).thenAnswer((_) => discovery.future);
+        final checked = <String>[];
+        when(() => core.serviceCheck(any())).thenAnswer((invocation) async {
+          final params =
+              invocation.positionalArguments.single as ServiceCheckParams;
+          checked.add(params.proxyName);
+          await Future<void>.delayed(const Duration(milliseconds: 2));
+          return [
+            ServiceCheckItem(
+              name: 'claude',
+              status: params.proxyName == 'US-4' ? 'available' : 'failed',
+              failureKind: params.proxyName == 'US-4' ? '' : 'network',
+              checkedAt: DateTime.now().millisecondsSinceEpoch,
+            ),
+          ];
+        });
+        when(
+          () => core.changeProxy(any()),
+        ).thenAnswer((_) async => const ChangeProxyResult(changed: true));
+        when(core.closeConnections).thenAnswer((_) async => true);
+        final action = actionOf(container);
+        try {
+          await action.smartAnchorMonitorTick();
+          expect(checked, containsAll(['US-1', 'US-2', 'US-3']));
+          expect(checked, isNot(contains('US-4')));
+          checked.clear();
+          await action.smartAnchorMonitorTick();
+          expect(checked, contains('US-4'));
+          expect(
+            container.read(currentProfileProvider)!.selectedMap[groupName],
+            'US-4',
+          );
+          await applySmartSwitch();
+        } finally {
+          discovery.complete(null);
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        }
+      },
+    );
 
     test('two health ticks switch with discovery still blocked', () async {
       const groupName = '🎯 Smart-Claude';

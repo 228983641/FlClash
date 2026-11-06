@@ -1,6 +1,43 @@
 import '../models/switch_event.dart';
 import 'service_access.dart';
 
+List<String> selectHealthStandbys({
+  required Iterable<String> ranked,
+  required String? currentName,
+  required String serviceId,
+  required Map<String, ServiceAccessResult> accessByProxy,
+  required int nowMs,
+  int limit = 2,
+}) {
+  if (limit <= 0) return const [];
+  final ready = <String>[];
+  final deferred = <String>[];
+  for (final name in ranked) {
+    if (name == currentName ||
+        name == 'DIRECT' ||
+        name == 'REJECT' ||
+        name == 'REJECT-DROP') {
+      continue;
+    }
+    final access = accessByProxy[name];
+    if (access != null &&
+        access.serviceId == serviceId &&
+        access.borrowedFrom == null &&
+        access.reason == ServiceAccessReason.networkFailed &&
+        nowMs - access.checkedAt < const Duration(minutes: 2).inMilliseconds) {
+      deferred.add(name);
+    } else {
+      ready.add(name);
+      if (ready.length >= limit) return ready;
+    }
+  }
+  deferred.sort(
+    (a, b) =>
+        accessByProxy[a]!.checkedAt.compareTo(accessByProxy[b]!.checkedAt),
+  );
+  return [...ready, ...deferred.take(limit - ready.length)];
+}
+
 class FailoverTarget {
   const FailoverTarget(this.name, {required this.isFallback});
 

@@ -923,7 +923,13 @@ class ProxiesAction extends _$ProxiesAction {
         if (current != null) {
           (currentServices[current] ??= []).add(service.serviceId);
         }
-        for (final name in ranked.where((name) => name != current).take(2)) {
+        for (final name in selectHealthStandbys(
+          ranked: ranked,
+          currentName: current,
+          serviceId: service.serviceId,
+          accessByProxy: smart.accessByService[service.serviceId] ?? const {},
+          nowMs: DateTime.now().millisecondsSinceEpoch,
+        )) {
           (standbyServices[name] ??= []).add(service.serviceId);
         }
       }

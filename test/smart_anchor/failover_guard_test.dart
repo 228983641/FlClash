@@ -36,6 +36,66 @@ FailoverTarget? note(
 }
 
 void main() {
+  group('health standby scheduling', () {
+    const now = 1000000;
+    ServiceAccessResult access(
+      String name,
+      int checkedAt, {
+      ServiceAccessReason reason = ServiceAccessReason.networkFailed,
+      String? borrowedFrom,
+    }) => ServiceAccessResult(
+      serviceId: 'youtube',
+      proxyName: name,
+      egressIp: '1.2.3.4',
+      reason: reason,
+      checkedAt: checkedAt,
+      borrowedFrom: borrowedFrom,
+    );
+
+    List<String> select(Map<String, ServiceAccessResult> results) =>
+        selectHealthStandbys(
+          ranked: ['current', 'DIRECT', 'A', 'B', 'C', 'REJECT'],
+          currentName: 'current',
+          serviceId: 'youtube',
+          accessByProxy: results,
+          nowMs: now,
+        );
+
+    test('recent failures yield to later candidates', () {
+      expect(select({'A': access('A', now - 10)}), ['B', 'C']);
+    });
+
+    test('exhausted candidates are retried oldest first', () {
+      expect(
+        select({
+          'A': access('A', now - 10),
+          'B': access('B', now - 30),
+          'C': access('C', now - 20),
+        }),
+        ['B', 'C'],
+      );
+    });
+
+    test('old failures and borrowed failures keep route priority', () {
+      expect(
+        select({
+          'A': access('A', now - 120000),
+          'B': access('B', now - 10, borrowedFrom: 'claude'),
+        }),
+        ['A', 'B'],
+      );
+    });
+
+    test('a recovered candidate regains its route priority', () {
+      expect(
+        select({
+          'A': access('A', now - 10, reason: ServiceAccessReason.accessible),
+        }),
+        ['A', 'B'],
+      );
+    });
+  });
+
   SwitchEvent switched(
     int time, {
     String service = 'youtube',
