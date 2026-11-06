@@ -99,6 +99,14 @@ class FlClashHttpOverrides extends HttpOverrides {
     return allowBadCertificateForReader(reader, certificate, host, port);
   }
 
+  static void configureBadCertificateCallback(
+    HttpClient client,
+    ProviderReader? Function() read,
+  ) {
+    client.badCertificateCallback = (certificate, host, port) =>
+        allowBadCertificateForOptionalReader(read(), certificate, host, port);
+  }
+
   @override
   HttpClient createHttpClient(SecurityContext? context) {
     final client = super.createHttpClient(context);

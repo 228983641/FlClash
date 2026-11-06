@@ -32,6 +32,17 @@ class _FakeCertificate implements X509Certificate {
   Uint8List get sha1 => Uint8List(0);
 }
 
+class _CallbackHttpClient extends Fake implements HttpClient {
+  bool Function(X509Certificate certificate, String host, int port)? callback;
+
+  @override
+  set badCertificateCallback(
+    bool Function(X509Certificate certificate, String host, int port)? value,
+  ) {
+    callback = value;
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -162,29 +173,24 @@ void main() {
     );
   });
 
-  test('a client without an attached provider reader rejects certificates', () {
-    expect(
-      FlClashHttpOverrides.allowBadCertificateForOptionalReader(
-        null,
-        _FakeCertificate(),
-        'example.com',
-        443,
-      ),
-      isFalse,
-    );
-  });
+  test(
+    'configured clients reject certificates before a reader is attached',
+    () {
+      final client = _CallbackHttpClient();
+      FlClashHttpOverrides.configureBadCertificateCallback(client, () => null);
 
-  test('an attached client uses the same certificate policy', () {
+      expect(client.callback!(_FakeCertificate(), 'example.com', 443), isFalse);
+    },
+  );
+
+  test('configured clients use the attached certificate policy', () {
     final container = buildContainer(checkCertificate: false);
-
-    expect(
-      FlClashHttpOverrides.allowBadCertificateForOptionalReader(
-        container.read,
-        _FakeCertificate(),
-        'example.com',
-        443,
-      ),
-      isTrue,
+    final client = _CallbackHttpClient();
+    FlClashHttpOverrides.configureBadCertificateCallback(
+      client,
+      () => container.read,
     );
+
+    expect(client.callback!(_FakeCertificate(), 'example.com', 443), isTrue);
   });
 }

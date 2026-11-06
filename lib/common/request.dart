@@ -35,13 +35,10 @@ class Request {
           }
           return FlClashHttpOverrides.findProxyForReader(read, uri);
         };
-        client.badCertificateCallback = (certificate, host, port) =>
-            FlClashHttpOverrides.allowBadCertificateForOptionalReader(
-              _read,
-              certificate,
-              host,
-              port,
-            );
+        FlClashHttpOverrides.configureBadCertificateCallback(
+          client,
+          () => _read,
+        );
         return client;
       },
     );
