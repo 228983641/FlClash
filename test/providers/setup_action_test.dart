@@ -1766,9 +1766,8 @@ void main() {
       },
     );
 
-    test(
-      'a sanitized smart selection is pushed even when the yaml is unchanged',
-      () async {
+    for (final outcome in ['success', 'rejected', 'newer-selection']) {
+      test('sanitized selection persistence: $outcome', () async {
         const profile = Profile(
           id: 4242,
           label: 'p',
@@ -1792,11 +1791,21 @@ void main() {
           },
         );
         final pushed = <SetupParams>[];
+        late ProviderContainer scoped;
         when(() => core.setupConfig(any())).thenAnswer((invocation) async {
           pushed.add(invocation.positionalArguments.single as SetupParams);
-          return '';
+          if (outcome == 'newer-selection') {
+            scoped
+                .read(profilesProvider.notifier)
+                .put(
+                  profile.copyWith(
+                    selectedMap: {'🎯 Smart-Claude': 'US-2', 'Proxy': 'US-2'},
+                  ),
+                );
+          }
+          return outcome == 'rejected' ? 'configuration rejected' : '';
         });
-        final scoped = ProviderContainer(
+        scoped = ProviderContainer(
           overrides: [
             profilesProvider.overrideWith(() => TestProfiles([profile])),
             currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
@@ -1818,12 +1827,27 @@ void main() {
         expect(pushed.single.selectedMap['Proxy'], 'TW-1');
         expect(pushed.single.toJson()['guarded-groups'], ['🎯 Smart-Claude']);
         expect(profile.selectedMap['🎯 Smart-Claude'], 'TW-1');
+        if (outcome != 'success') {
+          final saved = scoped.read(currentProfileProvider)!.selectedMap;
+          expect(
+            saved['🎯 Smart-Claude'],
+            outcome == 'rejected' ? 'TW-1' : 'US-2',
+          );
+          expect(saved['Proxy'], outcome == 'rejected' ? 'TW-1' : 'US-2');
+          return;
+        }
+        expect(
+          scoped.read(currentProfileProvider)!.selectedMap['🎯 Smart-Claude'],
+          'US-1',
+        );
 
         await setupAction.applyProfile();
+        expect(pushed, hasLength(1));
+        await setupAction.applyProfile(force: true);
         expect(pushed, hasLength(2));
         expect(pushed.last.selectedMap['🎯 Smart-Claude'], 'US-1');
-      },
-    );
+      });
+    }
 
     test('a custom profile declares only the proxies and providers it names, '
         'without a profile file', () async {

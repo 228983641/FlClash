@@ -913,6 +913,20 @@ class SetupAction extends _$SetupAction {
         globalState.lastConfigCounts =
             realProfile?.counts ?? configCountsOf(const {});
         _appliedInputs = inputs;
+        if (!profileFailed && selectionDiffers && profile != null) {
+          ref.read(profilesProvider.notifier).updateProfile(profile.id, (
+            latest,
+          ) {
+            final selections = Map<String, String>.of(latest.selectedMap);
+            for (final entry in sanitizedSelectedMap.entries) {
+              if (entry.value != rawSelectedMap[entry.key] &&
+                  selections[entry.key] == rawSelectedMap[entry.key]) {
+                selections[entry.key] = entry.value;
+              }
+            }
+            return latest.copyWith(selectedMap: selections);
+          });
+        }
         if (system.isAndroid) {
           await preferences.saveAppliedConfigMd5(yamlMd5);
         }
