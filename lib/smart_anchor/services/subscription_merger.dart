@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 enum AggregationGroupMode { primaryOnly, mergeAll }
 
 class SubscriptionSourceResult {
@@ -72,7 +74,13 @@ class SubscriptionMerger {
     for (final source in sources) {
       for (final proxy in source.proxies) {
         final originalName = proxy['name']?.toString() ?? 'proxy';
-        final key = _dedupKey(proxy);
+        final key = jsonEncode([
+          proxy.containsKey('dialer-proxy') ? source.sourceId : null,
+          _canonicalConnection({
+            for (final entry in proxy.entries)
+              if (entry.key != 'name') entry.key: entry.value,
+          }),
+        ]);
         final existing = proxyNameByDedup[key];
         if (existing != null) {
           proxyNameByKey['${source.sourceId}\x00$originalName'] = existing;
@@ -356,28 +364,14 @@ class SubscriptionMerger {
     );
   }
 
-  static String _dedupKey(Map<String, dynamic> proxy) {
-    final parts = <String>[];
-    for (final field in const [
-      'type',
-      'server',
-      'port',
-      'uuid',
-      'password',
-      'username',
-      'alterId',
-      'cipher',
-      'network',
-      'tls',
-    ]) {
-      final value = proxy[field];
-      if (value != null) {
-        parts.add('$field=$value');
-      }
+  static dynamic _canonicalConnection(dynamic value) {
+    if (value is Map) {
+      final keys = value.keys.cast<String>().toList()..sort();
+      return {for (final key in keys) key: _canonicalConnection(value[key])};
     }
-    if (parts.isEmpty) {
-      parts.add('name=${proxy['name']}');
+    if (value is List) {
+      return value.map(_canonicalConnection).toList();
     }
-    return parts.join('|');
+    return value;
   }
 }

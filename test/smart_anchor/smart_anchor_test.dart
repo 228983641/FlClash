@@ -176,6 +176,173 @@ void main() {
   });
 
   group('SubscriptionMerger', () {
+    test(
+      'connection differences keep distinct routes and group references',
+      () {
+        final base = <String, dynamic>{
+          'type': 'vless',
+          'server': 'entry.example',
+          'port': 443,
+          'uuid': 'test-user',
+          'tls': true,
+          'network': 'ws',
+        };
+        final variants = <Map<String, dynamic>>[
+          {'servername': 'first.example'},
+          {'servername': 'second.example'},
+          {
+            'ws-opts': {'path': '/first'},
+          },
+          {
+            'ws-opts': {'path': '/second'},
+          },
+          {
+            'ws-opts': {
+              'headers': {'Host': 'first.example'},
+            },
+          },
+          {
+            'ws-opts': {
+              'headers': {'Host': 'second.example'},
+            },
+          },
+          {
+            'reality-opts': {'public-key': 'first'},
+          },
+          {
+            'reality-opts': {'public-key': 'second'},
+          },
+          {
+            'alpn': ['h2', 'http/1.1'],
+          },
+          {
+            'alpn': ['http/1.1', 'h2'],
+          },
+          {
+            'future-transport': {'enabled': true},
+          },
+          {
+            'future-transport': {'enabled': 'true'},
+          },
+        ];
+        final names = [for (var i = 0; i < variants.length; i++) 'route-$i'];
+        final merged = SubscriptionMerger.merge([
+          SubscriptionSourceResult(
+            sourceId: 'primary',
+            sourceLabel: 'Primary',
+            ok: true,
+            proxies: [
+              for (var i = 0; i < variants.length; i++)
+                {...base, ...variants[i], 'name': names[i]},
+            ],
+            proxyGroups: [
+              {'name': 'Routes', 'type': 'select', 'proxies': names},
+            ],
+          ),
+        ]);
+        final expected = [for (final name in names) '[Primary] $name'];
+        expect(merged.proxies.map((proxy) => proxy['name']), expected);
+        expect(merged.proxyGroups.first['proxies'], expected);
+        expect(merged.proxyGroups.last['proxies'], expected);
+      },
+    );
+
+    test('dedup ignores names and recursively ignores map insertion order', () {
+      final merged = SubscriptionMerger.merge([
+        const SubscriptionSourceResult(
+          sourceId: 'a',
+          sourceLabel: 'A',
+          ok: true,
+          proxies: [
+            {
+              'name': 'first',
+              'type': 'vmess',
+              'server': 'entry.example',
+              'ws-opts': {
+                'path': '/ws',
+                'headers': {'Host': 'ws.example', 'X': '1'},
+              },
+            },
+          ],
+        ),
+        const SubscriptionSourceResult(
+          sourceId: 'b',
+          sourceLabel: 'B',
+          ok: true,
+          proxies: [
+            {
+              'ws-opts': {
+                'headers': {'X': '1', 'Host': 'ws.example'},
+                'path': '/ws',
+              },
+              'server': 'entry.example',
+              'type': 'vmess',
+              'name': 'second',
+            },
+          ],
+          proxyGroups: [
+            {
+              'name': 'Routes',
+              'type': 'select',
+              'proxies': ['second'],
+            },
+          ],
+        ),
+      ], mode: AggregationGroupMode.mergeAll);
+      expect(merged.proxies, hasLength(1));
+      expect(merged.proxyGroups.last['proxies'], ['[A] first']);
+    });
+
+    test('same dialer name in different subscriptions keeps each chain', () {
+      final merged = SubscriptionMerger.merge([
+        for (final label in ['A', 'B'])
+          SubscriptionSourceResult(
+            sourceId: label,
+            sourceLabel: label,
+            ok: true,
+            proxies: [
+              {
+                'name': 'Exit',
+                'type': 'socks5',
+                'server': 'exit.example',
+                'port': 443,
+                'dialer-proxy': 'Entry',
+              },
+              {
+                'name': 'Entry',
+                'type': 'socks5',
+                'server': '$label.example',
+                'port': 443,
+              },
+            ],
+          ),
+      ]);
+      expect(merged.proxies, hasLength(4));
+      for (final label in ['A', 'B']) {
+        expect(
+          merged.proxies.firstWhere(
+            (p) => p['name'] == '[$label] Exit',
+          )['dialer-proxy'],
+          '[$label] Entry',
+        );
+      }
+    });
+
+    test('credentials containing old key delimiters stay distinct', () {
+      final merged = SubscriptionMerger.merge([
+        const SubscriptionSourceResult(
+          sourceId: 'a',
+          sourceLabel: 'A',
+          ok: true,
+          proxies: [
+            {'name': 'one', 'type': 'socks5', 'password': 'x|username=y'},
+            {'name': 'two', 'type': 'socks5', 'password': 'x', 'username': 'y'},
+          ],
+        ),
+      ]);
+      expect(merged.proxies, hasLength(2));
+    });
+
     SubscriptionSourceResult sourceA() {
       return const SubscriptionSourceResult(
         sourceId: 'a',
