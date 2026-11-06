@@ -17,6 +17,10 @@ class _StalledHttpClient extends Fake implements HttpClient {
   String Function(Uri url)? findProxy;
 
   @override
+  bool Function(X509Certificate certificate, String host, int port)?
+  badCertificateCallback;
+
+  @override
   Future<HttpClientRequest> openUrl(String method, Uri url) =>
       Completer<HttpClientRequest>().future;
 }
