@@ -40,6 +40,16 @@ func handleGetIsInit() bool {
 	return isInit.Load()
 }
 
+func ensureListenerBindings() {
+	if !isRunning.Load() {
+		handleStartListener()
+		return
+	}
+	configMu.Lock()
+	defer configMu.Unlock()
+	updateListeners(currentConfig)
+}
+
 func handleStartListener() bool {
 	configMu.Lock()
 	defer configMu.Unlock()

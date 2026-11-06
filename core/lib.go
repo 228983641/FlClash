@@ -363,9 +363,7 @@ func StopTun() {
 
 func StartListener() {
 	defer recoverExport("startListener")
-	if !isRunning.Load() {
-		handleStartListener()
-	}
+	ensureListenerBindings()
 }
 
 func StopListener() {
