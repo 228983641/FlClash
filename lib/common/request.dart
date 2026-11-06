@@ -13,6 +13,7 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 class Request {
   late final Dio dio;
   late final Dio _clashDio;
+  late final Dio _directDio;
   String? userAgent;
 
   ProviderReader? _read;
@@ -23,46 +24,71 @@ class Request {
 
   Request() {
     dio = Dio(BaseOptions(headers: {'User-Agent': browserUa}));
-    _clashDio = Dio();
-    _clashDio.httpClientAdapter = IOHttpClientAdapter(
+    _clashDio = _createDownloadClient(useLocalProxy: true);
+    _directDio = _createDownloadClient(useLocalProxy: false);
+  }
+
+  Dio _createDownloadClient({required bool useLocalProxy}) {
+    final client = Dio();
+    client.httpClientAdapter = IOHttpClientAdapter(
       createHttpClient: () {
-        final client = HttpClient();
-        client.findProxy = (Uri uri) {
-          client.userAgent = globalState.ua;
+        final httpClient = HttpClient();
+        httpClient.findProxy = (Uri uri) {
+          if (!useLocalProxy) return 'DIRECT';
           final read = _read;
-          if (read == null) {
-            return 'DIRECT';
-          }
+          if (read == null) return 'DIRECT';
+          httpClient.userAgent = globalState.ua;
           return FlClashHttpOverrides.findProxyForReader(read, uri);
         };
         FlClashHttpOverrides.configureBadCertificateCallback(
-          client,
+          httpClient,
           () => _read,
         );
-        return client;
+        return httpClient;
       },
     );
+    return client;
   }
 
   Future<Response<T>> _download<T>(String url, ResponseType responseType) {
     final target = downloadTarget(url);
     final cancelToken = CancelToken();
-    return _clashDio
-        .getUri<T>(
-          target.uri,
-          options: Options(responseType: responseType, headers: target.headers),
-          cancelToken: cancelToken,
-        )
-        .timeout(
-          downloadTimeoutDuration,
-          onTimeout: () {
-            cancelToken.cancel();
-            throw DioException.receiveTimeout(
-              timeout: downloadTimeoutDuration,
-              requestOptions: RequestOptions(path: url),
-            );
-          },
+    final options = Options(
+      responseType: responseType,
+      headers: target.headers,
+    );
+
+    Future<Response<T>> get(Dio client) {
+      return client
+          .getUri<T>(target.uri, options: options, cancelToken: cancelToken)
+          .timeout(
+            downloadTimeoutDuration,
+            onTimeout: () {
+              cancelToken.cancel();
+              throw DioException.receiveTimeout(
+                timeout: downloadTimeoutDuration,
+                requestOptions: RequestOptions(path: url),
+              );
+            },
+          );
+    }
+
+    // Subscription servers must not depend on the proxy group they update.
+    // The direct client still follows the Android VPN/TUN route, but avoids
+    // re-entering the local mixed-port proxy. Keep the proxy path as a
+    // transport fallback for networks where direct TUN access is unavailable.
+    return get(_directDio).catchError((error) {
+      if (error is DioException &&
+          error.type == DioExceptionType.unknown &&
+          !cancelToken.isCancelled) {
+        commonPrint.log(
+          'direct download failed for ${target.uri.host}; retrying via proxy',
+          logLevel: LogLevel.warning,
         );
+        return get(_clashDio);
+      }
+      throw error;
+    });
   }
 
   Future<Response<Uint8List>> getFileResponseForUrl(String url) async {
