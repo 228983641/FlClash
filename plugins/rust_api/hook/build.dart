@@ -32,7 +32,7 @@ Map<String, String> _bindgenEnvironment(BuildInput input) {
   if (configured != null && configured.isNotEmpty) {
     final directory = Directory(configured);
     if (directory.existsSync() && directory.listSync().any(_isLibclang)) {
-      return {'LIBCLANG_PATH': directory.path};
+      return _androidBindgenEnvironment(directory.path, input);
     }
   }
 
@@ -42,13 +42,60 @@ Map<String, String> _bindgenEnvironment(BuildInput input) {
       '${llvmRoot.path}${Platform.pathSeparator}$name',
     );
     if (directory.existsSync() && directory.listSync().any(_isLibclang)) {
-      return {'LIBCLANG_PATH': directory.path};
+      return _androidBindgenEnvironment(directory.path, input);
     }
   }
   throw StateError(
     'No libclang under ${llvmRoot.path} (lib or lib64); the NDK Flutter '
     'passed cannot run bindgen for rquickjs',
   );
+}
+
+Map<String, String> _androidBindgenEnvironment(
+  String libclangPath,
+  BuildInput input,
+) {
+  if (!Platform.isWindows) {
+    return {'LIBCLANG_PATH': libclangPath};
+  }
+  final llvmRoot = File.fromUri(
+    input.config.code.cCompiler!.compiler,
+  ).parent.parent;
+  final clangResources = Directory.fromUri(llvmRoot.uri.resolve('lib/clang/'));
+  if (!clangResources.existsSync()) {
+    return {'LIBCLANG_PATH': libclangPath};
+  }
+  final resources = clangResources
+      .listSync()
+      .whereType<Directory>()
+      .where(
+        (directory) => File.fromUri(
+          directory.uri.resolve('include/stdbool.h'),
+        ).existsSync(),
+      )
+      .toList();
+  final targetTriple = switch (input.config.code.targetArchitecture) {
+    Architecture.arm64 => 'aarch64-linux-android',
+    Architecture.arm => 'armv7-linux-androideabi',
+    Architecture.x64 => 'x86_64-linux-android',
+    Architecture.ia32 => 'i686-linux-android',
+    _ => null,
+  };
+  if (targetTriple == null || resources.length != 1) {
+    return {'LIBCLANG_PATH': libclangPath};
+  }
+  final sysroot = Directory.fromUri(
+    llvmRoot.uri.resolve('sysroot/'),
+  ).path.replaceAll(r'\', '/');
+  final includeTriple = targetTriple == 'armv7-linux-androideabi'
+      ? 'arm-linux-androideabi'
+      : targetTriple;
+  final resourcePath = resources.single.path.replaceAll(r'\', '/');
+  return {
+    'BINDGEN_EXTRA_CLANG_ARGS_${targetTriple.replaceAll('-', '_')}':
+        '--sysroot="$sysroot" -I"$sysroot/usr/include/$includeTriple" -resource-dir="$resourcePath"',
+    'LIBCLANG_PATH': libclangPath,
+  };
 }
 
 bool _isLibclang(FileSystemEntity entity) {
